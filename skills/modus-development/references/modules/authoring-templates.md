@@ -15,6 +15,8 @@
 | `skills/modus-sync-knowledge/SKILL.md` | 当前代码任务确有长期影响后的静默最小修订 |
 | `using-modus/references/authoring/evidence/` | machine-packet、scope-modeling、scenario-closure、语言证据适配 |
 | `.../authoring/framework/` | 布局、运行形态、自然语言、图文、各 deliverable 的读者任务 |
+| `.../authoring/framework/editorial.md`、`examples.md` | 稳定的阅读排版合同与随包成对片段；按问题加载，不复制教学业务事实 |
+| `.../authoring/execution-strategy.md` | 可替换的上下文、成文和读者测试组织方式，不降低质量合同、不新增状态 |
 | `.../authoring/publication.md` | 回读、核验、读时哈希、发布与执行卡清理 |
 | `.../authoring/parallel-domain-authoring.md`、domain-worker-prompt | 用户明确授权时完整 Domain 委派，根作者拥有执行卡与共享产物 |
 | `modus-init/references/constraint-*`、constraint-profiles | 从实际项目提炼 Team Standard；不是语言常识复制 |
@@ -29,6 +31,8 @@ K1：调查能力/公开入口族，决定领域与模块，保持稳定身份�
 正式知识的 API/Object/Rule/State/Collaboration/Infrastructure 有唯一专题主定义，模块拥有完整场景并链接它们。不为每个类/DTO/endpoint 创建竞争目录，也不复制同一事实到每个模块。
 
 生成知识的源码坐标进入少量 frontmatter `anchors.locations`，正文仍须独立可读；复杂异步/状态/决策/对象/资源机制用对应图表或表格，不用导航图替代机制图。
+
+编辑安排和实际回读/预览缺口复用唯一执行卡的现有正文。域作者逐篇回读全部目标专题、分片、Module 与路由，根作者抽样只作二次校准；未实际预览不能宣称布局已通过。维护者完整教学样稿位于 `tests/fixtures/authoring/`，不进入用户技能；只运行样稿自验不代表真实项目生成质量已验证。
 
 ## 不同工作流的关键差异
 

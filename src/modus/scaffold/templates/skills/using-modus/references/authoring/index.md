@@ -22,6 +22,7 @@
 - [证据消费与事实闭合](evidence/index.md)回答“凭什么这样写”，不规定正文目录。
 - [知识生成框架](framework/index.md)回答“写到哪里、为谁回答什么”，不复制机器取证流程。
 - [验证与发布](publication.md)区分 Agent 的语义回读、确定性机械检查与安全写入。
+- [执行策略](execution-strategy.md)组织写前安排、逐篇编辑、样稿使用与可用时的独立读者测试；它是可调整的做法，不是第四套事实或质量规范。
 - init/reinit 的每个 Domain 生成或恢复前，按[逐域加载与恢复](evidence/scope-modeling.md#逐域加载与恢复)依次读取本域执行卡、对应证据、相关已有正文和写作规范；上下文压缩后使用同一顺序。
 - 用户显式授权且宿主支持时，[按 Domain 并行撰写](parallel-domain-authoring.md)约束 worker 的独占路径、handoff 与根作者验收；串行流程不必加载。
 

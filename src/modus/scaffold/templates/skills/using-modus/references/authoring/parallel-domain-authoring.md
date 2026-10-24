@@ -27,7 +27,7 @@
 - 每个 Module 的 candidate/capability/source path/symbol 精确 selector 映射；
 - 固定的 `bundleDigest`、`baselineDigest`、Surface、构建单元与语言；
 - 必读的 Evidence、Framework、deliverable、图文和发布合同；
-- 当前 visual 候选、读时哈希、保护路径、三类读者问题和允许写入的精确路径。
+- 当前 visual 候选、用户明确的交付要求、已有编辑安排、读时哈希、保护路径、三类读者问题和允许写入的精确路径。
 - 相关已有正文、跨域主定义、人工材料与约束路径，以及待核对的交接状态。
 
 worker 每次开始或恢复本域都按[逐域加载与恢复](evidence/scope-modeling.md#逐域加载与恢复)先只读执行卡，再依次加载对应证据、相关已有正文和写作规范；上下文压缩后也从第一步恢复。输入包和 handoff 只用于定位，不能代替实际读取；卡片与实际文件的差异交由根作者核对。
@@ -38,9 +38,13 @@ worker 不重跑 build 或 Scope，不新增、合并、移动或改名 Domain/M
 
 worker 先按场景形成可复用事实，再共同投影到六专题和 Module，避免为不同文件重复扫描同一链路。每个非平凡场景使用真实任务标题展开触发、判定、权威写入、完成、失败恢复与验证，不以 frontmatter、文件清单或导航表代替正文。源码路径和行号只进入各目标文件 frontmatter 的 `anchors.locations`；正文不得出现 `path#L`、完整源码路径或证据清单。
 
-证据闭合后重新评估 visual 候选。发现异步交接、持久状态、多条件决策、对象映射或资源生命周期时，新增或修订相应决定，并记录读者问题、复杂度触发、表达类型、唯一目标和支撑边；一个 Domain 总览图不能自动豁免 Module 或专题里的独立复杂机制。
+写前按[编辑规则](framework/editorial.md)安排目标页面的读者问题、事实主落点、叙述顺序、图文分工与案例，按需选择[对照样稿](framework/examples.md)；证据闭合后调整已有安排，通过 handoff 交给根作者保存到同一执行卡正文，不新建卡片或 receipt。[执行策略](execution-strategy.md)只能组织上述动作，不降低共享合同，也不授权 worker 继续委派本域。
+
+证据闭合后重新评估 visual 候选。发现异步交接、持久状态、多条件决策、对象映射或资源生命周期时，新增或修订相应决定，并记录读者问题、复杂度触发、表达类型、唯一目标和支撑边；一个 Domain 总览图不能自动豁免 Module 或专题里的独立复杂机制，`waived` 也不能自动豁免用户明确的最低配图要求。
 
 域级 `coverage-audit` 必须复用当前 Domain 的 candidate/capability/source path/symbol selector。`modus/knowledge/**` 是生成结果，不能充当源码 coverage selector；no-match、空结果或 partial 只能触发补证或明确缺口，不能宣称 Domain 已 `reviewed`。
+
+worker 按[发布合同](publication.md)逐篇完整回读本轮六专题及其分片、全部目标 Module 和 Domain 路由，先核对事实与覆盖，再检查行文、图文和案例。使用可用的目标阅读器查看实际预览，修订后重看受影响页面；不可用时记录具体页面、未验证项与影响。独立读者仅是授权和隔离上下文可用时的增强，由根作者按现有委派规则组织；未执行时不能把 worker 自查描述为独立验收。
 
 ## 交接与主作者验收
 
@@ -51,9 +55,9 @@ worker 通过任务消息返回 handoff，不新建 receipt，也不直接修改
 - 每个 Module 的触发、判定、权威写入、完成、失败恢复证据及缺口；
 - 六专题事实覆盖和 visual 决定；
 - `coverage-audit` 的精确源码范围与结果、域级 verify 结果；
-- 三类读者回读，以及跨域调用、事实所有者、术语和完成信号声明。
+- 已逐篇回读的目标范围、编辑与实际预览结果、具体未验证项；区分三类读者自查与实际独立读者反馈，并说明跨域调用、事实所有者、术语和完成信号。
 
-根作者读取实际文件和 handoff 后，串行更新唯一执行卡中的 Module evidence/status、Domain coverage、visual 和 outcome。worker 完成或 `verify --domain` 为 clean 都不等于 `reviewed`：根作者至少回读 Domain、六专题与简单/普通/最复杂的代表性 Module，核对正文无源码路径、场景叙事、结构化锚点、解释型图表、失败恢复和验证入口，并处理跨域方向与术语差异。通过后才把本域标为 `reviewed`；质量偏薄则定向退回原 worker 或由根作者补查。
+根作者读取实际文件和 handoff 后，串行更新唯一执行卡中的 Module evidence/status、Domain coverage、visual 和 outcome。worker 完成或 `verify --domain` 为 clean 都不等于 `reviewed`：根作者至少回读 Domain、六专题与简单/普通/最复杂的代表性 Module，核对正文无源码路径、场景叙事、结构化锚点、解释型图表、行文排版、失败恢复和验证入口，并处理跨域方向与术语差异。该抽查是对 worker 全量逐篇回读的二次校准，不能替代前者；同时核对实际预览范围与未验证项，不把未运行检查记为通过。通过后才把本域标为 `reviewed`；质量偏薄则定向退回原 worker 或由根作者补查。
 
 ## 恢复与冲突
 

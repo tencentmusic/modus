@@ -1,0 +1,188 @@
+{
+  "checked_on": "2026-10-24",
+  "timezone": "Asia/Shanghai",
+  "python": "3.14.2",
+  "source_sha256": "7476b25377b0482b843a93d90c68dbd55ecd65ec2d894c836fcb6e79641517a8",
+  "core_demo": {
+    "accepted": {
+      "job_id": "import-1",
+      "status": "queued",
+      "total": 3,
+      "processed": 0,
+      "written": 0,
+      "rejected": 0,
+      "attempts": 0,
+      "retryable": false,
+      "error": null,
+      "results": []
+    },
+    "partial": {
+      "job_id": "import-1",
+      "status": "partial",
+      "total": 3,
+      "processed": 3,
+      "written": 2,
+      "rejected": 1,
+      "attempts": 1,
+      "retryable": false,
+      "error": null,
+      "results": [
+        {
+          "row_index": 0,
+          "email": "lin@example.test",
+          "outcome": "created",
+          "reason": null
+        },
+        {
+          "row_index": 1,
+          "email": "bad-address",
+          "outcome": "rejected",
+          "reason": "invalid_email"
+        },
+        {
+          "row_index": 2,
+          "email": "lin@example.test",
+          "outcome": "updated",
+          "reason": null
+        }
+      ]
+    },
+    "business_errors": [
+      "IdempotencyConflict",
+      "InvalidRequest",
+      "JobNotFound",
+      "RetryNotAllowed"
+    ],
+    "failed_before_recovery": {
+      "job_id": "import-2",
+      "status": "failed",
+      "total": 2,
+      "processed": 1,
+      "written": 1,
+      "rejected": 0,
+      "attempts": 1,
+      "retryable": true,
+      "error": "storage_unavailable",
+      "results": [
+        {
+          "row_index": 0,
+          "email": "chen@example.test",
+          "outcome": "created",
+          "reason": null
+        }
+      ]
+    },
+    "recovered": {
+      "job_id": "import-2",
+      "status": "succeeded",
+      "total": 2,
+      "processed": 2,
+      "written": 2,
+      "rejected": 0,
+      "attempts": 2,
+      "retryable": false,
+      "error": null,
+      "results": [
+        {
+          "row_index": 0,
+          "email": "chen@example.test",
+          "outcome": "created",
+          "reason": null
+        },
+        {
+          "row_index": 1,
+          "email": "xu@example.test",
+          "outcome": "created",
+          "reason": null
+        }
+      ]
+    },
+    "retry_exhausted": {
+      "job_id": "import-3",
+      "status": "failed",
+      "total": 2,
+      "processed": 0,
+      "written": 0,
+      "rejected": 0,
+      "attempts": 2,
+      "retryable": false,
+      "error": "storage_unavailable",
+      "results": []
+    },
+    "all_rows_rejected": {
+      "job_id": "import-4",
+      "status": "failed",
+      "total": 1,
+      "processed": 1,
+      "written": 0,
+      "rejected": 1,
+      "attempts": 1,
+      "retryable": false,
+      "error": "all_rows_rejected",
+      "results": [
+        {
+          "row_index": 0,
+          "email": "x",
+          "outcome": "rejected",
+          "reason": "empty_name"
+        }
+      ]
+    }
+  },
+  "additional_checks": [
+    {
+      "check": "整体结构拒绝、无任务副作用及100行上限",
+      "passed": true
+    },
+    {
+      "check": "键顺序无关、原始邮箱大小写有关、租户分区独立",
+      "passed": true
+    },
+    {
+      "check": "输入和输出深拷贝、查询不推进执行",
+      "passed": true
+    },
+    {
+      "check": "恢复保留先前拒绝结果、重排不计次、重复重排拒绝",
+      "passed": true
+    },
+    {
+      "check": "第二次存储故障和全行拒绝均不允许恢复",
+      "passed": true
+    },
+    {
+      "check": "故障参数检查不出队、越界不注入及FIFO顺序",
+      "passed": true
+    }
+  ],
+  "visual_review": "not_run_by_fixture_author",
+  "document_integrity": {
+    "markdown_files": 12,
+    "valid_local_links": 62,
+    "valid_source_anchors": 52,
+    "mermaid_blocks": 5,
+    "code_fences_balanced": true,
+    "mermaid_rendered": false
+  },
+  "existing_domain_verifier": {
+    "function": "run_verify_knowledge",
+    "domain": "contact-import",
+    "publication": false,
+    "result": {
+      "schemaVersion": 1,
+      "status": "clean",
+      "scope": {
+        "domain": "contact-import"
+      },
+      "counts": {},
+      "findings": [],
+      "checkedDocuments": 9
+    }
+  },
+  "type_check": {
+    "tool": "mypy",
+    "target": "import_source.py",
+    "status": "passed",
+    "files_checked": 1
+  }
+}
