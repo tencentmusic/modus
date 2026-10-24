@@ -90,7 +90,7 @@ modus:
 
 每个 Module 使用 `pending → evidence-ready → authored → reviewed`；Domain 完成时记录 `changed` 或 `unchanged`。无法继续时记录带原因的 `blocked`，但它不是完成态。只有该 Module 的精确 `module-authoring.requestedScope` 已核对并直接回读当前方法体、配置、SQL、测试或资源，且 `evidence.status` 已原位更新为 `ready`，才能标记 `evidence-ready`；一个覆盖多个独立 Module 的整域宽请求不能推进状态。正文写入后先逐 Module 回读，再进入 `authored`；只有三类读者回读和使用源码 selector 的域级 coverage audit 完成并记录为 `coverage.status: audited` 后，才能标记 `reviewed`。不得在批量写完文件后一次性把所有 Module 从 `pending` 改成 `reviewed`。状态是可恢复的编排事实，不是正文质量评分。
 
-每次阶段转换都原位更新这张卡。生成了文件不等于阶段完成；恢复任务时先读卡片和正式正文，再从最早未完成状态继续。并行时只有根作者串行更新执行卡，Domain worker 通过 handoff 提议事实和状态，不并发写卡。预计剩余范围无法保持当前深度时，应在 Domain 边界保存并恢复，不得压缩后续正文赶进度。所有已确认目标都达到 `reviewed` 且有 `changed / unchanged` Domain 终态后，发布阶段才删除卡片；存在 `blocked` 时保留。执行卡丢失或被提前删除时，不得根据生成文件反向拼装一张更小的“全部 reviewed”卡；能从权威来源完整恢复原状态才继续，否则保留阻塞并如实报告。
+每次阶段转换都原位更新这张卡。生成了文件不等于阶段完成；每个 Domain 开始或恢复前都执行下述[逐域加载与恢复](#逐域加载与恢复)，再从最早未完成状态继续。并行时只有根作者串行更新执行卡，Domain worker 通过 handoff 提议事实和状态，不并发写卡。预计剩余范围无法保持当前深度时，应在 Domain 边界保存并恢复，不得压缩后续正文赶进度。所有已确认目标都达到 `reviewed` 且有 `changed / unchanged` Domain 终态后，发布阶段才删除卡片；存在 `blocked` 时保留。执行卡丢失或被提前删除时，不得根据生成文件反向拼装一张更小的“全部 reviewed”卡；能从权威来源完整恢复原状态才继续，否则保留阻塞并如实报告。
 
 卡片正文用三个小账本即可，字段可以按正文语言本地化，但语义不得丢失；发布状态以 frontmatter 为准，正文表不得形成第二套冲突状态：
 
@@ -98,7 +98,7 @@ modus:
 | --- | --- |
 | bundle / baseline | 双摘要，或不可用原因 |
 | 正文语言 | 用户要求或判定依据 |
-| 当前阶段 | K1～K6 与最近一次完成动作 |
+| 当前阶段 | 当前 Domain/Module、K1～K6、最近一次完成动作与下一动作；状态以 frontmatter 为准 |
 
 | 入口族 | 处置 | Domain/Module 或共享落点 | 证据/缺口 |
 | --- | --- | --- | --- |
@@ -107,3 +107,16 @@ modus:
 | Domain / Module | Surface | 构建单元与语言 | selectors | 主定义/图形计划 | 状态 | 结果或缺口 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 稳定 ID | 可多选 | 可多项 | candidate/capability/path/symbol | 专题、Module 与唯一主图 | 四阶段之一 | changed/unchanged，或非完成态 blocked 与具体原因 |
+
+## 逐域加载与恢复
+
+init/reinit 在首次进入、切换或返回任一 Domain，以及上下文压缩、会话恢复或作者交接后，必须在生成或续写本域正文前按以下顺序重新加载。串行作者与 Domain worker 使用同一流程；会话摘要、任务消息和“之前读过”只能帮助定位，不能替代实际读取。
+
+1. **先读执行卡。** 从本轮唯一 `modus/.cache/knowledge-authoring/scope-confirmation.md` 读取证据会话和当前 Domain 的完整条目及相关正文表，核对已确认范围、排除项、Module 归属、逐 Module 精确 selector 与 `requestedScope`、Domain/Module status、evidence、coverage、outcome、未闭合缺口、主定义/visual 决定和读时哈希。先确定本域最早未完成动作，再取证；不能根据目录名、已有文件或压缩摘要猜测归属和进度。工作区成员使用合并执行卡中的对应成员与 Domain 条目，不另建卡；worker 只读根作者指定的同一张卡。
+2. **再加载对应证据。** 按卡中双摘要或不可用原因、逐 Module selector，遵守[机器证据合同](machine-packet.md)加载本域待续作或复核范围的 `module-authoring` context，并按[场景闭合](scenario-closure.md)回读对应的当前方法体、装配、配置、SQL、测试和明确材料；按实际构建单元读取相关[语言适配器](language-adapters/index.md)。核对摘要和请求范围，不能把 `evidence.status: ready`、旧结论或文件首行锚点当成已经读到证据。上下文中已丢失的证据按原精确范围重新请求或定向回读；失败、空结果、partial 或源码漂移时回到当前源码补证并保留原因，不重建 bundle、不扩大为整域宽请求。已验收且与当前续作无关的 Module 不因恢复而重新调查。
+3. **然后回读相关已有正文。** 读取本域已有 Domain 路由、将写入或引用的六专题主定义与 Module 场景，以及相关跨域主定义、人工业务材料和约束，核对事实所有者、已写内容、链接与执行卡进度。首次创建时确认对应正文确实不存在；不能根据“文件已存在”推断已经完成。保留原读时哈希；发现实际文件与卡片不一致或 CAS 冲突时先核对原因，不刷新哈希后直接覆盖，也不自动推进状态。
+4. **最后加载写作规范。** 完整读取[生成框架](../framework/index.md)，联读[布局](../framework/layout.md)、实际 [Surface](../framework/surface-profiles.md)、[自然语言](../framework/localization.md)，以及本域将编写的 [Domain](../framework/deliverables/domain.md)、[Module](../framework/deliverables/module.md)、[六专题总则](../framework/deliverables/topics.md)及其对应详细合同；复杂关系同时读取[图文表达](../framework/visual-expression.md)。仅阅读索引、上一个 Domain 的规范摘要或通用写作模板不算完成加载。
+
+上述读取完成且范围、证据、正文与规范一致后，才从本域最早未完成状态继续取证、撰写或回读。证据缺口先补查，仍不可得则记录具体缺口；执行卡缺失、归属/selector 不明或必需规范不可读时，不凭记忆续写。恢复本身不触发重新确认 Scope、重跑 build、重置已完成状态或重写已验收正文，也不新增“已加载”字段、平行 receipt 或质量评分。同一 Domain 在未发生上下文丢失且证据仍可用时复用调查，不为不同专题重复扫描。
+
+计划暂停或交接前，由根作者将实际进度、未闭合问题和下一动作原位保存到执行卡；worker 通过 handoff 提供这些事实。发生压缩或意外中断后，即使停在某个 Module 中间，也从本节第 1 步恢复，不能直接沿压缩摘要续写剩余正文。

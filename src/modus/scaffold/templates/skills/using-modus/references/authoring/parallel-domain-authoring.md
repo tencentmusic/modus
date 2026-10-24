@@ -2,7 +2,7 @@
 并行改变调度方式，不改变领域所有权与验收语义。
 一个领域同时只有一个正文作者，公共产物由根作者汇总。
 固定摘要用于让各领域共享同一证据会话。
-恢复任务先检查已写文件与交接状态，再决定继续范围。
+恢复任务先读唯一执行卡，再加载证据、正文与规范，并核对交接状态。
 -->
 
 # 按 Domain 并行撰写
@@ -23,10 +23,14 @@
 每个 Domain 的分配包至少包含：
 
 - Domain/Module 稳定 ID、确认后的边界和 canonical 目标目录；
+- 唯一执行卡的实际路径、本域条目、Domain/Module 进度、缺口和下一动作；工作区包含成员身份；
 - 每个 Module 的 candidate/capability/source path/symbol 精确 selector 映射；
 - 固定的 `bundleDigest`、`baselineDigest`、Surface、构建单元与语言；
 - 必读的 Evidence、Framework、deliverable、图文和发布合同；
 - 当前 visual 候选、读时哈希、保护路径、三类读者问题和允许写入的精确路径。
+- 相关已有正文、跨域主定义、人工材料与约束路径，以及待核对的交接状态。
+
+worker 每次开始或恢复本域都按[逐域加载与恢复](evidence/scope-modeling.md#逐域加载与恢复)先只读执行卡，再依次加载对应证据、相关已有正文和写作规范；上下文压缩后也从第一步恢复。输入包和 handoff 只用于定位，不能代替实际读取；卡片与实际文件的差异交由根作者核对。
 
 worker 不重跑 build 或 Scope，不新增、合并、移动或改名 Domain/Module。它逐 Module 请求并核对 `module-authoring.requestedScope`；Domain 级宽请求不能替代逐 Module context。请求失败、空结果或 partial 时回当前方法体、配置、SQL、测试和运行证据定向补查，而不是降低正文深度。
 
@@ -53,6 +57,6 @@ worker 通过任务消息返回 handoff，不新建 receipt，也不直接修改
 
 ## 恢复与冲突
 
-worker 超时或失败时，根作者先读取本域实际 diff 与 handoff，不自动派新作者覆盖。优先让原 worker 定向续写；必须更换作者时，新作者先完整回读本域现状、初始哈希和未闭合证据。CAS 冲突只暂停受影响文件或 Domain，不能刷新哈希后盲目覆盖，其他 Domain 可以继续。
+worker 超时或失败时，根作者先读取执行卡的本域状态，再核对实际 diff 与 handoff，将已核实进度、未闭合问题和下一动作原位保存，不自动派新作者覆盖。优先让原 worker 定向续写；原 worker 恢复或必须更换作者时，都从[逐域加载与恢复](evidence/scope-modeling.md#逐域加载与恢复)的执行卡读取开始，依次加载证据、实际正文与写作规范，核对初始哈希和交接。卡记 `pending` 而文件已写入时也不能直接重写，须由根作者核对再续作。CAS 冲突只暂停受影响文件或 Domain，不能刷新哈希后盲目覆盖，其他 Domain 可以继续。
 
 唯一执行卡始终由根作者单写，并保留最早未完成状态。不得因批次靠后、上下文变长或时间压力把后续 Domain 压缩为同长度短文。所有 Domain 验收完成后，根作者再串行执行跨域矩阵校准、根概览、business seed、全局语义回读与 publication，最后才删除执行卡。

@@ -25,6 +25,8 @@
 
 ## 阅读路由
 
+init/reinit 每次进入或恢复 Domain 时，先按[逐域加载与恢复](../evidence/scope-modeling.md#逐域加载与恢复)读取本域执行卡、对应证据和相关已有正文，再加载本框架及适用的详细合同；上下文压缩后不能用规范摘要替代实际读取。
+
 - 先读[稳定布局](layout.md)和[本地化](localization.md)。
 - 按运行入口组合[Surface 画像](surface-profiles.md)，不要按语言选择正文模板。
 - 按产物读取[根概览](deliverables/root.md)、[Domain](deliverables/domain.md)、[六专题](deliverables/topics.md)、[Module](deliverables/module.md)及特殊人工产物合同。

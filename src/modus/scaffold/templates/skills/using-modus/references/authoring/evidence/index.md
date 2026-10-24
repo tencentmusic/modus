@@ -6,6 +6,8 @@
 
 本目录是正文作者唯一的共享取证指南。先判断要回答的问题，再加载最小必要参考：
 
+init/reinit 的 Domain 生成及其 worker 先执行[逐域加载与恢复](scope-modeling.md#逐域加载与恢复)，从本域执行卡确定范围、Module 归属、selector 和进度，再进入下列取证路由；上下文压缩后的恢复也不跳过这一步。
+
 1. 读取[机器证据包](machine-packet.md)，理解 proposal、witness、coverage、ambiguity、omitted count 和展开句柄的边界。
 2. 建立或复核 Domain/Module 时读取[Scope 建模](scope-modeling.md)。
 3. 为契约、对象和场景形成可发布事实时读取[场景闭合](scenario-closure.md)。

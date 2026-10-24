@@ -16,10 +16,12 @@
 
 - Domain 稳定 ID、业务边界、目标自然语言、Surface、构建单元与实现语言；
 - canonical 写入根 `modus/knowledge/domain/<slug>/`，以及完整 Module 稳定 ID/中文任务名；
+- 唯一执行卡的实际路径、本域条目定位和当前 Domain/Module 进度、缺口与下一动作；工作区同时标明成员身份；
 - 每个 Module 独立的 candidate/capability/path/symbol selector 与预期 `requestedScope`；
 - 固定 `bundleDigest`、`baselineDigest`，或机器层不可用的明确原因；
 - 读时哈希、受保护的 `references/business/**`、共享文件和禁止写入路径；
 - 当前 visual 决定、读者问题、机制触发、目标文件和未闭合证据；
+- 本域相关已有正文、跨域主定义、人工材料与约束路径，以及待根作者核对的实际文件/交接状态；
 - 必读的证据、框架、产物、图文、发布合同及本委托合同路径。
 
 ## 委托模板
@@ -35,6 +37,9 @@
 - 唯一允许写入：[domain-root]/SKILL.md 与 [domain-root]/references/** 中的生成正文
 - 禁止写入：references/business/**、其他 Domain、scope-confirmation.md、根概览、Team Standard、源码、Git
 - 读时哈希与保护路径：[hashes-and-protected-paths]
+- 唯一执行卡（只读）与本域条目：[execution-card-path-and-domain-entry]
+- 当前进度、缺口与下一动作：[domain-module-progress-and-gaps]
+- 相关已有正文与交接：[existing-content-and-handoff-paths-or-absence]
 
 固定证据会话
 - bundleDigest：[bundle-digest-or-unavailable-reason]
@@ -42,8 +47,8 @@
 - Module 与 selector：[complete-module-selector-map]
 
 必须执行
-1. 完整读取：[required-contract-paths]。
-2. 按 Module 逐个请求 module-authoring context，并核对 requestedScope 必须等于 `module:[domain-id]/[module-id]`。独立 Module 不得使用整域宽请求替代；失败、空结果或 partial 时回当前源码、配置、SQL、迁移、测试和运行证据定向补查，并在 handoff 说明 fallback。
+1. 每次开始或恢复本域，包括上下文压缩后，执行 scope-modeling.md 的“逐域加载与恢复”：先实际读取指定的唯一执行卡，核对本域范围、Module 归属、selector 和进度；再按第 2 步加载对应证据，然后回读相关已有正文与交接，最后完整读取适用写作规范：[required-contract-paths]。完成这套顺序后才从最早未完成动作续作；不得只凭本任务消息或压缩摘要写作。卡片与实际文件不一致时将差异交给根作者核对，不自行改卡或覆盖正文。
+2. 取证时按 Module 逐个请求 module-authoring context，并核对 requestedScope 必须等于 `module:[domain-id]/[module-id]`。独立 Module 不得使用整域宽请求替代；失败、空结果或 partial 时回当前源码、配置、SQL、迁移、测试和运行证据定向补查，并在 handoff 说明 fallback。压缩导致证据丢失时按原 selector 定向重新加载，不重跑 build；卡中 ready 不能代替证据读取。
 3. 先按真实任务闭合触发、输入、判定、权威写入、返回/异步交接、完成、失败残留、恢复和验证，再把同一事实投影到六专题与 Module；不要为不同文件重复扫描同一链路。
 4. 正文写成可独立阅读的工程手册，不是证据目录。仓库源码路径和行号只写入目标文件 frontmatter 的少量 `anchors.locations`；正文不得出现 `path#L`、完整源码路径或“证据”清单。移除 frontmatter 后，正文仍须让新人复述任务、贡献者安全修改、维护者定位失败与恢复。
 5. 每个非平凡 Module 使用真实场景 H3，解释独有字段、分支、受理/完成、失败残留、恢复和修改验证。六专题逐项定义契约、对象、规则、状态、协作和资源，不得只列接口、类、枚举、表或中间件。
@@ -53,6 +58,7 @@
 
 handoff 必须返回
 - 实际写入、未写、冲突与保护文件；
+- 本域当前进度、未闭合问题、下一动作及执行卡与实际文件的差异，供根作者保存后恢复；
 - 每个 Module 的 requestedScope、selector、证据模式、触发/判定/权威写入/完成/失败恢复/验证摘要及缺口；
 - 六专题覆盖与每项 visual 决定；
 - coverage-audit 的源码范围、结果和本域 verify 结果；
