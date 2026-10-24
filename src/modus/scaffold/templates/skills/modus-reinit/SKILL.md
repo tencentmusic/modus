@@ -7,13 +7,15 @@ description: 全面评审并重建知识快照，保留稳定业务身份及人�
 
 全量复核已有正文时使用。共享[证据指南](../using-modus/references/authoring/evidence/index.md)、[生成框架](../using-modus/references/authoring/framework/index.md)与[发布合同](../using-modus/references/authoring/publication.md)；本文件只描述 reinit 差异。
 
-每个 Domain 生成或续写前都按[逐域加载与恢复](../using-modus/references/authoring/evidence/scope-modeling.md#逐域加载与恢复)先读执行卡中的本域范围、Module 归属、selector 和进度，再加载对应证据、相关已有正文和写作规范。上下文压缩后使用同一流程；全局盘点或之前读过规范不能替代本次加载。
+每个 Domain 生成或续写前都按[逐域加载与恢复](../using-modus/references/authoring/evidence/scope-modeling.md#逐域加载与恢复)先读执行卡中的本域范围、Module 归属、selector 和进度，再加载对应证据、相关已有正文和写作规范。压缩恢复后的第一项本域工作就是读卡，不能先查源码、读成稿或修改文件；全局盘点或之前读过规范不能替代本次加载。
 
 ## 先盘点，再证明变化
 
 完整读取现有正文与哈希，将目标归为 `unchanged`、`anchor-only`、`implementation-change`、`scope-change`、`content-repair`、疑似退役或人工正文。稳定身份和主定义默认复用；源码路径/符号移动只修锚点，正文布局变化不是 Scope 变化。
 
 `content-repair` 包括：通用模板段落替代真实场景、代表锚点替代事实、跨 Module 复制、完成/失败语义不清、复杂关系缺少能显著帮助理解的图表，以及实际影响理解的段落、表格或图文布局缺陷。真正满足读者任务且事实未变的正文保持 `unchanged` 并跳写，不因新版样稿或编辑偏好重排全库。
+
+在本轮范围内同样执行[接口逐项对账](../using-modus/references/authoring/framework/deliverables/api.md#逐接口展开与对账)、[字段闭合](../using-modus/references/authoring/framework/deliverables/object.md#字段闭合)和[逐篇验收](../using-modus/references/authoring/publication.md#逐篇验收与事实对账)。已有族级汇总、漏字段、跨页条件写反或复杂模块仅有导航表，都不能以“文件存在”认定 `unchanged`；按事实缺口定向修复并保存具体页、条目与下一动作。
 
 ## 执行
 
