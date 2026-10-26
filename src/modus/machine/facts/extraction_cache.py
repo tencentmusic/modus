@@ -139,6 +139,7 @@ def _implementation_digest() -> hashlib._Hash:
     from modus.machine.facts import (
         language_capabilities as _language_capabilities,
     )
+    from modus.machine.facts import native_cpp, native_kotlin, native_objc, native_swift
     from modus.machine.facts import (
         native_parser as _native_parser,
     )
@@ -158,6 +159,15 @@ def _implementation_digest() -> hashlib._Hash:
         Path(_native_parser.__file__),
         Path(_native_syntax.__file__),
         Path(_native_visitor.__file__),
+        *(
+            Path(cast(str, module.__file__))
+            for module in (
+                native_objc,
+                native_swift,
+                native_cpp,
+                native_kotlin,
+            )
+        ),
         Path(__file__),
     ):
         code.update(path.read_bytes())
@@ -172,6 +182,8 @@ def _implementation_digest() -> hashlib._Hash:
         "tree-sitter-cpp",
         "tree-sitter-c-sharp",
         "tree-sitter-kotlin",
+        "tree-sitter-objc",
+        "tree-sitter-swift",
         "tree-sitter-php",
         "tree-sitter-rust",
     ):

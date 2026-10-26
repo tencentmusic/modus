@@ -72,6 +72,9 @@ _GRAMMARS = {
     "cpp": ("cpp", "language"),
     "csharp": ("c_sharp", "language"),
     "kotlin": ("kotlin", "language"),
+    "objective-c": ("objc", "language"),
+    "objective-cpp": ("objc", "language"),
+    "swift": ("swift", "language"),
     "php": ("php", "language_php"),
     "rust": ("rust", "language"),
 }

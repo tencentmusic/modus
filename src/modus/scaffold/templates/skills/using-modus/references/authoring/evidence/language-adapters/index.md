@@ -15,7 +15,7 @@ Language Adapter 只决定如何取得和核验事实，不改变正文目录、
 - [Python](python.md)
 - [Go](go.md)
 - [Rust](rust.md)
-- [C / C++](native.md)
+- [C / C++ / Objective-C / Objective-C++ / Swift 与跨端契约](native.md)
 - [.NET](dotnet.md)
 - [PHP](php.md)
 - [IaC 与声明式配置](iac.md)

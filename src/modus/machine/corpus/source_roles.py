@@ -19,12 +19,33 @@ _CONFIG_NAMES = frozenset(
         "pom.xml",
         "build.gradle",
         "build.gradle.kts",
+        "settings.gradle",
+        "settings.gradle.kts",
+        "podfile",
+        "podfile.lock",
+        "package.swift",
+        "package.resolved",
         "go.mod",
         "cargo.toml",
     }
 )
 _CONFIG_SUFFIXES = frozenset(
-    {".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf", ".properties", ".json"}
+    {
+        ".yaml",
+        ".yml",
+        ".toml",
+        ".ini",
+        ".cfg",
+        ".conf",
+        ".properties",
+        ".json",
+        ".pbxproj",
+        ".xcconfig",
+        ".xcscheme",
+        ".xcworkspacedata",
+        ".podspec",
+        ".modulemap",
+    }
 )
 _GENERATED_PARTS = frozenset(
     {"dist", "build", "target", "generated", "gen", "vendor", "node_modules"}
@@ -32,7 +53,25 @@ _GENERATED_PARTS = frozenset(
 _FIXTURE_PARTS = frozenset(
     {"fixture", "fixtures", "sample", "samples", "example", "examples", "testdata"}
 )
-_TEST_PARTS = frozenset({"test", "tests", "__tests__", "spec", "specs"})
+_TEST_PARTS = frozenset(
+    {
+        "test",
+        "tests",
+        "__tests__",
+        "spec",
+        "specs",
+        "commontest",
+        "androidtest",
+        "androidunittest",
+        "androidinstrumentedtest",
+        "iostest",
+        "iosarm64test",
+        "iossimulatorarm64test",
+        "iosx64test",
+        "jvmtest",
+        "desktoptest",
+    }
+)
 
 
 # 分类顺序有意固定：文档、生成文件、夹具、测试先于普通运行源码。

@@ -232,7 +232,7 @@
     ".h": {
       "language": "c",
       "role": "source",
-      "extractor": "extract_c"
+      "extractor": "extract_header"
     },
     ".hcl": {
       "language": "terraform",
@@ -322,7 +322,7 @@
     ".m": {
       "language": "objective-c",
       "role": "source",
-      "extractor": "extract_generic_text"
+      "extractor": "extract_objc"
     },
     ".md": {
       "language": "markdown",
@@ -340,9 +340,9 @@
       "extractor": "extract_js"
     },
     ".mm": {
-      "language": "objective-c",
+      "language": "objective-cpp",
       "role": "source",
-      "extractor": "extract_generic_text"
+      "extractor": "extract_objcpp"
     },
     ".mts": {
       "language": "typescript",
@@ -462,7 +462,7 @@
     ".swift": {
       "language": "swift",
       "role": "source",
-      "extractor": "extract_generic_text"
+      "extractor": "extract_swift"
     },
     ".tf": {
       "language": "terraform",

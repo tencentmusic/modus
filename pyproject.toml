@@ -51,6 +51,8 @@ dependencies = [
     "tree-sitter-cpp>=0.23,<0.25",
     "tree-sitter-c-sharp>=0.23,<0.25",
     "tree-sitter-kotlin>=1.0,<2.0",
+    "tree-sitter-objc>=3.0.2,<4.0",
+    "tree-sitter-swift>=0.7.3,<0.8",
     "tree-sitter-php>=0.23,<0.25",
 ]
 
@@ -226,6 +228,10 @@ module = [
     "modus.machine.facts.native_binding",
     "modus.machine.facts.native_parser",
     "modus.machine.facts.native_visitor",
+    "modus.machine.facts.native_objc",
+    "modus.machine.facts.native_swift",
+    "modus.machine.facts.native_cpp",
+    "modus.machine.facts.native_kotlin",
 ]
 disallow_any_generics = false
 disallow_untyped_calls = false

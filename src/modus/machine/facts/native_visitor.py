@@ -208,15 +208,23 @@ class _FileParser:
     # 声明所属作用域和函数体作用域分开保存，支持遮蔽与参数解析。
     # 显式 export 的别名单独记录，默认导出名不能覆盖局部声明名。
     def declare(
-        self, node, scope, owners: tuple[str, ...], *, expression=None
+        self,
+        node,
+        scope,
+        owners: tuple[str, ...],
+        *,
+        expression=None,
+        name: str | None = None,
+        kind: str | None = None,
+        metadata: dict | None = None,
     ) -> tuple[dict, tuple[str, ...]]:
         name_node = self.name_node(node)
-        name = self.text(name_node).lstrip("$")
+        name = self.text(name_node).lstrip("$") if name is None else name
         if not name:
             name = (
                 "lambda_" + str(node.start_point.row + 1) + "_" + str(node.start_point.column + 1)
             )
-        kind = (
+        kind = kind or (
             "type"
             if node.type in _TYPE_NODES
             else "method"
@@ -249,6 +257,7 @@ class _FileParser:
             "exported": bool(node.parent and node.parent.type == "export_statement"),
             "line": anchor["line"],
             "column": anchor["column"],
+            **(metadata or {}),
         }
         self.declarations.append(record)
         self.bind(scope, name, "declaration", target=identity)
@@ -489,26 +498,37 @@ class _FileParser:
     # 统一成员分隔符仅用于名称匹配，不修改原始源码见证。
     # 复杂表达式标为 dynamic，不能从残余字符串推断一个精确目标。
     # Rust 泛型保留原表达式与类型实参，便于解释解析降级。
-    def reference(self, node, scope, *, context="call", name_node=None) -> None:
+    def reference(
+        self,
+        node,
+        scope,
+        *,
+        context="call",
+        name_node=None,
+        name: str | None = None,
+        metadata: dict | None = None,
+    ) -> None:
+        explicit_name = name is not None
         expression = (
             name_node or node.child_by_field_name("function") or node.child_by_field_name("name")
         )
         if expression is None:
-            expression = next(iter(node.named_children), None)
+            expression = next(iter(node.named_children), node if explicit_name else None)
         if expression is None:
             return
         original_expression = self.text(expression).strip()
         type_arguments: list[dict] = []
-        name = (
-            self.rust_callee(expression, type_arguments) or "<dynamic>"
-            if self.language == "rust"
-            else original_expression
-        )
+        if name is None:
+            name = (
+                self.rust_callee(expression, type_arguments) or "<dynamic>"
+                if self.language == "rust"
+                else original_expression
+            )
         receiver_node = node.child_by_field_name("object")
-        if receiver_node is not None:
+        if receiver_node is not None and not explicit_name:
             name = self.text(receiver_node) + "." + name
         name = name.replace("?.", ".").replace("->", ".").replace("::", ".").lstrip("$")
-        simple = name if self.language == "rust" else name.split("<", 1)[0]
+        simple = name if explicit_name or self.language == "rust" else name.split("<", 1)[0]
         if not simple or "(" in simple or "\n" in simple:
             simple = "<dynamic>"
         parts = simple.split(".")
@@ -537,6 +557,7 @@ class _FileParser:
                 "endLine": anchor["endLine"],
                 "endColumn": anchor["endColumn"],
                 "call_site": anchor,
+                **(metadata or {}),
                 **(
                     {
                         "sourceExpression": original_expression[:2048],

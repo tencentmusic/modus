@@ -463,6 +463,18 @@ def exercise_installed_wheel(wheel: Path) -> RuntimeVerification:
             _exercise_authoring_contract()
             project_root = workspace / "project"
             project_root.mkdir()
+            from modus.machine.corpus.source_snapshot import SourceSnapshot
+            from modus.machine.facts.structural import _get_extractor
+
+            for name, source in {
+                "View.m": "@implementation View\n- (void)run {}\n@end",
+                "View.mm": "@implementation View\n- (void)run {}\n@end",
+                "View.swift": "class View { func run() {} }",
+                "View.kt": "class View { fun run() {} }",
+            }.items():
+                path = project_root / name
+                facts = _get_extractor(path)(SourceSnapshot(path, source))
+                require(bool(facts.get("declarations")), f"安装后的语言解析不可用：{name}")
             (project_root / "main.py").write_text(SAMPLE_SOURCE, encoding="utf-8")
             project = SmokeProject(project_root, app, CliRunner())
 

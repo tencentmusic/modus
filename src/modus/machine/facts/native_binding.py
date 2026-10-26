@@ -33,7 +33,10 @@ _SOURCE_SUFFIXES = (
     ".php",
     ".h",
     ".hpp",
+    ".hh",
+    ".hxx",
 )
+_MOBILE_LANGUAGES = frozenset({"kotlin", "swift", "objective-c", "objective-cpp"})
 _BUILTINS = frozenset(
     {
         "len",
@@ -104,6 +107,8 @@ class _Project:
         self.directories: dict[str, set[str]] = defaultdict(set)
         self.package_names: dict[tuple[str, str], set[str]] = defaultdict(set)
         self.java_packages: dict[str, set[str]] = defaultdict(set)
+        self.kotlin_packages: dict[str, set[str]] = defaultdict(set)
+        self.kotlin_symbols: dict[tuple[str, str], set[str]] = defaultdict(set)
         self.named_exports: dict[tuple[str, str], list[dict]] = defaultdict(list)
         self.star_exports: dict[str, list[dict]] = defaultdict(list)
         for path, file in self.files.items():
@@ -111,6 +116,8 @@ class _Project:
             self.directories[directory].add(path)
             if file.get("language") == "java":
                 self.java_packages[file.get("package", "")].add(path)
+            elif file.get("language") == "kotlin":
+                self.kotlin_packages[file.get("package", "")].add(path)
             for exported in file.get("exports", ()):
                 if exported.get("star"):
                     self.star_exports[path].append(exported)
@@ -123,6 +130,11 @@ class _Project:
                     self.java_types[(file.get("package", "") + "." + decl["name"]).strip(".")].add(
                         path
                     )
+                elif (
+                    file.get("language") == "kotlin"
+                    and self.scopes.get(decl.get("scope_id"), {}).get("kind") == "module"
+                ):
+                    self.kotlin_symbols[(file.get("package", ""), decl["name"])].add(decl["id"])
         self.dependencies: list[dict] = []  # 失败查找也参与依赖记录，供缓存失效判断。
         self.configs: dict[str, dict] = {}  # 配置读取按项目会话复用。
         self.modules: dict[tuple[str, str], tuple[str, ...]] = {}
@@ -289,7 +301,22 @@ class _Project:
     # 缓存命中也记录模块集合依赖，复用不能丢失解释依据。
     # 本地 package.json 入口作为数据读取，不运行 JavaScript。
 
-    def resolve_module(self, file: str, specifier: str) -> tuple[str, ...]:
+    def resolve_module(
+        self, file: str, specifier: str, *, import_kind: str = ""
+    ) -> tuple[str, ...]:
+        if (
+            self.files[file].get("language") in {"objective-c", "objective-cpp"}
+            and import_kind == "module"
+        ):
+            self.dependency(
+                file,
+                "module-set",
+                specifier,
+                resolved=False,
+                targetFiles=[],
+                importKind=import_kind,
+            )
+            return ()
         cache_key = (file, specifier)
         if cache_key in self.modules:
             result = self.modules[cache_key]
@@ -317,6 +344,18 @@ class _Project:
             if specifier.endswith(".*"):
                 exact.update(self.java_packages.get(specifier[:-2], ()))
             bases.append(specifier.replace(".", "/"))
+        elif language == "kotlin":
+            if specifier.endswith(".*"):
+                exact.update(self.kotlin_packages.get(specifier[:-2], ()))
+            else:
+                package, _, name = specifier.rpartition(".")
+                exact.update(
+                    self.nodes[target]["source_file"]
+                    for target in self.kotlin_package_targets(file, package, name)
+                )
+        elif language == "swift":
+            # Swift import 指向构建模块；同名源码文件不能证明模块身份。
+            pass
         elif language == "go":
             exact.update(self._go_module_files(file, parent, specifier))
         elif specifier.startswith("."):
@@ -419,7 +458,14 @@ class _Project:
                 targets.update(alias_targets)
             elif row["kind"] == "import":
                 imported = self.files[file]["imports"][row["import_index"]]
-                modules = self.resolve_module(file, imported["specifier"])
+                modules = self.resolve_module(
+                    file, imported["specifier"], import_kind=imported["kind"]
+                )
+                if self.files[file].get("language") == "kotlin":
+                    package, _, imported_name = imported["specifier"].rpartition(".")
+                    targets.update(self.kotlin_package_targets(file, package, imported_name))
+                    proof = "kotlin-import"
+                    continue
                 for module in modules:
                     self.dependency(
                         file,
@@ -441,6 +487,40 @@ class _Project:
                 targetFile=self.nodes[target].get("source_file", ""),
             )
         return targets, proof, True
+
+    def kotlin_package_targets(self, file: str, package: str, name: str) -> set[str]:
+        """包声明只证明潜在可见性，不证明构建单元或 expect/actual 的目标选择。"""
+        targets = {
+            target
+            for target in self.kotlin_symbols.get((package, name), ())
+            if self.nodes[target].get("source_file") == file
+            or (
+                self.declarations[target].get("visibility") != "private"
+                and "private" not in self.declarations[target].get("modifiers", ())
+            )
+        }
+        self.dependency(
+            file,
+            "package-set",
+            package + "." + name,
+            resolved=bool(targets),
+            targetFiles=sorted(self.kotlin_packages.get(package, ())),
+        )
+        return targets
+
+    def kotlin_unqualified(self, file: str, name: str) -> tuple[set[str], str, bool]:
+        targets = self.kotlin_package_targets(file, self.files[file].get("package", ""), name)
+        if targets:
+            return targets, "kotlin-package", True
+        for imported in self.files[file].get("imports", ()):
+            if imported["kind"] == "star":
+                self.resolve_module(file, imported["specifier"], import_kind=imported["kind"])
+                targets.update(
+                    self.kotlin_package_targets(
+                        file, imported["specifier"].removesuffix(".*"), name
+                    )
+                )
+        return targets, "kotlin-star-import" if targets else "no-declaration", True
 
     # 重导出与星号导出递归展开，循环分支不产生猜测目标。
     # 只有最外层完整结果可缓存，避免把循环中途的部分集合当作全集。
@@ -492,6 +572,25 @@ class _Project:
             return set(), "alias-cycle", True
         if "." not in name:
             targets, reason, blocked = self.lookup(file, scope_id, name, seen)
+            if self.files[file].get("language") == "kotlin":
+                if not targets and not blocked:
+                    return self.kotlin_unqualified(file, name)
+                if (
+                    targets
+                    and reason == "scope"
+                    and all(
+                        self.scopes.get(self.declarations.get(target, {}).get("scope_id"), {}).get(
+                            "kind"
+                        )
+                        == "module"
+                        for target in targets
+                    )
+                ):
+                    package_targets = self.kotlin_package_targets(
+                        file, self.files[file].get("package", ""), name
+                    )
+                    if package_targets - targets:
+                        return targets | package_targets, "kotlin-package", True
             if not targets and not blocked and self.files[file].get("language") == "go":
                 targets = set(self.package_names.get((str(PurePosixPath(file).parent), name), ()))
                 self.dependency(file, "package-set", name, resolved=bool(targets))
@@ -526,7 +625,9 @@ class _Project:
         for binding in values:
             if binding["kind"] == "import":
                 imported = self.files[file]["imports"][binding["import_index"]]
-                modules = self.resolve_module(file, imported["specifier"])
+                modules = self.resolve_module(
+                    file, imported["specifier"], import_kind=imported["kind"]
+                )
                 if imported["kind"] in {"named", "default"}:
                     imported_targets, _, _ = self.lookup(file, scope_id, head, seen)
                     for target in imported_targets:
@@ -538,6 +639,9 @@ class _Project:
                             ).get(member, ())
                             if row["kind"] == "declaration"
                         )
+                    if self.files[file].get("language") == "kotlin":
+                        # 具名导入的成员必须属于该声明，不能取同文件任意顶层导出。
+                        continue
                     if not imported_targets and self.files[file].get("language") == "python":
                         modules = self.resolve_module(
                             file, imported["specifier"].rstrip(".") + "." + imported["imported"]
@@ -564,6 +668,61 @@ class _Project:
                 )
         return targets, "import" if targets else "member-call", True
 
+    def objc_member_targets(self, file: str, reference: dict, targets: set[str]) -> set[str]:
+        """仅在所属类或已导入头文件提供证据时补充 category/interface 方法候选。"""
+        receiver = reference.get("receiver", "")
+        if not receiver or "." in receiver or receiver == "super":
+            return targets
+        bindings, _ = self.binding(file, reference["scope_id"], receiver)
+        if any(row["kind"] in {"local", "parameter"} for row in bindings):
+            return set()
+        visible_files = {file}
+        for imported in self.files[file].get("imports", ()):
+            if imported["kind"] == "include":
+                visible_files.update(
+                    self.resolve_module(file, imported["specifier"], import_kind=imported["kind"])
+                )
+        owner_names: set[str] = set()
+        method_kind = reference.get("methodKind", "")
+        if receiver == "self":
+            current = self.scopes.get(reference["scope_id"])
+            visited: set[str] = set()
+            while current and current["kind"] != "type" and current["id"] not in visited:
+                visited.add(current["id"])
+                current = self.scopes.get(current["parent"])
+            if current and current["kind"] == "type":
+                owner = self.declarations.get(current["owner"], {})
+                owner_names.add(owner.get("objcClass") or owner.get("name", ""))
+            method_kind = method_kind or self.declarations.get(reference["caller_nid"], {}).get(
+                "methodKind", ""
+            )
+        else:
+            owner_names.add(receiver)
+            method_kind = method_kind or "class"
+        for visible_file in visible_files:
+            if self.files[visible_file].get("language") not in {"objective-c", "objective-cpp"}:
+                continue
+            for declaration in self.files[visible_file].get("declarations", ()):
+                if (
+                    declaration["kind"] != "type"
+                    or (declaration.get("objcClass") or declaration["name"]) not in owner_names
+                ):
+                    continue
+                targets.update(
+                    row["target"]
+                    for row in self.scope_bindings.get(declaration["body_scope_id"], {}).get(
+                        reference["nameTail"], ()
+                    )
+                    if row["kind"] == "declaration"
+                )
+        if method_kind in {"class", "instance"}:
+            targets = {
+                target
+                for target in targets
+                if self.declarations[target].get("methodKind", method_kind) == method_kind
+            }
+        return targets
+
     # 内建函数只有未被本地绑定遮蔽时才直接归类。
     # 全局同名回退明确标为 heuristic，不能因为只剩一个候选就升级。
     # 多目标保留候选集及未解析说明，而不是任意选择第一个。
@@ -576,9 +735,29 @@ class _Project:
         ):
             self.outcomes.append({**reference, "status": "builtin", "resolvedBy": "language"})
             return
+        language = self.files[file].get("language")
         targets, proof, blocked = self.resolve_name(file, reference["scope_id"], name)
+        if (
+            language in {"objective-c", "objective-cpp"}
+            and reference.get("member")
+            and (reference.get("objcRole") == "message" or reference.get("objcSelector"))
+        ):
+            targets = self.objc_member_targets(file, reference, targets)
+            if targets:
+                proof = "objc-member"
         if not targets and not blocked and not reference.get("member"):
-            targets = set(self.names.get(reference["nameTail"], ()))
+            targets = {
+                target
+                for target in self.names.get(reference["nameTail"], ())
+                if language not in _MOBILE_LANGUAGES
+                or self.nodes[target].get("language") == language
+                or (
+                    language == "objective-cpp"
+                    and not reference.get("objcRole")
+                    and not reference.get("objcSelector")
+                    and self.nodes[target].get("language") in {"c", "cpp"}
+                )
+            }
             self.dependency(
                 file,
                 "lookup",
@@ -588,12 +767,45 @@ class _Project:
                 ownerId=reference["caller_nid"],
             )
             proof = "heuristic"  # 同名匹配不构成精确绑定。
-        certainty = (
-            "candidate" if len(targets) > 1 else "heuristic" if proof == "heuristic" else "exact"
+        if language in _MOBILE_LANGUAGES and reference["context"] == "call":
+            callable_targets = {
+                target for target in targets if self.declarations[target].get("kind") != "property"
+            }
+            if targets and not callable_targets:
+                proof = "non-callable-binding"
+            targets = callable_targets
+        mobile_candidate = (
+            language in _MOBILE_LANGUAGES
+            and proof != "heuristic"
+            and (
+                proof.startswith("kotlin-")
+                or reference.get("member")
+                or reference.get("syntaxRecovery")
+                or reference.get("bindingConservative")
+                or any(
+                    self.declarations[target].get("kind") == "method"
+                    or self.declarations[target].get("extensionReceiver")
+                    or self.declarations[target].get("syntaxRecovery")
+                    or any(
+                        modifier in self.declarations[target].get("modifiers", ())
+                        for modifier in ("expect", "actual")
+                    )
+                    for target in targets
+                )
+            )
         )
-        if not targets or len(targets) > 1:
+        certainty = (
+            "candidate"
+            if len(targets) > 1 or mobile_candidate
+            else "heuristic"
+            if proof == "heuristic"
+            else "exact"
+        )
+        if not targets or certainty == "candidate":
             reason = (
                 "ambiguous"
+                if len(targets) > 1
+                else "insufficient-evidence"
                 if targets
                 else "member-call"
                 if reference.get("member")
@@ -656,11 +868,13 @@ class _Project:
                     "occurrenceId": reference["occurrenceId"],
                     **(
                         {
-                            "candidateSetId": candidate_set_id,
+                            **({"candidateSetId": candidate_set_id} if candidate_set_id else {}),
                             "candidateCount": len(sorted_targets),
-                            "reason_code": "machine.facts.binding-multiple-targets",
+                            "reason_code": "machine.facts.binding-multiple-targets"
+                            if len(targets) > 1
+                            else "machine.facts.binding-insufficient-evidence",
                         }
-                        if len(targets) > 1
+                        if certainty == "candidate"
                         else {}
                     ),
                 }
@@ -727,7 +941,7 @@ def _isolate_file_identities(files: list[dict]) -> list[dict]:
 # 导入解析集中在完整项目视图，单文件提取缓存不携带跨文件推断。
 def _bind_imports(project: _Project, file: str, facts: dict) -> None:
     for row in facts.get("imports", ()):
-        for target in project.resolve_module(file, row["specifier"]):
+        for target in project.resolve_module(file, row["specifier"], import_kind=row["kind"]):
             source_id = next(
                 (node["id"] for node in facts["nodes"] if node.get("kind") == "file"), ""
             )
@@ -745,10 +959,16 @@ def _bind_imports(project: _Project, file: str, facts: dict) -> None:
                         "source": source_id,
                         "target": target_id,
                         "relation": "imports",
-                        "resolution": "exact",
-                        "binding_kind": "declared-exact",
-                        "resolvedBy": "import",
-                        "confidence": "EXTRACTED",
+                        "resolution": "candidate" if facts.get("language") == "kotlin" else "exact",
+                        "binding_kind": "runtime-candidate"
+                        if facts.get("language") == "kotlin"
+                        else "declared-exact",
+                        "resolvedBy": "kotlin-import"
+                        if facts.get("language") == "kotlin"
+                        else "import",
+                        "confidence": "INFERRED"
+                        if facts.get("language") == "kotlin"
+                        else "EXTRACTED",
                         "source_file": file,
                         "source_location": f"L{row.get('line', 1)}:1",
                     }

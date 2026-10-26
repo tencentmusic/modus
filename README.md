@@ -208,6 +208,10 @@ Python、Java、Go、C/C++ 和 TypeScript 可以在结构证据之上使用本�
   <img src="https://img.shields.io/badge/Astro%20%2F%20Svelte-template-FF5D01?logo=astro&logoColor=white" alt="Astro and Svelte templates" />
 </p>
 
+Objective-C、Objective-C++ 和 Swift 提供专门结构提取：保留 OC selector/category/protocol、Swift 扩展与参数标签，并按内容区分 `.h`。Objective-C++ 分别恢复 OC 与 C++ 结构，明确标为部分覆盖；Kotlin 补充包、导入、扩展函数与 Compose 尾随闭包，C++ 补充命名空间、头文件声明与模板调用。日常检索也覆盖 `.m`、`.mm`、`.hh`、`.hxx`。
+
+这些结构证据不等于 Xcode/Swift/Kotlin 编译语义；不自动解析全部构建变体、宏展开或 IDL/JNI 跨语言桥接。原生和 Kotlin 取证适配会指导 Agent 核对生成来源、注册、Action/State 与端侧生命周期，缺失关系保留为候选或未解析。
+
 其余已登记的源码、模板、配置、数据定义和文档格式仍会进入有界通用证据流程。Modus 会如实保留覆盖缺口，而不会因为某个 Provider 缺失就断言仓库没有业务行为。
 
 ### 为什么选择 Modus

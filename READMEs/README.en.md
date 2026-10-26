@@ -208,6 +208,10 @@ Python, Java, Go, C/C++, and TypeScript can add local compiler or type-checker o
   <img src="https://img.shields.io/badge/Astro%20%2F%20Svelte-template-FF5D01?logo=astro&logoColor=white" alt="Astro and Svelte templates" />
 </p>
 
+Objective-C, Objective-C++, and Swift have dedicated structural extraction, including OC selectors/categories/protocols, Swift extensions and argument labels, and content-based `.h` dispatch. Objective-C++ combines separate OC and C++ observations with explicit partial coverage. Kotlin adds packages, imports, extension functions, and Compose trailing closures; C++ adds namespaces, header declarations, and template calls. Ordinary source retrieval also includes `.m`, `.mm`, `.hh`, and `.hxx`.
+
+These observations are not Xcode, Swift, or Kotlin compiler semantics. They do not automatically resolve every build variant, macro expansion, or IDL/JNI bridge. Native and Kotlin evidence guides direct agents to verify generated origins, registrations, Action/State flows, and client lifecycles; missing relations remain candidate or unresolved evidence.
+
 Other registered source, template, configuration, data-definition, and document formats still enter a bounded generic-evidence path. Modus preserves coverage gaps instead of interpreting a missing provider as proof that the repository has no business behavior.
 
 ### Why choose Modus

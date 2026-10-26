@@ -93,6 +93,10 @@ _STRUCTURAL_EXTRACTOR_NAMES = (
     "extract_go",
     "extract_c",
     "extract_cpp",
+    "extract_header",
+    "extract_objc",
+    "extract_objcpp",
+    "extract_swift",
     "extract_csharp",
     "extract_kotlin",
     "extract_php",
@@ -131,7 +135,7 @@ def builtin_extensions() -> ExtensionRegistry:
             *(
                 RegisteredImplementation(
                     name,
-                    "tree-sitter/1",
+                    "tree-sitter/2",
                     cast(StructuralExtractor, getattr(structural, name)),
                 )
                 for name in _STRUCTURAL_EXTRACTOR_NAMES
