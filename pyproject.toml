@@ -1,6 +1,6 @@
 [project]
 name = "openmodus"
-version = "0.0.5"
+version = "0.0.6"
 description = "为编程助手构建有证据支撑、可持续维护的项目知识。"
 readme = "README.md"
 requires-python = ">=3.11"
