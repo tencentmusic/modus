@@ -1,4 +1,4 @@
 interface:
   display_name: "Modus 开发与写作"
-  short_description: "基于 modus-open 源码理解模块边界、开发验证和文章事实依据"
+  short_description: "基于当前 Modus 源码理解模块边界、开发验证和文章事实依据"
   default_prompt: "请使用 $modus-development，先核对当前源码，再完成本次 Modus 开发或写作任务。"

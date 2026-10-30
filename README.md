@@ -27,7 +27,6 @@
 
 [![PyPI](https://img.shields.io/pypi/v/openmodus?label=PyPI&color=3775A9)](https://pypi.org/project/openmodus/)
 ![Python](https://img.shields.io/badge/Python-3.11%E2%80%933.14-3776AB?logo=python&logoColor=white)
-<!-- NOCA:AllFileLicenseCheck(项目许可声明与根目录协议及包元数据一致) -->
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [**简体中文**](README.md) · [English](READMEs/README.en.md)
@@ -117,7 +116,7 @@ cd path/to/your-project
 modus init
 ```
 
-在交互式终端中选择 Claude Code、Codex、Cursor 或 CodeBuddy。CLI 将平台中立的 Skill 与命令安装到项目，再通过对应适配器接入所选平台，并记录受管文件的所有权。脚本接入、多平台接入和安装状态检查见[安装与接入选项](#安装与接入选项)。
+在交互式终端中选择 Claude Code、Codex、Cursor、CodeBuddy 或 DeepSeek Harness（预览）。CLI 将平台中立的 Skill 与命令安装到项目，再通过对应适配器接入所选平台，并记录受管文件的所有权。脚本接入、多平台接入和安装状态检查见[安装与接入选项](#安装与接入选项)。
 
 <!--
 知识创作入口与后续维护入口分开说明，避免将重建作为日常前置。
@@ -327,7 +326,7 @@ Modus 自身也遵守它倡导的边界：入口层保持窄，应用编排与�
 | `modus.machine` | 机器层：按 N1–N6 生命周期（corpus→facts→resolution→capability→projection→packet）冻结输入、观察事实、解析关系，并为当前 init/reinit 发布不可变、有界的证据包。 |
 | `modus.orchestrator` | 组合预检、任务上下文与知识影响候选；不拥有检索算法或知识写入。 |
 | `modus.retrieval` | 在统一时间与输出预算下渐进选择正文、当前源码和约束，并显式报告部分结果。 |
-| `modus.platforms` / `modus.hooks` | 把中立 Skill 投影到四个平台，隔离宿主目录、说明文件与会话 Hook 差异。 |
+| `modus.platforms` / `modus.hooks` | 把中立 Skill 投影到五个平台，隔离宿主目录、说明文件与会话 Hook 差异。 |
 | `modus.scaffold` | 打包中立模板，执行确定性项目安装、升级协调、所有权记录与安全卸载。 |
 | `knowledge_verification` / `knowledge_write_session` | 分离机械完整性核验、人工所有权、比较并交换写入和原子发布。 |
 
@@ -344,6 +343,8 @@ Modus 自身也遵守它倡导的边界：入口层保持窄，应用编排与�
 公网 PyPI 发行包名是 `openmodus`，安装不需要私有软件源。也可以用 `pipx install openmodus`；如果本机自定义索引不代理公网 PyPI，可以运行 `uv tool install --default-index https://pypi.org/simple openmodus`。
 
 `modus init` 在交互式终端中选择平台；脚本或非交互终端中可显式指定，例如 `modus init --platform codex`，需要多个平台时重复 `--platform`，或用 `modus init --all-platforms`。未指定平台的首次非交互运行会接入全部支持的平台。同一份中立 Skill 合同会投影到所选平台。
+
+DeepSeek Harness（预览）使用 `modus init --platform dsh` 接入项目工作流；原生插件 `@modus-ai/modus` 额外提供上下文检索、知识状态、影响检查和核验工具。Python CLI 当前需从包含 DSH 集成的源码安装，原生插件可从 npm 安装；兼容 DSH `0.2.1-rc.3` / `0.2.2-alpha.2`。参见 [DSH 安装与使用](integrations/dsh/README.md)、[集成设计](integrations/dsh/architecture.md)。
 
 接入后在目标仓库运行 `modus status`：显示 `Installation: installed`（已安装）表示项目资产已就位。CLI 会在 `modus/knowledge/` 放置初始文件，仍需在 Agent 中运行 `/modus-init` 创作正文；`status` 的知识文档数也会计入初始文件，不能单独作为创作完成的依据。
 
@@ -423,5 +424,4 @@ uv run --locked --extra test mypy
 
 ### License
 
-<!-- NOCA:AllFileLicenseCheck(项目许可声明与根目录协议及包元数据一致) -->
 Modus 使用 [MIT License](LICENSE)。

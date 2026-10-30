@@ -104,6 +104,21 @@ init/reinit 终稿在删除执行卡之前运行一次 `modus knowledge verify -
 
 ## CAS 发布
 
+`modus knowledge update` 只接受项目根相对的 `modus/knowledge/` 下 Markdown 路径。`documents` 和 `deletions` 不得混入根目录 `README.md`、`evidence.md`、源码或测试；需要同步这些普通项目文件时，按任务授权使用宿主编辑工具单独修改。路径或请求形状不合法时，CLI 在任何写入前拒绝整批请求（退出码 `2`）；这与合法请求执行中的逐文件 CAS 冲突不同。
+
+通过 `modus knowledge update --input <更新请求.json>` 提交，临时 JSON 放在正式知识目录之外。输入字段如下；示例中的路径、完整正文和摘要都要替换为本轮真实值：
+
+```json
+{
+  "documents": {"modus/knowledge/domain/example/references/rule.md": "修订后的完整 Markdown"},
+  "expectedHashes": {"modus/knowledge/domain/example/references/rule.md": "读取原正文时记录的 SHA-256"},
+  "deletions": [],
+  "allowTeamStandard": false
+}
+```
+
+摘要按原正文的 UTF-8 编码计算，例如 `hashlib.sha256(before.encode("utf-8")).hexdigest()`；`before` 必须是本轮理解、修订所依据的完整读取结果。新建文件的预期摘要为 `null`，删除已有生成正文时在 `deletions` 列出路径并提供原摘要。普通同步保留 `allowTeamStandard: false`，不写人工约束或业务资料。退出码 `1` 表示存在逐文件冲突，已成功的写入不会回滚；检查报告的 `writes`、`unchanged`、`deleted` 和 `conflicts`，重读冲突正文后重新判断，不能只刷新摘要重试。
+
 1. 完整读取目标并记录哈希；内容不变就跳写。
 2. 新增先写目标并回读；更新保持原语义位置，不追加日期式 changelog。
 3. 移动先写新落点、修复全部入站链接和导航，再按原读时哈希删除旧生成文件。

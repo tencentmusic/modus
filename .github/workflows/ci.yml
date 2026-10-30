@@ -17,6 +17,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dsh-plugin:
+    name: DSH plugin / Node.js 24
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MODUS_TEST_EXECUTABLE: ${{ github.workspace }}/.venv/bin/modus
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: integrations/dsh/package-lock.json
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+          python-version: "3.14"
+          version: "0.12.13"
+      - name: Install Modus and plugin dependencies
+        run: |
+          uv sync --locked --extra test
+          npm ci --ignore-scripts --prefix integrations/dsh
+      - name: Compile and test with the real Modus CLI
+        working-directory: integrations/dsh
+        run: npm test
+      - name: Verify isolated bundle installation
+        working-directory: integrations/dsh
+        run: npm run smoke:package
+
   test:
     name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}

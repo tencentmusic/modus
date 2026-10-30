@@ -25,11 +25,12 @@ flowchart TD
 
 | 源码位置 | 责任与主要入口 |
 | --- | --- |
-| `pyproject.toml`、`uv.lock`、`src/modus/__init__.py` | `openmodus` 包、依赖锁、版本；终端入口 `modus = modus.cli:main` |
+| `pyproject.toml`、`uv.lock`、`src/modus/__init__.py` | `openmodus` 包、依赖锁、版本；终端命令 `modus` 由 `modus.cli:main` 提供 |
 | `cli.py`、`cli_commands/`、`command_reference.py`、`surface.py` | 命令树、参数/交互/退出码、帮助元数据、五个内置技能的调用类别 |
 | `commands/` | 安装、更新、卸载、个人包维护、状态与核验等应用服务；`*_report.py` 负责展示 |
 | `scaffold/`、`scaffold/templates/` | 模板目录、受管写入、中立接入资产；模板定义助手行为与知识种子 |
-| `platforms/`、`hooks/` | 四种宿主的布局投影、共享区块/钩子合并、启动事件与最小指引 |
+| `platforms/`、`hooks/` | 宿主的布局投影、共享区块/钩子合并、启动事件与最小指引 |
+| 仓库 `integrations/dsh/` | DSH 原生工具、会话执行与 CLI 协议适配；项目 Skill 投影仍由 Python 平台层管理 |
 | `machine/` | 初始化分析的 N1–N6、资源策略、不可变证据存储与有界查询 |
 | `orchestrator/`、`retrieval/` | 当前源码与知识的路由、搜索、共享预算、影响候选与上下文交付 |
 | `knowledge_update.py`、`knowledge_write_session.py` | 显式材料更新、哈希条件写入、生成文档精确退役 |
@@ -49,9 +50,9 @@ flowchart TD
 | 助手显式工作流 | `/modus-init`、`/modus-reinit`、`/modus-update-knowledge` | `surface.py` 与三个同名模板 |
 | 自动知识能力 | `using-modus`、`modus-sync-knowledge` | `surface.py`；update-knowledge 同时支持意图路由 |
 | 内部适配器 | `internal init-analysis build/select/context`、`context resolve`、`knowledge ...` | `cli_commands/analysis.py`、`context.py`、`knowledge.py` |
-| 内置宿主 | `claude`、`codebuddy`、`codex`、`cursor` | `platforms/registry.py` |
+| 内置宿主 | `claude`、`codebuddy`、`codex`、`cursor`、`dsh` | `platforms/registry.py` |
 
-内部入口可调用，但不显示为普通用户命令。不能沿用旧版 `auto/vibe/plan/spec/harness` 作为当前公开命令。斜杠别名以 `command_reference.py` 为准，主名称使用连字符。
+内部入口供工作流调用，不显示为普通用户命令。命令能力以实际注册为准；斜杠别名以 `command_reference.py` 为准，主名称使用连字符。
 
 ## 接入后项目的目录
 
@@ -77,8 +78,6 @@ flowchart TD
 ```
 
 工作区另外使用 `knowledge/handbook/SKILL.md` 与 `references/generated/` 保存外层导航。实际路径由 `ModusPaths`、`KnowledgePathIdentity` 决定。
-
-iwiki 的 `modus/artifacts/<story-id>` 是交付过程区的设计描述；当前 `ModusPaths` 不拥有这一需求交付引擎。仓库原有未跟踪 `artifacts/`、`docs/output/` 是历史材料，不能直接证明本分支功能。
 
 机器链：`corpus.freeze → facts.observe → resolution.resolve → capability.compose → projection.project → packet.package`。后段消费前段产物；`store/runtime` 是横切支撑；`pipeline.py` 只编排。
 

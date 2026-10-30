@@ -11,6 +11,7 @@ from .claude import ClaudeAdapter
 from .codebuddy import CodeBuddyAdapter
 from .codex import CodexAdapter
 from .cursor import CursorAdapter
+from .dsh import DshAdapter
 
 
 class UnknownPlatformError(ValueError):
@@ -69,6 +70,7 @@ BUILTIN_REGISTRY = PlatformRegistry(
         CodexAdapter,
         CursorAdapter,
         CodeBuddyAdapter,
+        DshAdapter,
     )
 )
 

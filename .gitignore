@@ -41,6 +41,12 @@ build/
 /.claude/
 /.cursor/
 /.codebuddy/
+/.dsh/
 /.modus/
 /.worktrees/
 /.benchmark-state/
+
+# DSH 插件的本地依赖与构建产物
+node_modules/
+integrations/dsh/lib/
+integrations/dsh/*.tgz

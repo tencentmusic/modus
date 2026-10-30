@@ -150,7 +150,7 @@ CLI_COMMANDS: Final[tuple[CliCommand, ...]] = (
         short="接入 Modus 项目",
         role="项目接入",
         purpose="安装项目资产与平台技能；通过 /modus-init 创作知识。",
-        usage=("modus init", "modus init --all-platforms"),
+        usage=("modus init", "modus init --all-platforms", "modus init --platform dsh"),
         related=("/modus-init",),
         tier="common",
     ),

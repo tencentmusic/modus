@@ -10,7 +10,7 @@ uv run --locked --extra test python -m modus --version
 uv run --locked --extra test python -m modus --help
 ```
 
-这样调用当前 checkout，不拿用户 PATH 上旧 `modus-ai` 代表本仓库。需要隔离项目环境时，可显式给 `UV_PROJECT_ENVIRONMENT` 一个任务临时目录，不替换用户 HOME/CODEX_HOME。
+这些命令使用当前 checkout，避免误用 PATH 中其他安装版本。需要隔离项目环境时，可显式给 `UV_PROJECT_ENVIRONMENT` 一个任务临时目录，不替换用户 HOME/CODEX_HOME。
 
 ## 按契约选最小测试
 
@@ -50,8 +50,10 @@ git diff --check
 
 发布前 `./scripts/wheel-smoke.sh` 在临时目录重新构建一个 wheel 和源码包，再调用 package_smoke；已有产物可用 `python scripts/package_smoke.py ARTIFACT...`。该脚本验证，不发布。
 
-`release_smoke/contracts.py` 声明架构见证、五个技能、四个平台、元数据和排除项；archive 拒绝危险成员与路径穿越；verification 执行静态策略；runtime 在脱离源码路径的独立 wheel 环境验证知识、分析、更新、卸载。源码单测通过不能替代安装产物验收。
+`release_smoke/contracts.py` 声明架构见证、工作流与平台集合、元数据和排除项；archive 拒绝危险成员与路径穿越；verification 执行静态策略；runtime 在脱离源码路径的独立 wheel 环境验证知识、分析、更新、卸载。源码单测通过不能替代安装产物验收。
 
 wheel 将 schemas 打包到 `modus/_bundled/schemas`；source 包保留源码、文档、模板、模式、测试、脚本和锁文件。`schema_resources.py` 统一读源码/安装资源；新增资源需检查两种分发形态。
 
 CI 定义 Linux 3.11–3.14，以及 macOS/Windows 最低与最高版本；Linux 3.14 执行静态/类型/分发检查。本地结果只代表实际 OS、Python、可用工具链与运行命令，不等于矩阵已通过。
+
+DSH 原生插件独立运行 Node.js 检查；源码入口、真实 CLI 测试与隔离安装要求见 [DSH 贡献与验证](../../../../integrations/dsh/architecture.md#贡献与验证)。Python 测试不能替代该插件的运行时验证。

@@ -86,12 +86,12 @@ def test_status_reports_install_state_without_writing(project: Path) -> None:
     assert _tree_snapshot(root) == before
 
 
-# 四个平台共享权威技能，但分别产出各宿主原生入口。
+# 各平台共享权威技能，但分别产出各宿主原生入口。
 # 用户自建命令不属于 Modus 清单，重复安装必须保留。
 # 比较整个树验证幂等，而非只核对受管文件数量。
 # 安装报告与清单一致，消费者无需自行重新统计。
 def test_init_projects_the_core_surface_and_is_idempotent(project: Path) -> None:
-    platforms = ["claude", "codex", "cursor", "codebuddy"]
+    platforms = ["claude", "codex", "cursor", "codebuddy", "dsh"]
     first = run_init(project, platforms)
     paths = ModusPaths.for_root(project)
     manifest = Manifest.read(paths)

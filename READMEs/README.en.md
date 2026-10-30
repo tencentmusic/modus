@@ -1,4 +1,4 @@
-<div align="center"> <!-- NOCA:LowCommentRatio(读者文档以可见正文承载说明，代码注释率不适用于 Markdown) -->
+<div align="center">
 
 # Modus
 
@@ -27,7 +27,6 @@ Already installed? Run `modus update`
 
 [![PyPI](https://img.shields.io/pypi/v/openmodus?label=PyPI&color=3775A9)](https://pypi.org/project/openmodus/)
 ![Python](https://img.shields.io/badge/Python-3.11%E2%80%933.14-3776AB?logo=python&logoColor=white)
-<!-- NOCA:AllFileLicenseCheck(项目许可声明与根目录协议及包元数据一致) -->
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
 
 [简体中文](../README.md) · [**English**](README.en.md)
@@ -117,7 +116,7 @@ cd path/to/your-project
 modus init
 ```
 
-In an interactive terminal, select Claude Code, Codex, Cursor, or CodeBuddy. The CLI installs platform-neutral Skills and commands into the project, projects them through the selected host adapter, and records ownership of managed files. See [Installation and connection options](#installation-and-connection-options) for scripted and multi-platform setup and installation checks.
+In an interactive terminal, select Claude Code, Codex, Cursor, CodeBuddy, or DeepSeek Harness (preview). The CLI installs platform-neutral Skills and commands into the project, projects them through the selected host adapter, and records ownership of managed files. See [Installation and connection options](#installation-and-connection-options) for scripted and multi-platform setup and installation checks.
 
 <!--
 Document initialization and ongoing maintenance as separate entry points.
@@ -327,7 +326,7 @@ Modus follows the boundaries it advocates: the entry surface stays narrow, appli
 | `modus.machine` | The machine layer: freezes inputs, observes facts, resolves relationships, and publishes an immutable, bounded evidence bundle for the current init/reinit run along the N1–N6 lifecycle (corpus → facts → resolution → capability → projection → packet). |
 | `modus.orchestrator` | Composes preflight, task context, and knowledge-impact candidates without owning retrieval algorithms or knowledge writes. |
 | `modus.retrieval` | Progressively selects prose, current source, and constraints under one time and output budget, reporting partial results explicitly. |
-| `modus.platforms` / `modus.hooks` | Projects canonical Skills into four hosts while isolating host directories, resident instructions, and session Hooks. |
+| `modus.platforms` / `modus.hooks` | Projects canonical Skills into five hosts while isolating host directories, resident instructions, and session Hooks. |
 | `modus.scaffold` | Packages neutral templates and owns deterministic project installation, upgrade reconciliation, ownership records, and safe uninstall. |
 | `knowledge_verification` / `knowledge_write_session` | Separate mechanical integrity checks, human ownership, compare-and-swap writes, and atomic publication. |
 
@@ -350,6 +349,8 @@ After connecting, run `modus status` in the target repository. The output `Insta
 <!--
 Keep command examples synchronized with registered options and exit behavior.
 -->
+
+DeepSeek Harness (preview) uses `modus init --platform dsh` for project workflows. The native plugin `@modus-ai/modus` adds context, status, knowledge-impact, and verification tools. Install the Python CLI from source containing the DSH integration, and install the native plugin from npm. Supported DSH versions are `0.2.1-rc.3` / `0.2.2-alpha.2`; see the [installation guide](../integrations/dsh/README.md) and [integration architecture](../integrations/dsh/architecture.md) (Chinese).
 
 ### CLI commands
 
@@ -425,5 +426,4 @@ When contributing, treat the CLI, Skills, schemas, and Markdown contracts as pub
 
 ### License
 
-<!-- NOCA:AllFileLicenseCheck(项目许可声明与根目录协议及包元数据一致) -->
 Modus is available under the [MIT License](../LICENSE).

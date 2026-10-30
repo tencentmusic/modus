@@ -23,8 +23,10 @@ _DEVELOPER_DOCS = (
     REPO_ROOT / "CONTRIBUTING.md",
     *sorted((REPO_ROOT / "docs").rglob("*.md")),
     *sorted((REPO_ROOT / "src/modus").rglob("README.md")),
+    *sorted((REPO_ROOT / "skills/modus-development").rglob("*.md")),
     REPO_ROOT / "tests/README.md",
     REPO_ROOT / "scripts/README.md",
+    *sorted((REPO_ROOT / "integrations/dsh").glob("*.md")),
 )
 _MARKDOWN_ROOTS = (
     *_DEVELOPER_DOCS,
