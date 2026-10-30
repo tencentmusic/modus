@@ -106,7 +106,7 @@ WORKFLOW_NAMES = frozenset(
     }
 )
 COMMAND_NAMES = frozenset({"init", "reinit", "update-knowledge"})
-PLATFORM_NAMES = frozenset({"claude", "codebuddy", "codex", "cursor"})
+PLATFORM_NAMES = frozenset({"claude", "codebuddy", "codex", "cursor", "dsh"})
 WHEEL_METADATA_HEADERS = (
     ("Description-Content-Type", "text/markdown"),
     ("License-Expression", "MIT"),

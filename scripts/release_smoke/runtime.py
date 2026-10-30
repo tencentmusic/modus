@@ -166,6 +166,10 @@ def _exercise_knowledge_paths(project: SmokeProject) -> dict[Path, bytes]:
         {entry.stem for entry in paths.commands_dir.glob("*.md")} == COMMAND_NAMES,
         "首次安装的显式命令范围不符合发布契约",
     )
+    require(
+        {entry.name for entry in (project.root / ".dsh/skills").iterdir()} == WORKFLOW_NAMES,
+        "安装后的 DSH 技能不符合发布契约",
+    )
     project.invoke("context", "resolve", "helper", "--scope", "project-read")
     project.invoke("status", "--json")
 

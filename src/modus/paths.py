@@ -21,6 +21,7 @@ PLATFORM_SKILL_DIRS: Final[tuple[str, ...]] = (
     ".agents",
     ".cursor",
     ".codebuddy",
+    ".dsh",
 )
 
 # Every project-root directory generated for a host platform. Source and

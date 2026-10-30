@@ -4,7 +4,7 @@
 
 ## 定位一个改动
 
-先使用只读诊断检查 checkout 和已有修改，再读取当前 `AGENTS.md`（如果存在）、`CONTRIBUTING.md`、模块 README。旧版 TypeScript/npm、个人安装的 `modus-ai` 与当前 `openmodus` 源码不是同一基线。
+先使用只读诊断检查 checkout 和已有修改，再读取当前 `AGENTS.md`（如果存在）、`CONTRIBUTING.md`、模块 README。验证时调用当前 checkout 的 CLI，避免将 PATH 中其他安装版本的行为当作当前实现。
 
 用一句话描述可观察结果，例如“普通 status 在解析器不可导入时仍可用”“旧查询游标不能跨证据包使用”“更新受管文件保留用户编辑”。据此选择所有者和对应测试。只做与这个结果有关的改动。
 

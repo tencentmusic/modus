@@ -27,6 +27,8 @@ git diff --check
 
 CI 覆盖 Linux 的 Python 3.11–3.14，以及 macOS、Windows 的最低与最高支持版本；Linux/Python 3.14 还执行风格、类型与分发检查。本地结果只代表实际运行的环境。覆盖率用于分析，没有强制百分比门槛。
 
+DSH 原生插件在 `integrations/dsh/` 独立构建。涉及插件时，还需按 [DSH 设计与贡献](integrations/dsh/architecture.md#贡献与验证) 运行 TypeScript、真实 CLI 和隔离安装验证；Python 检查不覆盖 npm 运行时。
+
 ## 命名与模块设计
 
 - 组合入口保持声明式：终端适配器拥有参数、交互、输出流和退出码，服务拥有应用行为，报告模块将结构化结果转为读者可理解的文本。
@@ -58,6 +60,8 @@ CI 覆盖 Linux 的 Python 3.11–3.14，以及 macOS、Windows 的最低与最�
 `src/modus/scaffold/templates/` 是随包交付的产品契约，Python 直接读取这些资源，不另存一份竞争性正文规范。其[本地化约定](src/modus/scaffold/templates/skills/using-modus/references/authoring/framework/localization.md)规定默认语言与局部修订边界。
 
 设计规则放在负责它的文档中，其他指南通过链接引用。文件名保持稳定、含义明确。创作设计与安装后的参考必须同步更新；相对链接和命令示例会按仓库与真实 CLI 注册情况检查。
+
+公开文档应让用户和贡献者仅凭仓库内容与公开资料理解、使用和维护项目。使用仓库相对链接、公开源码链接和可替换的路径示例；不包含内部系统地址、个人环境快照或会话工作记录。长期指南保存操作方法与设计理由，具体版本的验证结果随 PR、CI 或 Release 记录。
 
 ## 测试与扩展
 

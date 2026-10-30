@@ -1,0 +1,79 @@
+{
+  "name": "@modus-ai/modus",
+  "version": "1.0.0",
+  "description": "Modus project knowledge, business constraints and source evidence for DeepSeek Harness",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    }
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "architecture.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh-plugin",
+    "modus",
+    "project-knowledge"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tencentmusic/modus.git",
+    "directory": "integrations/dsh"
+  },
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": "0.2.1-rc.3 || 0.2.2-alpha.2"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "smoke:package": "npm run build && node scripts/package-smoke.mjs",
+    "smoke:registry": "node scripts/package-smoke.mjs --registry",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-util-values": "0.2.2-alpha.2"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.5 || 4.0.6-alpha.1",
+    "@deepseek-ai/dsh-agent": "0.2.1-rc.3 || 0.2.2-alpha.2",
+    "@deepseek-ai/dsh-sandbox-policy": "0.2.1-rc.3 || 0.2.2-alpha.2",
+    "@deepseek-ai/dsh-shell": "0.2.1-rc.3 || 0.2.2-alpha.2",
+    "@deepseek-ai/dsh-shell-env": "0.2.1-rc.3 || 0.2.2-alpha.2",
+    "@deepseek-ai/dsh-system-prompt": "0.2.1-rc.3 || 0.2.2-alpha.2",
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.3 || 0.2.2-alpha.2",
+    "@deepseek-ai/dsh-working-directory": "0.2.1-rc.3 || 0.2.2-alpha.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-app-boot": "0.2.2-alpha.2",
+    "@deepseek-ai/cordis": "4.0.6-alpha.1",
+    "@deepseek-ai/dsh-agent": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-sandbox-policy": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-shell": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-shell-env": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-system-prompt": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-tools": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-working-directory": "0.2.2-alpha.2",
+    "@types/node": "^22.0.0",
+    "typescript": "~5.9.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org",
+    "tag": "latest"
+  }
+}

@@ -8,7 +8,7 @@ The package follows a small ports-and-adapters design:
     The shared install/uninstall lifecycle and manifest ownership rules.
 ``rendering`` / ``sections`` / ``hooks``
     Pure content rendering plus non-destructive shared-file editors.
-``claude`` / ``codex`` / ``cursor`` / ``codebuddy``
+``claude`` / ``codex`` / ``cursor`` / ``codebuddy`` / ``dsh``
     Thin adapters that state only host paths, metadata, and presentation quirks.
 
 Downstream code normally needs only the stable facade exported here.

@@ -10,12 +10,13 @@
 | Codex | `.agents/skills` | `AGENTS.md` 的 `modus-codex` 区块 | `.codex/hooks.json` |
 | Cursor | `.cursor/skills` | `.cursor/rules/modus.mdc` | `.cursor/hooks.json` |
 | CodeBuddy | `.codebuddy/skills`，另有 `.codebuddy/commands` | `CODEBUDDY.md` 的 `modus-codebuddy` 区块 | `.codebuddy/settings.json` |
+| DSH | `.dsh/skills` | `AGENTS.md` 的 `modus-dsh` 区块 | 原生插件提供运行时指引与工具 |
 
 `.modus/skills` 是接入项目的中立权威源，宿主目录是投影副本。扩展不要让模板硬编码宿主路径或通过目录扫描隐式新增用户工作流。
 
-Claude 的 model-invocable/user-invocable 两轴独立：自动能力 model-only，显式 init/reinit user-only，update-knowledge 支持二者。对应 frontmatter 转换由 ClaudeAdapter 做，其他宿主不机械复制其私有字段。
+Claude 与 DSH 的 model-invocable/user-invocable 两轴独立：自动能力 model-only，显式 init/reinit user-only，update-knowledge 支持二者。两者通过 `platforms/rendering.py: render_invocation_metadata` 共享已验证的 frontmatter 转换，其他宿主由各自适配器决定权限投影。
 
-Claude 投影复用 `skillmd.split_frontmatter` 的有界 YAML 解析，保留已有顶层配置，并补充缺失的布尔权限字段。仅序列化头部，正文逐字保留；头部沿用 LF/CRLF 换行，已有完整权限时直接返回原文。中立模板和其他宿主副本不受此转换影响。
+共享权限渲染复用 `skillmd.split_frontmatter` 的有界 YAML 解析，保留已有顶层配置，并补充缺失的布尔权限字段。仅序列化头部，正文逐字保留；头部沿用 LF/CRLF 换行，已有完整权限时直接返回原文。中立模板和其他宿主副本不受此转换影响。
 
 ## Hook 路径
 
@@ -31,4 +32,6 @@ Codex JSON 输出按 wire bytes 限制，包括 ASCII 转义；宿主的会话/�
 
 新增平台一起更新平台注册、宿主合同、展示词汇、布局、启动器及发布平台集合；不要改变全局可变注册表。检查 `paths.py` 输出排除规则，防止源码分析把自己的宿主投影当项目事实。
 
-测试：`test_platforms.py`、`test_hooks.py`、`test_install_safety.py`、`test_project_lifecycle.py`。覆盖布局路径约束、调用维度、共享条目保留、事件上限/错误、启动放行、输出封套、安装后的真实运行。宿主配置渲染正确不等于本次在四个实际应用中都测试过。
+测试：`test_platforms.py`、`test_hooks.py`、`test_install_safety.py`、`test_project_lifecycle.py`。覆盖布局路径约束、调用维度、共享条目保留、事件上限/错误、启动放行、输出封套、安装后的真实运行。宿主配置渲染正确不能替代实际宿主运行验证。
+
+DSH 将项目投影与 profile 插件分开管理；插件通过宿主执行服务调用 Modus CLI。会话绑定、只读工具和失败语义见 [DSH 集成设计](../../../../integrations/dsh/architecture.md)。

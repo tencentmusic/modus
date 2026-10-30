@@ -30,8 +30,8 @@ from modus.surface import CORE_SKILLS
 # 名称集合一致只能证明发现能力；顺序和独立路径还保护安装行为。
 # 标记与 hook 路径必须互不冲突，否则卸载一个宿主会影响另一个。
 def test_builtin_registry_and_host_contracts_share_one_complete_vocabulary() -> None:
-    assert set(BUILTIN_REGISTRY.names) == set(SUPPORTED_HOSTS)
-    assert available_platforms() == sorted(SUPPORTED_HOSTS)
+    assert set(BUILTIN_REGISTRY.names) == {*SUPPORTED_HOSTS, "dsh"}
+    assert available_platforms() == sorted([*SUPPORTED_HOSTS, "dsh"])
 
     adapters = get_adapters(list(SUPPORTED_HOSTS))
     assert [adapter.name for adapter in adapters] == list(SUPPORTED_HOSTS)
@@ -41,6 +41,8 @@ def test_builtin_registry_and_host_contracts_share_one_complete_vocabulary() -> 
         assert adapter.layout.hook is not None
         hook_paths.add(adapter.layout.hook.path)
     assert len(hook_paths) == len(adapters)
+    # DSH 由 Cordis 插件提供运行时上下文，不属于 JSON hook 协议。
+    assert get_adapters(["dsh"])[0].layout.hook is None
 
 
 # 自定义注册表应拥有独立目录，不向内置全局状态追加类型。
