@@ -8,8 +8,8 @@
 
 init/reinit 的 Domain 生成及其 worker 先执行[逐域加载与恢复](scope-modeling.md#逐域加载与恢复)，从本域执行卡确定范围、Module 归属、selector 和进度，再进入下列取证路由；上下文压缩后的恢复也不跳过这一步。
 
-1. 读取[机器证据包](machine-packet.md)，理解 proposal、witness、coverage、ambiguity、omitted count 和展开句柄的边界。
-2. 建立或复核 Domain/Module 时读取[Scope 建模](scope-modeling.md)。
+1. 仅 init/reinit 读取[机器证据包](machine-packet.md)，理解 proposal、witness、coverage、ambiguity、omitted count 和展开句柄的边界。update/sync 按[增量维护](../incremental.md)直接核对当前源码、测试、配置与明确材料，不加载机器取证流程。
+2. 建立或复核 Domain/Module 时读取[Scope 建模](scope-modeling.md)。update/sync 只复用身份与结构决策规则，不运行其中的 build、context、coverage-audit 或执行卡流程。
 3. 为契约、对象和场景形成可发布事实时读取[场景闭合](scenario-closure.md)。
 4. 按实际构建单元只加载相关[语言适配器](language-adapters/index.md)。
 

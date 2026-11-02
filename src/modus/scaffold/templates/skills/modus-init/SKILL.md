@@ -11,7 +11,7 @@ description: 基于当前源码与用户材料，初始化完整的项目知识�
 
 开始 status、build 或调查前，先检查唯一执行卡 `modus/.cache/knowledge-authoring/scope-confirmation.md`。存在未完成卡，或当前请求/宿主是在继续中断任务时，先实际读卡并执行[上下文保存与恢复](../using-modus/references/authoring/context-continuity.md)，再进入记录的阶段。压缩、容量/服务错误、工具中断、取消后继续都适用；不得凭摘要续写、重跑 build 或重做 Scope。原卡缺失/冲突按恢复合同处理，不从已有输出拼装缩小的完成卡。
 
-确属新一轮任务时，只读执行一次 `modus status --json`。仅当根配置明确 `kind: workspace` 时转入[workspace 流程](references/workspace-init.md)；普通项目进入下表。已有正式完整知识且本轮需要全量重建时转 [modus-reinit](../modus-reinit/SKILL.md)。
+确属新一轮任务时，复用本轮已有的 `modus status --json` 结果；尚未盘点才只读执行一次。仅当根配置明确 `kind: workspace` 时转入[workspace 流程](references/workspace-init.md)；普通项目进入下表。已有可恢复的稳定 Domain/Module 身份时转 [modus-reinit](../modus-reinit/SKILL.md)，沿用本轮盘点；局部正文缺失不构成从零重建身份的理由。
 
 ## 六个阶段入口
 

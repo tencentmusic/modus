@@ -336,7 +336,11 @@ On the first `/modus-init` run, you can give the agent known project boundaries,
 
 For existing knowledge, use `/modus-reinit` when overall boundaries change or a full review is needed. To incorporate specific new material or local facts, use `/modus-update-knowledge` and provide the material path and affected scope. Ordinary coding tasks do not need these authoring workflows rerun.
 
+After upgrading the CLI, run `modus update --project` to deliver the latest commands, skills, and shared references to an installed project; add `--dry-run` for a read-only preview. This preserves knowledge prose and user-edited integration files. Resolve reported conflicts separately. Knowledge workflows then review or revise prose within their own scope.
+
 Full authoring follows K1–K6: scope and material → definition planning → evidence closure → Domain and Module prose → project constraints → system overview and publication. Team standards are authored separately after domain facts are reviewed; the overview then uses both final outputs. Existing human standards remain protected, and first-time initialization only fills a missing document or an unchanged framework seed. See the [authoring contract](../docs/authoring-contract.md) for stage ownership and review requirements.
+
+Incremental updates and automatic sync share the prose and publication rules. They trace changed definitions to affected consumers, cross-domain handoffs, and navigation without reading initialization bundles. Engineering changes trigger a review of applicable team standards; editing those standards requires explicit intent. Unchanged prose is not rewritten, and per-file conflicts preserve successful writes.
 
 ### Automatic knowledge capabilities
 

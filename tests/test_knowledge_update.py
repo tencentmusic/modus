@@ -205,6 +205,47 @@ def test_invalid_batch_is_rejected_before_any_write(tmp_path: Path, extra: dict)
     assert not (tmp_path / "modus").exists()
 
 
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"initialize_team_standard": True, "allow_team_standard": True},
+        {"initialize_team_standard": "true"},
+        {"allow_team_standard": 1},
+    ],
+)
+def test_direct_writer_rejects_invalid_permissions_before_side_effects(
+    tmp_path: Path, options: dict
+) -> None:
+    """直接调用与批量调用同样拒绝矛盾权限，不能依赖上层预检。"""
+    with pytest.raises(ValueError):
+        session.write_document(
+            ModusPaths.for_root(tmp_path),
+            TEAM,
+            "# 项目规范\n",
+            expected_hash=None,
+            allow_human=True,
+            **options,
+        )
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_empty_write_distinguishes_a_missing_document_from_existing_empty_bytes(
+    tmp_path: Path,
+) -> None:
+    """写入回执必须对应实际文件，空正文不能绕过新建或所有权判断。"""
+    first = update_knowledge(str(tmp_path), {MODULE: ""})
+    assert first["writes"] == [MODULE]
+    assert (tmp_path / MODULE).read_bytes() == b""
+    retry = update_knowledge(str(tmp_path), {MODULE: ""})
+    assert retry["status"] == "noop"
+    assert retry["unchanged"] == [MODULE]
+
+    denied = update_knowledge(str(tmp_path), {TEAM: ""})
+    assert denied["status"] == "partial"
+    assert denied["writes"] == []
+    assert not (tmp_path / TEAM).exists()
+
+
 # 摘要匹配只证明内容未变，不赋予删除人工文档的权限。
 # 退役还需通过类别所有权检查，未知类别保守保留。
 @pytest.mark.parametrize(

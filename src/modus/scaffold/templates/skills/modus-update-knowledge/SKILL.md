@@ -5,10 +5,9 @@ description: 根据源码或用户提供的材料，增量更新受影响的项�
 
 # modus-update-knowledge
 
-局部维护正文时使用，不构建或读取初始化 bundle。复用[证据指南](../using-modus/references/authoring/evidence/index.md)、[生成框架](../using-modus/references/authoring/framework/index.md)和[发布合同](../using-modus/references/authoring/publication.md)。
+局部维护正文时使用。完整读取[增量维护流程](../using-modus/references/authoring/incremental.md)，沿其链接按需加载证据、正文与发布细则。本入口只确定用户意图与授权，不运行全量六阶段、不构建或读取初始化 bundle。
 
-1. 以用户目标、当前源码/diff/材料和相关完整正文的交集确定范围，并记录读时哈希。
-2. 既有稳定身份、主定义和语义分组默认保持。新能力或真实拆并/移动/退役按[Scope 建模](../using-modus/references/authoring/evidence/scope-modeling.md)合并确认一次；anchor-only、标题和分片调整不确认。
-3. 按[场景闭合](../using-modus/references/authoring/evidence/scenario-closure.md)调查一次，按[编辑规则](../using-modus/references/authoring/framework/editorial.md)核对受影响页面的读者问题、叙述顺序、图文分工与案例，按需参考[对照样稿](../using-modus/references/authoring/framework/examples.md)，再在原语义位置修订。同步维护主定义、引用与导航，不扩大为全库重写，不追加日期式更新块，也不为编辑验收新建执行卡。
-4. 保护无关正文和人工文件。API/Object 移动先写新落点、修根入口与入链，再 CAS 删除旧详情；空分片先合并剩余事实。
-5. 按[发布合同](../using-modus/references/authoring/publication.md)逐篇完整回读受影响页面及关联上下文，核对事实、行文、图文与案例，用真实读者任务检查能否独立理解。对变化的图表或版式使用可用的实际预览，修复后重看受影响内容；不可用时记录具体页面、未验证项和影响，不宣称通过。运行对应 Domain 的机械核验，CAS 写入并回读。`clean` 不替代语义判断，独立读者仅是授权与隔离上下文可用时的增强，不能以自查冒充。
+- 以用户目标、当前源码/diff/材料和相关完整正文确定起点，再追踪真实受影响的主定义、消费者与导航；不把初始文件清单当作影响范围的全部。
+- 既有稳定身份、主定义与语义分组默认保持。真实新增、拆并、迁移或退役只合并确认一次，沿用已有完整授权；anchor-only、标题和分片调整不重复确认。
+- 人工 constraint/business 默认保护。明确委托维护 Team Standard 才启用维护权限，首次初始化权限不用于增量更新；查阅材料不等于授权保存原始副本。
+- 完成受影响正文的修订、逐篇回读、实际预览、定向核验与 CAS 发布。报告真实写入、未变、冲突和未验证项，不将局部维护扩大为全库重写。

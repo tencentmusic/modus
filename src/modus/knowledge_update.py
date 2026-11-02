@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, TypeAlias
 
 from .knowledge_reader import BoundKnowledgeReadError, read_bound_regular_text
-from .knowledge_write_session import delete_document, write_document
+from .knowledge_write_session import TeamStandardWriteMode, delete_document, write_document
 from .paths import ModusPaths
 
 _DigestMap: TypeAlias = Mapping[str, str | None]
@@ -49,7 +49,7 @@ def _validated_hashes(expected_hashes: object) -> _DigestMap:
 # 批量报告不宣称事务性回滚，已完成写入会明确保留。
 @dataclass(slots=True)
 class _UpdateLedger:
-    """Collect independent per-document outcomes without obscuring control flow."""
+    """按文档保存独立结果，保留部分成功与冲突的边界。"""
 
     written: list[str] = field(default_factory=list)
     unchanged: list[str] = field(default_factory=list)
@@ -143,7 +143,7 @@ def validate_update_input(
     allow_team_standard: object,
     initialize_team_standard: object = False,
 ) -> None:
-    """Validate the entire request's shape before any document can be changed."""
+    """在首个写入前检查整批形状；执行期冲突仍按文档报告。"""
     if not isinstance(documents, Mapping) or not all(
         isinstance(key, str) and isinstance(value, str) for key, value in documents.items()
     ):
@@ -155,12 +155,9 @@ def validate_update_input(
         or not all(isinstance(target, str) for target in deletions)
     ):
         raise ValueError("deletions 必须为单个 Markdown 路径组成的列表")
-    if not isinstance(allow_team_standard, bool):
-        raise ValueError("allowTeamStandard 必须为布尔值")
-    if not isinstance(initialize_team_standard, bool):
-        raise ValueError("initializeTeamStandard 必须为布尔值")
-    if initialize_team_standard and allow_team_standard:
-        raise ValueError("首次填充与人工维护不能同时启用；请选择一种 team-standard 写入方式")
+    TeamStandardWriteMode.from_flags(
+        initialize=initialize_team_standard, maintain=allow_team_standard
+    )
     if len(set(deletions)) != len(deletions):
         raise ValueError("deletions 不能包含重复路径")
     if set(documents) & set(deletions):

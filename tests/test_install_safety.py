@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from _support.markdown import assert_local_markdown_links_resolve
 from modus.commands.init_project import InitConflictError, run_init
 from modus.commands.uninstall import (
     UninstallPlanChangedError,
@@ -17,6 +18,7 @@ from modus.commands.uninstall import (
 from modus.commands.update import preview_update, run_update
 from modus.manifest import Manifest
 from modus.paths import ModusPaths
+from modus.platforms import available_platforms
 
 
 # 清单外的空文件仍可能属于用户，不能因为没有内容就接管。
@@ -46,6 +48,55 @@ def test_update_preserves_user_edits_and_untracked_collision(tmp_path: Path) -> 
     assert edited.relative_to(tmp_path).as_posix() in result["userEditedFiles"]
     assert missing.read_bytes() == b""
     assert edited.read_text(encoding="utf-8") == "my instructions"
+
+
+def test_update_delivers_workflow_changes_to_every_host_and_retains_user_edits(
+    tmp_path: Path,
+) -> None:
+    """同版本升级也应传播命令、技能和新增参考；知识与宿主自定义保持原样。"""
+    run_init(tmp_path, list(available_platforms()))
+    paths = ModusPaths.for_root(tmp_path)
+    manifest = Manifest.read(paths)
+    workflow_files = [
+        entry for entry in manifest.files if entry.template.startswith(("skills/", "commands/"))
+    ]
+    expected = {entry.path: (tmp_path / entry.path).read_bytes() for entry in workflow_files}
+    added = {
+        entry.path
+        for entry in workflow_files
+        if entry.template.endswith("/authoring/incremental.md")
+    }
+    assert added
+    for entry in workflow_files:
+        target = tmp_path / entry.path
+        if entry.path in added:
+            target.unlink()
+        else:
+            old_text = "# Previous installed workflow\n"
+            target.write_text(old_text, encoding="utf-8", newline="")
+            manifest.add_file(entry.path, old_text, entry.template)
+    manifest.files = [entry for entry in manifest.files if entry.path not in added]
+    manifest.write(paths)
+
+    edited = ".agents/skills/modus-reinit/SKILL.md"
+    (tmp_path / edited).write_bytes(b"# User-owned workflow\n")
+    paths.team_standard.write_bytes(b"# Human team policy\n")
+
+    result = run_update(tmp_path)
+
+    assert result["status"] == "partial"
+    assert result["userEditedFiles"] == [edited]
+    assert added <= set(result["addedFiles"])
+    for relative, content in expected.items():
+        actual = (tmp_path / relative).read_bytes()
+        assert actual == (b"# User-owned workflow\n" if relative == edited else content), relative
+        assert_local_markdown_links_resolve(tmp_path / relative, root=tmp_path)
+    assert paths.team_standard.read_bytes() == b"# Human team policy\n"
+
+    retry = run_update(tmp_path)
+    assert retry["status"] == "partial"
+    assert retry["userEditedFiles"] == [edited]
+    assert retry["appliedFiles"] == retry["addedFiles"] == []
 
 
 # 首次安装同样遵守所有权边界，不能将空文件视为可用路径。

@@ -232,7 +232,10 @@ def _exercise_authoring_contract() -> None:
     required_references = (
         "skills/modus-init/SKILL.md",
         "skills/modus-reinit/SKILL.md",
+        "skills/modus-update-knowledge/SKILL.md",
+        "skills/modus-sync-knowledge/SKILL.md",
         "skills/using-modus/references/authoring/index.md",
+        "skills/using-modus/references/authoring/incremental.md",
         "skills/using-modus/references/authoring/stages/k1-scope.md",
         "skills/using-modus/references/authoring/stages/k2-plan.md",
         "skills/using-modus/references/authoring/stages/k3-evidence.md",

@@ -11,6 +11,8 @@ description: 全面评审并重建知识快照，保留稳定业务身份及人�
 
 盘点或构建前先检查唯一执行卡。存在本轮未完成卡或正在继续中断任务时，先实际读卡，再按[上下文保存与恢复](../using-modus/references/authoring/context-continuity.md)加载证据、已有正文与规范，从最早未完成动作继续。压缩、容量/服务错误、工具中断或取消后继续都适用；不重跑 build、重做 Scope 或凭摘要续写。卡片缺失或与请求冲突按恢复合同处理。
 
+确属新一轮时，复用本轮已有的 `modus status --json` 结果；尚未盘点才只读执行一次。根配置明确 `kind: workspace` 时进入[工作区流程](../modus-init/references/workspace-init.md)，不在外层根建立业务 Domain。普通项目没有可恢复的稳定 Domain/Module 身份时转入 [modus-init](../modus-init/SKILL.md)，沿用本轮盘点而不重复执行；部分知识缺失但身份可恢复时仍按 reinit 处理。
+
 新一轮重建完整读取已确认范围的正文与哈希，以稳定身份 → 入口/对象责任 → 语义变化 → 结构变化 → 文件变化判断。目标归为 `unchanged`、`anchor-only`、`implementation-change`、`scope-change`、`content-repair`、疑似退役或人工正文。
 
 `content-repair` 包括简略条目、接口/字段缺漏、模板套话、复制内容、完成/失败不清、已定义中文未应用、缺失[初始化质量要求](../using-modus/references/authoring/framework/index.md#初始化质量要求)规定的案例/图形，以及已观察到的阅读缺陷。文件存在不能证明 unchanged；准确且已满足质量要求的正文、图表保持原位并跳写。

@@ -28,9 +28,10 @@ K4 交付业务事实和场景，K5 从原始证据中提炼工程要求，K6 �
 - [证据](evidence/index.md)：凭什么写，如何覆盖材料并闭合事实。
 - [框架](framework/index.md)：写到哪里、业务解释与图文质量、各产物的详细合同。
 - [发布](publication.md)：逐篇回读、实际预览、机械核验、CAS 与清理。
+- [增量维护](incremental.md)：update/sync 的影响传播、约束边界、定向验收与冲突恢复。
 - [上下文](context-continuity.md)：压缩前保存、摘要保留项、异常恢复与作者交接。
 - [跨域协作](cross-domain.md)：主定义、依赖、共享基线、冲突传播与双向核对。
 - [执行策略](execution-strategy.md)：工作单元、样稿与可用时的独立读者测试。
 - [并行协议](parallel-domain-authoring.md)及[固定委托合同](domain-worker-prompt.md)：只在用户已明确授权委派时加载。
 
-update/sync 直接复用受影响范围的证据、框架和发布细则，不运行全量六阶段、不建初始化卡、不消费 bundle，也不为新增配图要求扩大局部写入范围。Python 不生成、扩写或评分自然语言正文，机械 clean 不代表业务正确、完整或可读。
+update/sync 从增量维护入口复用受影响范围的证据、框架和发布细则，不运行全量六阶段、不建初始化卡、不消费 bundle，也不为新增配图要求扩大局部写入范围。Python 不生成、扩写或评分自然语言正文，机械 clean 不代表业务正确、完整或可读。
