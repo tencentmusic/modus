@@ -25,9 +25,10 @@ N5 创作投影
     ↓ package
 N6 创作上下文包
 ────────────── 机器与创作的边界 ──────────────
-K1 范围模型 → K2 创作计划 → K3 证据闭环
-                                ↓
-K6 核验发布 ← K5 系统组装 ← K4 领域成稿
+K1 完整范围 → K2 全局主定义与跨域依赖
+    → 当前 Domain：K2 细化 → K3 ↔ K4（逐工作单元）
+    → 下一 Domain：K2 → K3 ↔ K4
+    → K5 系统组装 → K6 核验发布
     ↓
 可持续维护的中文开源知识树
 ```
@@ -158,6 +159,8 @@ baselineDigest        = corpusDigest + analysisContextDigest + 契约版本
 
 核验基线、构建目录、原子写入、认证根身份、执行有界查询、组装任务上下文。`module-authoring` 保留选中的建议与代表路径，将范围内 `authoringSignal` 附到建议，并提供解析度、来源层、见证、省略与展开句柄。这些信号定位事务、状态、权威写入、资源、消息和入口，不能替代源码评审。
 
+创作上下文 packet、分析包及 select 页各自使用 `schemaVersion: 1`，上下文契约随 CLI 与正文模板同步更新。packet 通过 evidence 保留库存/入口/关系原记录，通过 coverageGaps 传递各次查询缺口，通过 expansionQueries 给出可选的精确展开条件；receipt counts 按最终交付计数，代表路径保留顺序、来源与整条裁剪语义。
+
 创作上下文回显 `bundleDigest`、`baselineDigest` 与精确 `requestedScope`。没有候选、能力、路径或符号选择器的 `module-authoring` 请求必须拒绝。能力句柄可直接传给 `context` 与 `select`。
 
 内部独立处理目录构建、原子发布、打开时认证、完整性检查、游标编码、证据查询与上下文组装。消费者边界只有：
@@ -203,15 +206,22 @@ Go 示例声明 `extract_go`、`go`、`builtin-go-frameworks` 与入口检测器
 
 ## 第二部分：创作层 K1–K6
 
+六阶段各自对应[运行入口](../src/modus/scaffold/templates/skills/using-modus/references/authoring/index.md)中的一个 `stages/k*.md` 文件。init/reinit 先确定完整范围及全局主定义/依赖，再逐域推进 K2 → K3 ↔ K4，最后 K5/K6；并非先把全库 K3 做完再批量成稿。阶段没有新增机器状态，现有执行卡继续作为唯一恢复依据。
+
+[上下文合同](../src/modus/scaffold/templates/skills/using-modus/references/authoring/context-continuity.md)规定压缩前检查点及恢复必读；[跨域合同](../src/modus/scaffold/templates/skills/using-modus/references/authoring/cross-domain.md)从 K1/K2 保存主定义和交接，K3/K4 传播变化，K5 双向核对。并行时使用固定委托合同和可检查的事实输入包，不通过自由重写各域提示词改变质量要求。
+
 创作层在 N6 后开始，在实际知识树完成语义评审、机械完整性与原子写入后结束。N 层提供证据，K 层拥有判断与正文，两者不能互相宣称对方的完整性。
 
 ### 契约来源
 
 ```text
 references/authoring/
-├── evidence/       上下文包与源码如何成为闭合事实
-├── framework/      各知识产品需要向读者表达什么
-└── publication.md  语义评审、机械完整性与安全写入
+├── stages/k*.md          K1～K6 六个编排入口
+├── evidence/            上下文包与源码如何成为闭合事实
+├── framework/           各知识产品需要向读者表达什么
+├── context-continuity.md 压缩前保存与恢复
+├── cross-domain.md       跨域事实、依赖与变化传播
+└── publication.md        语义评审、机械完整性与安全写入
 ```
 
 这些 Markdown 是创作规则的源文件。模板目录原样验证与分发，Python 不在安装时注入另一份标题、运行形态或完成规则。
@@ -220,7 +230,7 @@ references/authoring/
 
 四种工作流共用证据、框架与发布契约：init 创作完整首次快照，reinit 重证完整既有快照，update 修改明确局部范围，sync 只修改当前任务造成的最小长期影响。
 
-init/reinit 只通过认证的 `context` 和 `select` 读取机器产物，不能直接解析存储目录、数据页或清单。K1 用 `scope-discovery` / `reinit-diff`；每个变化模块获取自身 `module-authoring`；每个领域在读者评审前执行源码范围的 `coverage-audit`。不可用则回读当前源码并记录卡内缺口，不借旧包、不发无界模块请求、不用一个领域请求推动多个独立模块。生成的 `modus/knowledge/**` 路径不是源码选择器；空、无匹配或部分结果不能直接变成 `reviewed`。
+init/reinit 只通过认证的 `context` 和 `select` 读取机器产物，不能直接解析存储目录、数据页或清单。K1 用 `scope-discovery` / `reinit-diff`（后者交付当前基线，不计算新旧差分）；K2/K5 接入 service-boundary 与双向服务关系，K3 按需使用 constraint-extraction；每个变化模块获取自身 `module-authoring`；每个领域在读者评审前分别请求各源码范围的 `coverage-audit` 并合并结果，同一轴内取并集、不同轴取交集。不可用则回读当前源码并记录卡内缺口，不借旧包、不发无界模块请求、不用一个领域请求推动多个独立模块。执行卡的 requestedScope 是 Module 知识 ID，packet 的同名字段是实际查询对象；原卡正文按[消费合同](../src/modus/scaffold/templates/skills/using-modus/references/authoring/evidence/machine-packet.md#六阶段消费与可恢复记录)保存映射、来源、事实主落点和缺口处置，K6 做双向对账。生成的 `modus/knowledge/**` 路径不是源码选择器；空、无匹配或部分结果不能直接变成 `reviewed`。
 
 ### 完整性与阶段门槛
 

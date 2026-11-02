@@ -1,29 +1,34 @@
-<!--
-索引负责渐进导航，详细规则在目标页面维护，避免复制后漂移。
--->
+# K1～K6 正文创作入口
 
-# 正文知识创作边界
+init/reinit 按六个阶段入口执行；每个入口明确输入、必读细则、动作、产出与退回条件。入口负责编排，共享细则各有唯一所有者，不把整套规则复制六遍。
 
-正文知识只有两个规范源，再加一个发布边界：
+| 阶段 | 文件入口 | 可检查的产出 |
+| --- | --- | --- |
+| K1 范围建模 | [k1-scope.md](stages/k1-scope.md) | 完整范围、入口/材料处置、稳定身份与授权 |
+| K2 创作计划 | [k2-plan.md](stages/k2-plan.md) | 目标页、主定义、依赖、案例/图形与检查点计划 |
+| K3 证据闭环 | [k3-evidence.md](stages/k3-evidence.md) | 逐接口/字段/规则/场景事实、来源与具名缺口 |
+| K4 领域成稿 | [k4-domain.md](stages/k4-domain.md) | 六专题、全部模块与路由，以及逐篇验收 |
+| K5 系统组装 | [k5-system.md](stages/k5-system.md) | 跨域一致的系统概览与共享产物 |
+| K6 核验发布 | [k6-publish.md](stages/k6-publish.md) | 语义、机械、实际发布与预览结果 |
 
 ```text
-机器证据、当前源码、用户材料、既有正文
-                    │
-                    ▼
-       evidence/：怎样取得并闭合事实
-                    │
-                    ▼
-       framework/：事实应形成什么知识
-                    │
-                    ▼
-       publication.md：怎样回读并安全发布
+K1 确定完整范围
+  → K2 全局主定义与跨域依赖计划
+  → 当前 Domain：K2 细化 → K3 ↔ K4（按契约组/对象/场景推进）
+  → 下一 Domain：K2 → K3 ↔ K4
+  → K5 系统组装 → K6 核验发布
 ```
 
-- [证据消费与事实闭合](evidence/index.md)回答“凭什么这样写”，不规定正文目录。
-- [知识生成框架](framework/index.md)回答“写到哪里、为谁回答什么”，不复制机器取证流程。
-- [验证与发布](publication.md)区分 Agent 的语义回读、确定性机械检查与安全写入。
-- [执行策略](execution-strategy.md)组织写前安排、逐篇编辑、样稿使用与可用时的独立读者测试；它是可调整的做法，不是第四套事实或质量规范。
-- init/reinit 的每个 Domain 生成或恢复前，按[逐域加载与恢复](evidence/scope-modeling.md#逐域加载与恢复)依次读取本域执行卡、对应证据、相关已有正文和写作规范；上下文压缩后使用同一顺序。
-- 用户显式授权且宿主支持时，[按 Domain 并行撰写](parallel-domain-authoring.md)约束 worker 的独占路径、handoff 与根作者验收；串行流程不必加载。
+阶段不是新增机器状态。续作首先实际读取唯一执行卡，按[上下文保存与恢复](context-continuity.md)定位当前阶段和最早未完成条目；不从 K1 重启，不凭压缩摘要生成正文。
 
-`modus-init`、`modus-reinit`、`modus-update-knowledge` 和 `modus-sync-knowledge` 只选择范围并编排这三部分。Python 不生成、扩写或评价自然语言正文；机器 `clean` 也不表示内容专业、充分或正确。
+## 共享细则
+
+- [证据](evidence/index.md)：凭什么写，如何覆盖材料并闭合事实。
+- [框架](framework/index.md)：写到哪里、业务解释与图文质量、各产物的详细合同。
+- [发布](publication.md)：逐篇回读、实际预览、机械核验、CAS 与清理。
+- [上下文](context-continuity.md)：压缩前保存、摘要保留项、异常恢复与作者交接。
+- [跨域协作](cross-domain.md)：主定义、依赖、共享基线、冲突传播与双向核对。
+- [执行策略](execution-strategy.md)：工作单元、样稿与可用时的独立读者测试。
+- [并行协议](parallel-domain-authoring.md)及[固定委托合同](domain-worker-prompt.md)：只在用户已明确授权委派时加载。
+
+update/sync 直接复用受影响范围的证据、框架和发布细则，不运行全量六阶段、不建初始化卡、不消费 bundle，也不为新增配图要求扩大局部写入范围。Python 不生成、扩写或评分自然语言正文，机械 clean 不代表业务正确、完整或可读。

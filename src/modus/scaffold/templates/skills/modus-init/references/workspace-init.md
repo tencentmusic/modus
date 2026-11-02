@@ -42,13 +42,13 @@
 
 ## 4. 补齐已确认成员
 
-确认后按所列成员独立执行，复用单仓的固定正文树、六专题、Module 九类必答语义与 surface 画像、因果内容和写入合同：missing 成员需要安装时在其根执行 modus init，再完成首次正文；partial 成员复用可恢复稳定 Scope，全量复核约定范围。available 与 unavailable 成员除非另在用户明确范围内，否则保持只读。
+确认后按所列成员独立执行[六阶段入口](../../using-modus/references/authoring/index.md)，复用单仓的固定正文树、六专题、Module 九类必答语义与 surface 画像、因果内容和写入合同：missing 成员需要安装时在其根执行 modus init，再完成首次正文；partial 成员复用可恢复稳定 Scope，全量复核约定范围。available 与 unavailable 成员除非另在用户明确范围内，否则保持只读。
 
-独立成员可并行调查和写作，同一文件一个作者；每个已确认需要初始化的成员作为独立单仓同步构建一次 init-analysis，只消费自己的本轮 bundle，成员间不得混读。成员流程不再次发起 Scope/策略确认；构建失败就回到该成员当前源码，不重试。某成员失败仅报告实际受影响范围，继续其他成员与外层导览；Provider 失败不能当作成员全局无事实。
+默认串行补齐；只有本轮已明确授权委派时，独立成员才可并行调查和写作，同一文件一个作者；每个已确认需要初始化的成员作为独立单仓同步构建一次 init-analysis，只消费自己的本轮 bundle，成员间不得混读。成员流程不再次发起 Scope/策略确认；构建失败就回到该成员当前源码，不重试。某成员失败仅报告实际受影响范围，继续其他成员与外层导览；Provider 失败不能当作成员全局无事实。
 
 合并 scope-confirmation.md 记录已确认范围、实际完成状态与剩余项，不创建新状态体系或分仓回执。已确认退役/合并先修新落点与入链/导航，再 CAS 精准删除成员生成文件，保留人工文件路径和语义；历史交给各成员 Git。仅在当前授权涉及的成员中写入，跨到只读成员的链接缺口在结果说明，不擅自修复。
 
-成员的每个 Domain 生成或压缩后恢复前，都按[逐域加载与恢复](../../using-modus/references/authoring/evidence/scope-modeling.md#逐域加载与恢复)执行；从这张合并执行卡定位对应成员与本域范围、Module 归属、selector 和进度，再加载该成员证据、相关已有正文和写作规范。委托时传入合并卡实际路径与成员身份，不在成员根另建卡，也不沿用其他成员的摘要或 selector。
+成员的正文同样遵守[初始化质量要求](../../using-modus/references/authoring/framework/index.md#初始化质量要求)，在合并卡中用成员身份隔离[跨域协作基线](../../using-modus/references/authoring/cross-domain.md)与精确写入范围。成员的每个 Domain 生成或压缩后恢复前，都按[逐域加载与恢复](../../using-modus/references/authoring/evidence/scope-modeling.md#逐域加载与恢复)执行；从这张合并执行卡定位对应成员与本域范围、Module 归属、selector 和进度，再加载该成员证据、相关已有正文和写作规范。委托时传入合并卡实际路径与成员身份，不在成员根另建卡，也不沿用其他成员的摘要或 selector。
 
 压缩或异常中断后第一项成员业务操作必须先读合并卡，不能先查源码或修正文稿。每个已确认成员同样完成逐接口/逐字段对账、逐 Module 复杂场景选图和[逐篇验收](../../using-modus/references/authoring/publication.md#逐篇验收与事实对账)；记录带成员身份的具体页、剩余条目、未预览章节和逐图检查结果，不能用成员数量多或外层地图已完成来压缩成员手册深度。
 

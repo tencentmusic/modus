@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..capability.lifecycle import ComposedCapabilities
-from ..errors import safe_error_summary
+from ..errors import safe_error_summary, validate_code
 from ..resolution.lifecycle import ResolvedProgram
 from ..states import Completeness, ExecutionStatus
 from .community_signal import GraphEngine
@@ -62,6 +62,21 @@ def _attach_candidate_memberships(
         if isinstance(row, dict):
             row["candidateIds"] = sorted(memberships.get(str(row.get("path") or ""), []))
     return memberships
+
+
+def _reference_reason(value: object) -> str:
+    """上游短原因不是无效存储记录；规范化后仍能解释未解析边界。"""
+    reason = str(value or "unresolved")
+    if len(reason) > 120:
+        return "machine.resolution.reference-unresolved"
+    try:
+        return validate_code(
+            reason
+            if reason.startswith("machine.")
+            else "machine.resolution." + f"reference-{reason}"
+        )
+    except ValueError:
+        return "machine.resolution.reference-unresolved"
 
 
 # 社区划分仅提供结构线索，失败后仍可使用能力与目录证据。
@@ -191,7 +206,7 @@ def project(
             continue
         target.setdefault("coverageGaps", []).append(
             {
-                "reasonCode": str(raw.get("reason") or "machine.resolution.reference-unresolved"),
+                "reasonCode": _reference_reason(raw.get("reason")),
                 "symbol": str(raw.get("name") or ""),
                 "location": dict(raw.get("location") or {}),
                 "resolution": "unresolved",

@@ -511,6 +511,7 @@ def capability_navigation(
                         "candidateIds": [candidate_id],
                         "capabilityId": capability.capability_id,
                         "pathIndex": path_index,
+                        "stepIndex": edge_index,
                         "sourceSymbol": source.symbol,
                         "targetSymbol": target_symbol,
                         "resolution": str(path.resolution),

@@ -1,4 +1,4 @@
-"""N6 intent packets are useful, bounded and never pagination obligations."""
+"""通过真实分析包验证上下文的范围、来源、预算与可恢复查询。"""
 
 from __future__ import annotations
 
@@ -14,37 +14,49 @@ from modus.machine import (
     AnalysisOptions,
     ContextRequest,
     ContractError,
+    EvidenceQuery,
     PacketBudget,
     PacketScope,
     TaskIntent,
     analyze_repository,
     build_authoring_context,
     open_analysis,
+    query_evidence,
 )
+from modus.machine.packet.context_budget import fit_context_budget
+from modus.machine.store.contracts import AnalysisBundle
 from modus.paths import ModusPaths
 
 
-# 用结构解析构造真实 bundle，使上下文测试不依赖本机 Java 工具链。
-# 入口调用写操作提供一条可追溯代表路径，而非手工拼装最终回包。
-def _bundle(root: Path):
-    (root / "OrderController.java").write_text(
-        """class OrderController {
- @OpenApiPostMapping(apiName = "Create", apiUrl = "/orders")
- public void create() { persist(); }
- private void persist() { repository.save(order); }
-}
+def _bundle(root: Path, *, multiple: bool = False) -> AnalysisBundle:
+    # 结构解析使夹具独立于本机 Java 工具链；多步路径用于验证原子裁剪。
+    for name in ("Order", "Stock") if multiple else ("Order",):
+        (root / f"{name}Controller.java").write_text(
+            f"""class {name}Controller {{
+ @OpenApiPostMapping(apiName = "Create", apiUrl = "/{name.lower()}")
+ public void create() {{ stageA(); }}
+ private void stageA() {{ stageB(); }}
+ private void stageB() {{ stageC(); }}
+ private void stageC() {{ persist(); }}
+ private void persist() {{ repository.save(item); }}
+}}
 """,
-        encoding="utf-8",
-    )
+            encoding="utf-8",
+        )
     receipt = analyze_repository(root, AnalysisOptions(compiler_mode="off"))
     return open_analysis(root, receipt.identity)
 
 
-# 发现包先提供可调查能力，再提供可直接使用的展开句柄。
-# 关闭编译器必须留下降级原因，不能把结构证据提升为编译精度。
-# 对实际序列化内容做 schema 验证，覆盖字段名与类型的共同契约。
-# 扫描发布字节排除本机路径，保证包可跨工作区分享。
-# 上下文包不承担翻页义务，消费者无需追逐游标才能开始创作。
+def _validate(packet: object) -> None:
+    schema = json.loads(
+        (
+            Path(__file__).parents[2] / "schemas/machine/authoring-context-packet.schema.json"
+        ).read_text(encoding="utf-8")
+    )
+    Draft202012Validator.check_schema(schema)
+    Draft202012Validator(schema).validate(packet)
+
+
 def test_scope_packet_leads_with_capabilities_and_precise_handles(tmp_path: Path) -> None:
     bundle = _bundle(tmp_path)
     packet = build_authoring_context(bundle, ContextRequest(TaskIntent.SCOPE_DISCOVERY))
@@ -69,16 +81,7 @@ def test_scope_packet_leads_with_capabilities_and_precise_handles(tmp_path: Path
     assert payload["terminalEffects"][0]["kind"] == "data-write"
     assert any(handle["kind"] == "capability" for handle in payload["expansionHandles"])
     assert "nextCursor" not in json.dumps(payload)
-    schema = json.loads(
-        (
-            Path(__file__).parents[2]
-            / "schemas"
-            / "machine"
-            / "authoring-context-packet.schema.json"
-        ).read_text(encoding="utf-8")
-    )
-    Draft202012Validator.check_schema(schema)
-    Draft202012Validator(schema).validate(payload)
+    _validate(payload)
     published = ModusPaths.for_root(tmp_path).analysis_bundles_dir / bundle.bundle_digest
     serialized = "\n".join(
         path.read_text(encoding="utf-8") for path in sorted(published.rglob("*.json"))
@@ -87,9 +90,6 @@ def test_scope_packet_leads_with_capabilities_and_precise_handles(tmp_path: Path
     assert str(Path.home()) not in serialized
 
 
-# 以规范紧凑 JSON 的字节数验证预算，避免只统计内存对象条目。
-# 裁剪后的包仍要报告省略与部分覆盖，不能让截断伪装为完整结果。
-# 先发现候选再定向创作，保留真实消费者的两阶段调用方式。
 def test_packet_budget_trims_content_and_reports_omissions(tmp_path: Path) -> None:
     budget = PacketBudget(max_items=2, max_bytes=4_096, max_paths_per_capability=1)
     bundle = _bundle(tmp_path)
@@ -103,12 +103,23 @@ def test_packet_budget_trims_content_and_reports_omissions(tmp_path: Path) -> No
             budget=budget,
         ),
     )
-    encoded = json.dumps(packet.to_dict(), sort_keys=True, separators=(",", ":")).encode()
+    encoded = json.dumps(
+        packet.to_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode()
 
     assert len(encoded) <= budget.max_bytes
     assert packet.omitted_counts
     assert packet.coverage_receipts[0].completeness == "partial"
     assert packet.coverage_receipts[0].reason_code == "machine.packet.budget-exhausted"
+    _validate(packet.to_dict())
+    counts = packet.coverage_receipts[0].counts
+    assert counts["authoringSignals"] == sum(
+        len(row.get("authoringSignals", [])) for row in packet.proposals
+    )
+    assert counts["navigationSteps"] == len(packet.representative_paths)
+    assert counts["evidence"] == len(packet.evidence)
+    assert packet.expansion_queries
+    assert all("_" not in key for key in packet.omitted_counts)
 
 
 # 模块创作需要显式范围，缺失选择器不能退化成整个仓库。
@@ -117,10 +128,31 @@ def test_module_authoring_rejects_an_unbounded_request() -> None:
         ContextRequest(TaskIntent.MODULE_AUTHORING)
 
 
-# 创作信号要携带精度、来源层和源码见证，供读者独立判断可信度。
-# 计数回执应对应实际发送内容，不沿用裁剪前的总数。
-# 保留请求范围和 bundle 身份，让消费者能追溯本次选择。
-# 路径句柄允许按需展开细节，无需把全部证据塞进首包。
+def test_budget_removes_whole_paths_without_mutating_the_input(tmp_path: Path) -> None:
+    bundle = _bundle(tmp_path)
+    packet = build_authoring_context(
+        bundle,
+        ContextRequest(TaskIntent.MODULE_AUTHORING, PacketScope(paths=("OrderController.java",))),
+    )
+    original = packet.to_dict()
+    path_count = len(
+        {(row["capabilityId"], row["pathIndex"]) for row in packet.representative_paths}
+    )
+    assert path_count and len(packet.representative_paths) >= 4
+
+    fitted = fit_context_budget(packet, PacketBudget(max_items=1))
+
+    assert packet.to_dict() == original
+    assert not fitted.representative_paths
+    assert (
+        fitted.omitted_counts["representativePaths"]
+        == packet.omitted_counts.get("representativePaths", 0) + path_count
+    )
+    assert fitted.omitted_counts["navigationSteps"] == len(packet.representative_paths)
+    assert fitted.coverage_receipts[0].counts["representativePaths"] == 0
+    assert fitted.coverage_receipts[0].counts["navigationSteps"] == 0
+
+
 def test_module_authoring_packet_keeps_scoped_signals_with_provenance(
     tmp_path: Path,
 ) -> None:
@@ -153,8 +185,6 @@ def test_module_authoring_packet_keeps_scoped_signals_with_provenance(
     assert any(handle["kind"] == "path" for handle in payload["expansionHandles"])
 
 
-# 路径是合法入口，用户无需预先知道内部提案 ID。
-# 从路径推导的信号仍须绑定所有者，不能作为无归属文本附加。
 def test_module_authoring_can_derive_proposal_from_a_source_path(tmp_path: Path) -> None:
     bundle = _bundle(tmp_path)
     packet = build_authoring_context(
@@ -172,8 +202,6 @@ def test_module_authoring_can_derive_proposal_from_a_source_path(tmp_path: Path)
     )
 
 
-# 发现阶段返回的能力句柄必须能直接传回模块创作接口。
-# 此往返保护接口可组合性，避免要求调用者拼装内部映射。
 def test_capability_expansion_handle_is_a_direct_module_selector(tmp_path: Path) -> None:
     bundle = _bundle(tmp_path)
     discovery = build_authoring_context(bundle, ContextRequest(TaskIntent.SCOPE_DISCOVERY))
@@ -192,9 +220,6 @@ def test_capability_expansion_handle_is_a_direct_module_selector(tmp_path: Path)
     assert packet.to_dict()["requestedScope"]["capabilityIds"] == [capability_id]
 
 
-# 从 CLI 读取 JSON 验证适配层没有额外套入旧分页信封。
-# 两个摘要共同指定分析身份，避免误用“最新”包的可变状态。
-# 成功数据保持 stdout 可解析，供脚本直接消费。
 def test_internal_context_cli_returns_packet_without_cursor_protocol(tmp_path: Path) -> None:
     bundle = _bundle(tmp_path)
     result = CliRunner().invoke(
@@ -221,9 +246,6 @@ def test_internal_context_cli_returns_packet_without_cursor_protocol(tmp_path: P
     assert "nextCursor" not in payload
 
 
-# 缺少范围属于调用契约错误，退出码应区别于内部执行失败。
-# requiredAnyOf 给出可恢复的参数选择，不要求调用者解析中文提示。
-# 错误协议保留英文键名，展示层本地化不改变机器字段。
 def test_internal_context_cli_reports_unbounded_module_authoring_as_contract_error(
     tmp_path: Path,
 ) -> None:
@@ -254,3 +276,280 @@ def test_internal_context_cli_reports_unbounded_module_authoring_as_contract_err
         "paths",
         "symbols",
     ]
+
+
+@pytest.mark.parametrize("intent", list(TaskIntent))
+@pytest.mark.parametrize("selector", ["path", "symbol"])
+def test_source_selectors_are_real_queries(
+    tmp_path: Path, intent: TaskIntent, selector: str
+) -> None:
+    bundle = _bundle(tmp_path, multiple=True)
+    scope = (
+        PacketScope(paths=("OrderController.java",))
+        if selector == "path"
+        else PacketScope(symbols=("OrderController.create",))
+    )
+    packet = build_authoring_context(bundle, ContextRequest(intent, scope))
+    _validate(packet.to_dict())
+    # 本夹具无服务拓扑，空服务包是合法 no-match；其余意图都有真实证据。
+    if intent is not TaskIntent.SERVICE_BOUNDARY:
+        assert packet.proposals or packet.evidence or packet.terminal_effects
+        assert packet.coverage_receipts[0].completeness != "unavailable"
+    assert packet.requested_scope == scope
+    assert packet.expansion_queries
+
+
+@pytest.mark.parametrize("intent", list(TaskIntent))
+def test_unknown_capability_never_leaks_other_scopes(tmp_path: Path, intent: TaskIntent) -> None:
+    bundle = _bundle(tmp_path, multiple=True)
+    scope = PacketScope(capability_ids=("cap-missing",))
+    packet = build_authoring_context(bundle, ContextRequest(intent, scope))
+    assert not packet.proposals and not packet.evidence and not packet.ambiguities
+    assert not packet.source_anchors
+    assert packet.coverage_receipts[0].completeness == "unavailable"
+
+
+def test_unmatched_service_symbol_does_not_return_global_summary(tmp_path: Path) -> None:
+    bundle = _bundle(tmp_path, multiple=True)
+    scope = PacketScope(symbols=("MissingService.handle",))
+    page = query_evidence(bundle, EvidenceQuery(view="services", symbols=scope.symbols))
+    assert not page.items
+    packet = build_authoring_context(bundle, ContextRequest(TaskIntent.SERVICE_BOUNDARY, scope))
+    assert not packet.proposals and not packet.evidence
+    assert packet.coverage_receipts[0].completeness == "unavailable"
+
+
+@pytest.mark.parametrize(
+    "intent", [intent for intent in TaskIntent if intent is not TaskIntent.SERVICE_BOUNDARY]
+)
+def test_source_drift_survives_context_packaging(tmp_path: Path, intent: TaskIntent) -> None:
+    bundle = _bundle(tmp_path, multiple=True)
+    source = tmp_path / "OrderController.java"
+    source.write_text("// changed\n" + source.read_text())
+    packet = build_authoring_context(
+        bundle, ContextRequest(intent, PacketScope(paths=(source.name,)))
+    )
+    assert packet.coverage_gaps
+    assert any(
+        gap["reasonCode"] == "machine.packet.source-changed-after-analysis"
+        for gap in packet.coverage_gaps
+    )
+    assert packet.coverage_receipts[0].completeness == "partial"
+    assert not packet.proposals and not packet.evidence and not packet.representative_paths
+
+
+def test_audit_keeps_inventory_entries_relations_and_gaps(tmp_path: Path) -> None:
+    bundle = _bundle(tmp_path, multiple=True)
+    packet = build_authoring_context(
+        bundle,
+        ContextRequest(TaskIntent.COVERAGE_AUDIT, PacketScope(paths=("OrderController.java",))),
+    )
+    assert {"sourceFile", "sourceEntry", "sourceRelation"} <= {
+        row["details"]["recordType"] for row in packet.evidence
+    }
+    assert packet.coverage_gaps  # 动态 repository 调用未解析，不能被记录类型筛选抹去。
+    assert all(
+        gap["reasonCode"] != "machine.store.invalid-coverage-reason" for gap in packet.coverage_gaps
+    )
+    assert packet.coverage_receipts[0].completeness == "partial"
+    assert all(row["witness"]["path"] == "OrderController.java" for row in packet.evidence)
+    replay = next(row for row in packet.expansion_queries if row["recordTypes"] == ["sourceFile"])
+    assert query_evidence(
+        bundle,
+        EvidenceQuery(
+            view=replay["view"],
+            paths=tuple(replay["paths"]),
+            record_types=tuple(replay["recordTypes"]),
+        ),
+    ).items
+
+
+def test_colocated_signals_survive_storage_and_all_authoring_intents(tmp_path: Path) -> None:
+    # 一行内的锁、数据保存与消息发送分别影响规则、状态和协作说明。
+    # 只按行号和 effect 去重会把前三项压成最后一个 send，且没有缺口提示。
+    (tmp_path / "OrderController.java").write_text(
+        """class OrderController {
+ @OpenApiPostMapping(apiName = "Create", apiUrl = "/orders")
+ public void create() { lock(); repository.save(order); publisher.send(event); }
+}
+""",
+        encoding="utf-8",
+    )
+    receipt = analyze_repository(tmp_path, AnalysisOptions(compiler_mode="off"))
+    bundle = open_analysis(tmp_path, receipt.identity)
+    scope = PacketScope(paths=("OrderController.java",))
+    page = query_evidence(
+        bundle,
+        EvidenceQuery(view="evidence", paths=scope.paths, record_types=("authoringSignal",)),
+    )
+    expected = {("lock", "lock("), ("authoritative-write", "save"), ("authoritative-write", "send")}
+    effects = [row for row in page.items if row.to_dict()["kind"] == "effect"]
+    assert {(row.details["evidenceKind"], row.details["value"]) for row in effects} == expected
+    assert len({row.record_id for row in effects}) == len(expected)
+    for intent in (
+        TaskIntent.MODULE_AUTHORING,
+        TaskIntent.CONSTRAINT_EXTRACTION,
+        TaskIntent.COVERAGE_AUDIT,
+    ):
+        packet = build_authoring_context(bundle, ContextRequest(intent, scope))
+        _validate(packet.to_dict())
+        signals = [
+            signal
+            for proposal in packet.proposals
+            for signal in proposal.get("authoringSignals", [])
+        ]
+        flat_signals = [
+            row for row in packet.terminal_effects if row.get("recordType") == "authoringSignal"
+        ]
+        details = [signal["details"] for signal in signals] + flat_signals
+        assert expected <= {(row.get("evidenceKind"), row.get("value")) for row in details}
+        delivered_ids = {row["recordId"] for row in (*signals, *flat_signals)}
+        assert {row.record_id for row in effects} <= delivered_ids
+
+
+def test_unbound_configuration_signal_is_included_in_delivery_count(tmp_path: Path) -> None:
+    (tmp_path / "settings.py").write_text('import os\nTIMEOUT = os.getenv("TIMEOUT")\n')
+    receipt = analyze_repository(tmp_path, AnalysisOptions(compiler_mode="off"))
+    bundle = open_analysis(tmp_path, receipt.identity)
+    packet = build_authoring_context(
+        bundle,
+        ContextRequest(
+            TaskIntent.MODULE_AUTHORING,
+            PacketScope(paths=("settings.py",)),
+            PacketBudget(low_resolution_quota=0),
+        ),
+    )
+    signals = [
+        row["signal"]
+        for row in packet.ambiguities
+        if row.get("marker") == "unbound-authoring-signal"
+    ]
+    assert len(signals) == 1 and signals[0]["details"]["evidenceKind"] == "config"
+    assert packet.coverage_receipts[0].counts["authoringSignals"] == 1
+    assert packet.coverage_receipts[0].completeness == "partial"
+    _validate(packet.to_dict())
+
+
+def test_provenance_and_whole_paths_survive_one_path_quota(tmp_path: Path) -> None:
+    bundle = _bundle(tmp_path, multiple=True)
+    discovery = build_authoring_context(bundle, ContextRequest(TaskIntent.SCOPE_DISCOVERY))
+    cap = next(row["capabilityId"] for row in discovery.capabilities)
+    packet = build_authoring_context(
+        bundle,
+        ContextRequest(
+            TaskIntent.MODULE_AUTHORING,
+            PacketScope(capability_ids=(cap,)),
+            PacketBudget(max_paths_per_capability=1),
+        ),
+    )
+    assert len(packet.representative_paths) >= 4
+    assert [row["stepIndex"] for row in packet.representative_paths] == list(
+        range(len(packet.representative_paths))
+    )
+    assert packet.representative_paths[-1]["terminal"]
+    for row in packet.representative_paths:
+        assert row["recordId"] and row["witness"] and row["resolution"] and row["sourceLayer"]
+    constraints = build_authoring_context(
+        bundle, ContextRequest(TaskIntent.CONSTRAINT_EXTRACTION, PacketScope(capability_ids=(cap,)))
+    )
+    for row in (
+        *constraints.proposals,
+        *constraints.terminal_effects,
+        *constraints.authoritative_objects,
+    ):
+        assert row["recordId"] and row["witness"] and row["resolution"] and row["sourceLayer"]
+
+
+def test_mixed_selector_axes_intersect_and_domain_union_is_explicit(tmp_path: Path) -> None:
+    bundle = _bundle(tmp_path, multiple=True)
+    discovery = build_authoring_context(bundle, ContextRequest(TaskIntent.SCOPE_DISCOVERY))
+    candidate = next(
+        row["proposalId"]
+        for row in discovery.proposals
+        if row["capabilityIds"]
+        and any(
+            entry.get("path") == "OrderController.java" for entry in row["representativeEntries"]
+        )
+    )
+    a = query_evidence(bundle, EvidenceQuery(view="evidence", candidate_ids=(candidate,)))
+    b = query_evidence(bundle, EvidenceQuery(view="evidence", paths=("StockController.java",)))
+    mixed = query_evidence(
+        bundle,
+        EvidenceQuery(view="evidence", candidate_ids=(candidate,), paths=("StockController.java",)),
+    )
+    assert a.items and b.items and not mixed.items
+    assert {row.witness.path for row in (*a.items, *b.items) if row.witness} == {
+        "OrderController.java",
+        "StockController.java",
+    }
+
+
+def test_service_context_keeps_outgoing_incoming_and_projection_gaps(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from modus.machine.projection import lifecycle
+
+    def topology_fixture(*args: object, **kwargs: object) -> dict[str, object]:
+        # 确定的上游拓扑夹具，后续 N5/N6 仍实际发布、认证和查询。
+        return {
+            "baselineDigest": kwargs["baseline_digest"],
+            "nodes": [
+                {
+                    "id": "order",
+                    "kind": "service",
+                    "sourceAnchors": [{"path": "OrderController.java"}],
+                },
+                {
+                    "id": "stock",
+                    "kind": "service",
+                    "sourceAnchors": [{"path": "StockController.java"}],
+                },
+            ],
+            "edges": [
+                {
+                    "id": "reserve",
+                    "source": "order",
+                    "target": "stock",
+                    "relation": "calls",
+                    "resolution": "candidate",
+                    "sourceLayer": "reconciled",
+                    "witness": {"path": "OrderController.java", "startLine": 3},
+                }
+            ],
+            "coverageGaps": [
+                {
+                    "reasonCode": "machine.projection.service-relation-without-witness",
+                    "relationId": "unknown",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(lifecycle, "project_services", topology_fixture)
+    bundle = _bundle(tmp_path, multiple=True)
+    for scope in (
+        PacketScope(),
+        PacketScope(boundary_ids=("order",)),
+        PacketScope(boundary_ids=("stock",)),
+        PacketScope(paths=("OrderController.java",)),
+    ):
+        packet = build_authoring_context(bundle, ContextRequest(TaskIntent.SERVICE_BOUNDARY, scope))
+        relations = [
+            row for row in packet.evidence if row["details"]["recordType"] == "serviceRelation"
+        ]
+        assert len(relations) == 1
+        assert (
+            relations[0]["details"]["source"] == "order"
+            and relations[0]["details"]["target"] == "stock"
+        )
+        assert (
+            relations[0]["resolution"] == "candidate"
+            and relations[0]["witness"]["path"] == "OrderController.java"
+        )
+        _validate(packet.to_dict())
+        if not scope.boundary_ids and not scope.paths:
+            assert packet.coverage_gaps and packet.coverage_receipts[0].completeness == "partial"
+    (tmp_path / "OrderController.java").write_text("// changed")
+    stale = build_authoring_context(
+        bundle, ContextRequest(TaskIntent.SERVICE_BOUNDARY, PacketScope(boundary_ids=("stock",)))
+    )
+    assert stale.coverage_gaps and not stale.evidence

@@ -321,3 +321,70 @@ def test_publication_requires_v2_execution_evidence_and_coverage(tmp_path: Path)
     assert "authoring-execution-mode-invalid" in _codes(
         run_verify_knowledge(str(tmp_path), publication=True)
     )
+
+
+@pytest.mark.parametrize(
+    "selector",
+    [
+        "not-a-selector",
+        "path:modus/knowledge/domain/core",
+        "path:modus/.cache/init-analysis",
+        "path:../outside",
+        "path:.//",
+        "candidate: ",
+    ],
+)
+def test_publication_rejects_invalid_source_selectors(selector: str) -> None:
+    from modus.knowledge_verification.authoring_card import (
+        verify_domain_coverage,
+        verify_module_execution,
+    )
+
+    coverage = verify_domain_coverage(
+        "core", {"status": "audited", "mode": "machine-context", "selector": selector}
+    )
+    module = verify_module_execution(
+        "core",
+        "runner",
+        {
+            "status": "reviewed",
+            "evidence": {
+                "status": "ready",
+                "mode": "machine-context",
+                "requestedScope": "module:core/runner",
+                "selector": selector,
+            },
+        },
+    )[1]
+    assert {item.code for item in coverage} == {"authoring-coverage-selector-invalid"}
+    assert {item.code for item in module} == {"authoring-module-selector-invalid"}
+
+
+def test_publication_accepts_explicit_queries_and_source_fallback() -> None:
+    from modus.knowledge_verification.authoring_card import (
+        verify_domain_coverage,
+        verify_module_execution,
+    )
+
+    assert not verify_domain_coverage(
+        "core",
+        {
+            "status": "audited",
+            "mode": "machine-context",
+            "selector": ["candidate:core", "path:src/runner.py"],
+        },
+    )
+    assert not verify_module_execution(
+        "core",
+        "runner",
+        {
+            "status": "reviewed",
+            "evidence": {
+                "status": "ready",
+                "mode": "source-fallback",
+                "requestedScope": "module:core/runner",
+                "selector": "src/runner.py",
+                "reason": "source changed",
+            },
+        },
+    )[1]

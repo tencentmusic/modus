@@ -27,8 +27,8 @@ Module 能以一个或一组紧密相关的任务解释，具有可辨识的触�
 1. 完整确认卡 `modus/.cache/knowledge-authoring/scope-confirmation.md` 的可点击文件链接。
 2. 完整中文总览表；每个正式 Domain 一行，表头固定为 `业务域名称 | 简介 | 功能模块个数 | 列举功能模块中文名`。功能模块使用中文能力名，不得只列 slug、数量或部分示例代替完整表格。
 3. 明确说明正式正文尚未写入或本轮结构变化尚未发布。宿主支持 subagent 且至少有两个边界清楚的 Domain 时，提供四个同级选项，不能把并行授权藏在三个选项后的附注：
-   1. **确认业务域及功能模块，并按 Domain 使用 subagent 并行撰写（推荐）**
-   2. **确认业务域及功能模块，并串行撰写**
+   1. **确认业务域及功能模块，并串行撰写（推荐）**
+   2. **确认业务域及功能模块，并按 Domain 使用 subagent 并行撰写**
    3. **修改或新增业务域及功能模块**
    4. **重新生成业务域及功能模块**
 
@@ -54,16 +54,16 @@ Module 能以一个或一组紧密相关的任务解释，具有可辨识的触�
 
 frontmatter 使用以下 `schemaVersion: 2` 机器结构；Domain、Module 与 visual id 都使用稳定 slug。Module 的 `evidence` 记录精确 requested scope、selector 与取证模式，Domain 的 `coverage` 记录域级源码覆盖审计。Scope 阶段两者先置 `pending`，不能在批量写文件后补造为已完成。
 
-Scope 阶段的 `visuals` 只记录候选决定：每项同时记录它回答的 `readerQuestion` 和触发它的真实 `mechanism`。已知需要图表时使用 `mermaid` 或 `table` 并先置 `planned`；当前没有候选时使用 `kind: none`、`status: waived` 和具体理由，不能靠空列表表示“评估过”。这不是最终视觉计划，当前 Domain 的 Module 证据闭合后、写正文前必须重新评估并原位更新。
+Scope 阶段的 `visuals` 只记录候选决定：每项同时记录它回答的 `readerQuestion` 和触发它的真实 `mechanism`。已知需要图表时使用 `mermaid` 或 `table` 并先置 `planned`；当前没有候选时使用 `kind: none`、`status: waived` 和具体理由，不能靠空列表表示“评估过”。这不是最终视觉计划；按[图文合同](../framework/visual-expression.md#证据与唯一主图)，每个工作单元证据闭合后、写相应正文前重新评估并原位更新同一领域计划。
 
-用户明确的篇目、案例与最低配图要求记录在卡片已有正文，并将相应图表纳入现有 `visuals`。通用的按需选图建议不能覆盖这些要求，`waived` 不能自动豁免用户要求；没有持久状态时可以用有依据的阶段流程解释完成口径，不能为满足图数伪造状态或关系。
+[初始化质量要求](../framework/index.md#初始化质量要求)及用户明确的篇目、案例与最低配图要求记录在卡片已有正文，并将相应图表纳入现有 `visuals`。通用的按需选图建议不能覆盖这些要求，`waived` 不能自动豁免用户要求；没有持久状态时可以用有依据的阶段流程解释完成口径，不能为满足图数伪造状态或关系。
 
 ```yaml
 ---
 modus:
   authoring:
     schemaVersion: 2
-    executionMode: domain-parallel
+    executionMode: serial
     domains:
       order:
         status: pending
@@ -71,7 +71,7 @@ modus:
         coverage:
           status: pending
           mode: machine-context
-          selector: "candidate:order OR capability:submit-order"
+          selector: ["candidate:order", "capability:submit-order"]
         modules:
           submit-order:
             status: pending
@@ -90,15 +90,17 @@ modus:
 ---
 ```
 
-发布前 Domain 和每个 Module 都必须为 `reviewed`，Domain outcome 必须为 `changed` 或 `unchanged`。Module evidence 必须为 `ready`；机器 context 的 `requestedScope` 必须精确等于当前 Module，源码 fallback 或纯业务材料必须记录原因。Domain coverage 必须为 `audited`，使用源码 selector；机器 coverage 不可用时才使用带原因的 `source-review`。已实现的图表置为 `authored`，并在目标正文中紧邻图表前写 `<!-- modus:visual:<id> -->`；放弃原计划则置为 `waived` 并记录基于证据的 `reason`。这只核对作者已经声明的决定，不按全局数量强迫画图。
+`selector` 使用 `candidate:<id>`、`capability:<id>`、`path:<仓库相对源码路径>` 或 `symbol:<限定符号>`；列表/OR 表示独立请求的并集。实际命令里的多个轴仍取交集。source-fallback/source-review 可使用原源码路径；business-material 记录材料定位。发布器拒绝生成知识/缓存路径及无效机器 selector，但不能仅凭这些字符串证明查询执行或事实消费。
 
-图表计划不是“每个 Domain 填一项”的配额。卡片正文应为每项决定记录读者问题、触发它的复杂关系、唯一主落点和选型理由，并区分导航型表格与解释型图表。Module 导航表只能兑现导航目的；若调查发现异步交接、持久状态、多条件决策、对象映射或资源生命周期，仍需在相应主定义重新规划时序、状态、决策、关系或生命周期表达。一个 Domain 可以有多项 visual；没有用户或专用交付要求且证据证明关系简单时，也可以全部具体豁免。“本域已有一张图”不能豁免另一个独立读者问题。
+发布前 Domain 和每个 Module 都必须为 `reviewed`，Domain outcome 必须为 `changed` 或 `unchanged`。Module evidence 必须为 `ready`；卡中 `requestedScope` 必须为当前 Module 知识 ID；机器 packet 的同名字段是实际 selector 对象，须按[机器消费合同](machine-packet.md#六阶段消费与可恢复记录)另行核对映射，源码 fallback 或纯业务材料必须记录原因。Domain coverage 必须为 `audited`，使用源码 selector；机器 coverage 不可用时才使用带原因的 `source-review`。已实现的图表置为 `authored`，并在目标正文中紧邻图表前写 `<!-- modus:visual:<id> -->`；放弃原计划则置为 `waived` 并记录基于证据的 `reason`。这只核对作者已经声明的决定，不按全局数量强迫画图。
 
-每个 Module 使用 `pending → evidence-ready → authored → reviewed`；Domain 完成时记录 `changed` 或 `unchanged`。无法继续时记录带原因的 `blocked`，但它不是完成态。只有该 Module 的精确 `module-authoring.requestedScope` 已核对并直接回读当前方法体、配置、SQL、测试或资源，且 `evidence.status` 已原位更新为 `ready`，才能标记 `evidence-ready`；一个覆盖多个独立 Module 的整域宽请求不能推进状态。正文写入后先逐 Module 回读，再进入 `authored`；只有三类读者回读和使用源码 selector 的域级 coverage audit 完成并记录为 `coverage.status: audited` 后，才能标记 `reviewed`。不得在批量写完文件后一次性把所有 Module 从 `pending` 改成 `reviewed`。状态是可恢复的编排事实，不是正文质量评分。
+图表计划不是“每个 Domain 填一项”的配额。卡片正文应为每项决定记录读者问题、触发它的复杂关系、唯一主落点和选型理由，并区分导航型表格与解释型图表。Module 导航表只能兑现导航目的；若调查发现异步交接、持久状态、多条件决策、对象映射或资源生命周期，仍需在相应主定义重新规划时序、状态、决策、关系或生命周期表达。一个 Domain 可以有多项 visual；不受初始化或用户专用交付要求约束、且证据证明关系简单的额外候选，可以具体豁免。“本域已有一张图”不能豁免另一个独立读者问题。
+
+每个 Module 使用 `pending → evidence-ready → authored → reviewed`；Domain 完成时记录 `changed` 或 `unchanged`。无法继续时记录带原因的 `blocked`，但它不是完成态。只有该 Module 的知识 ID、实际请求与 packet `requestedScope` 映射已核对并直接回读当前方法体、配置、SQL、测试或资源，且 `evidence.status` 已原位更新为 `ready`，才能标记 `evidence-ready`；一个覆盖多个独立 Module 的整域宽请求不能推进状态。正文写入后先逐 Module 回读，再进入 `authored`；只有三类读者回读和使用源码 selector 的域级 coverage audit 完成并记录为 `coverage.status: audited` 后，才能标记 `reviewed`。不得在批量写完文件后一次性把所有 Module 从 `pending` 改成 `reviewed`。状态是可恢复的编排事实，不是正文质量评分。
 
 上述回读按[发布合同](../publication.md#逐篇验收与事实对账)实际执行并逐篇留可定位结果：域作者逐篇检查本轮六专题及其分片、全部目标 Module 和 Domain 路由，核对接口/字段清单与跨页条件后再检查行文与图文；可用时查看目标阅读器的实际预览，无法预览则记录具体未验证项。缺篇、缺条目、待修订的事实冲突或阅读缺陷未解决时不得推进 `reviewed`。根作者抽样只作二次校准，不能替代域内全量逐篇回读。独立读者是授权与隔离上下文可用时的增强，未执行时不能用自查冒充。
 
-每次阶段转换都原位更新这张卡。生成了文件不等于阶段完成；每个 Domain 开始或恢复前都执行下述[逐域加载与恢复](#逐域加载与恢复)，再从最早未完成状态继续。并行时只有根作者串行更新执行卡，Domain worker 通过 handoff 提议事实和状态，不并发写卡。预计剩余范围无法保持当前深度时，应在 Domain 边界保存并恢复，不得压缩后续正文赶进度。所有已确认目标都达到 `reviewed` 且有 `changed / unchanged` Domain 终态后，仍须按[发布合同](../publication.md#cas-发布)核对收尾条件；本轮整页/逐图验收完成且无待修或待验项才删除卡片，存在 `blocked` 或视觉待验位置时保留。执行卡丢失或被提前删除时，不得根据生成文件反向拼装一张更小的“全部 reviewed”卡；能从权威来源完整恢复原状态才继续，否则保留阻塞并如实报告。
+每次阶段转换都原位更新这张卡。生成了文件不等于阶段完成；每个 Domain 开始或恢复前都执行下述[逐域加载与恢复](#逐域加载与恢复)，再从最早未完成状态继续。并行时只有根作者串行更新执行卡，Domain worker 通过 handoff 提议事实和状态，不并发写卡。预计剩余范围无法保持当前深度时，在当前契约组、对象或场景边界保存并恢复，不必等完整 Domain 写完，不得压缩后续正文赶进度。所有已确认目标都达到 `reviewed` 且有 `changed / unchanged` Domain 终态后，仍须按[发布合同](../publication.md#cas-发布)核对收尾条件；本轮整页/逐图验收完成且无待修或待验项才删除卡片，存在 `blocked` 或视觉待验位置时保留。执行卡丢失或被提前删除时，不得根据生成文件反向拼装一张更小的“全部 reviewed”卡；能从权威来源完整恢复原状态才继续，否则保留阻塞并如实报告。
 
 卡片正文用三个小账本即可，字段可以按正文语言本地化，但语义不得丢失；发布状态以 frontmatter 为准，正文表不得形成第二套冲突状态：
 
@@ -118,19 +120,4 @@ modus:
 
 ## 逐域加载与恢复
 
-init/reinit 在首次进入、切换或返回任一 Domain，以及上下文压缩、会话恢复或作者交接后，必须按以下顺序重新加载。模型容量/服务错误、工具调用中断、取消后继续和失败轮次后的重试也属于恢复，是否出现压缩事件不影响判断。除定位执行卡所需的动作外，**恢复后的第一项本域工作就是实际读取执行卡**；不能先查源码、先读成稿、先修改文件，最后补读卡片。串行作者与 Domain worker 使用同一流程；会话摘要、任务消息和“之前读过”只能帮助定位，不能替代实际读取。
-
-入口先分清新一轮调查与原任务续作。存在本轮未完成卡，或用户/宿主要求继续已中断任务时，先走本节，不能从 init/reinit 的 build 或 Scope 步骤重启。卡片与当前请求是否同一轮须依据记录判断；历史卡不能自动扩大本轮范围。原任务应有卡却缺失时沿用卡片丢失的处置，不以“新初始化”绕过恢复。
-
-若初始调查尚未到建卡阶段就中断，先核对已有构建返回和调查记录，从实际未完成步骤接续；这不属于已建卡丢失。已尝试过的 build 不重跑，结果不可确认时记录原因并回当前源码；不得凭生成文件猜测已确认范围。
-
-1. **先读执行卡。** 从本轮唯一 `modus/.cache/knowledge-authoring/scope-confirmation.md` 读取证据会话和当前 Domain 的完整条目及相关正文表，核对已确认范围、排除项、Module 归属、逐 Module 精确 selector 与 `requestedScope`、Domain/Module status、evidence、coverage、outcome、未闭合缺口、主定义/visual 决定和读时哈希。先确定本域最早未完成动作，再取证；不能根据目录名、已有文件或压缩摘要猜测归属和进度。工作区成员使用合并执行卡中的对应成员与 Domain 条目，不另建卡；worker 只读根作者指定的同一张卡。
-2. **再加载对应证据。** 按卡中双摘要或不可用原因、逐 Module selector，遵守[机器证据合同](machine-packet.md)加载本域待续作或复核范围的 `module-authoring` context，并按[场景闭合](scenario-closure.md)回读对应的当前方法体、装配、配置、SQL、测试和明确材料；按实际构建单元读取相关[语言适配器](language-adapters/index.md)。核对摘要和请求范围，不能把 `evidence.status: ready`、旧结论或文件首行锚点当成已经读到证据。上下文中已丢失的证据按原精确范围重新请求或定向回读；失败、空结果、partial 或源码漂移时回到当前源码补证并保留原因，不重建 bundle、不扩大为整域宽请求。已验收且与当前续作无关的 Module 不因恢复而重新调查。
-3. **然后回读相关已有正文。** 读取本域已有 Domain 路由、将写入或引用的六专题主定义与 Module 场景，以及相关跨域主定义、人工业务材料和约束，核对事实所有者、已写内容、链接与执行卡进度。首次创建时确认对应正文确实不存在；不能根据“文件已存在”推断已经完成。中断前写入缺少返回结果时，核对目标实际内容与原预期差异，区分未落盘、已落盘待验收和冲突；不直接重放追加/替换命令。保留原读时哈希；发现实际文件与卡片不一致或 CAS 冲突时先核对原因，不刷新哈希后直接覆盖，也不自动推进状态。
-4. **最后加载写作规范。** 完整读取[生成框架](../framework/index.md)，联读[布局](../framework/layout.md)、实际 [Surface](../framework/surface-profiles.md)、[自然语言](../framework/localization.md)、[编辑规则](../framework/editorial.md)，以及本域将编写的 [Domain](../framework/deliverables/domain.md)、[Module](../framework/deliverables/module.md)、[六专题总则](../framework/deliverables/topics.md)及其对应详细合同；复杂关系同时读取[图文表达](../framework/visual-expression.md)，按需从[对照样稿](../framework/examples.md)选取适合当前读者问题的样例。仅阅读索引、上一个 Domain 的规范摘要或通用写作模板不算完成加载。
-
-上述读取完成且范围、证据、正文与规范一致后，才从本域最早未完成状态继续取证、撰写或回读。证据缺口先补查，仍不可得则记录具体缺口；执行卡缺失、归属/selector 不明或必需规范不可读时，不凭记忆续写。恢复本身不触发重新确认 Scope、重跑 build、重置已完成状态或重写已验收正文，也不新增“已加载”字段、平行 receipt 或质量评分。同一 Domain 在未发生上下文丢失且证据仍可用时复用调查，不为不同专题重复扫描。
-
-计划暂停或交接前，由根作者将实际进度、未闭合问题和下一动作原位保存到执行卡；worker 通过 handoff 提供这些事实。保存到具体页、接口/字段/场景、最近完成的检查和最早未完成动作，同时保留未预览章节、待渲染 visual id 与结果未知的写入，不能只记 Domain 名或“继续补充”。每完成一个可恢复单元就原位更新当前记录，不等到预计压缩才保存，也不追加重复历史日志。发生压缩或意外中断后，即使停在某个 Module 中间，也从本节第 1 步恢复，不能直接沿压缩摘要续写剩余正文。
-
-发现已经跳过恢复顺序时立即停止本域续作，补做四步加载并核对这段期间的实际修改，再决定保留或修订；不得事后把漏读写成已执行。worker 将该差异交给根作者合并入原卡。只有实际内容变化或发现未完成验收才重开受影响范围，不因恢复本身重置全部领域。
+每次进入、切换或恢复 Domain，都执行[上下文保存与恢复](../context-continuity.md)的完整流程。该文件统一拥有压缩前检查点、压缩摘要保留项、四步恢复、意外中断和作者交接规则；不能用当前卡片状态或会话摘要替代实际读取。

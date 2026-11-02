@@ -213,6 +213,27 @@ def service_catalog(
                 f"services/boundaries/{_digest_path(boundary_id)}/records/{_digest_path(record_id)}.json",
             )
         )
+    # 没有可发布关系也可能是投影缺口，不能把诊断丢成“没有依赖”。
+    for row in _as_objects(services.get("coverageGaps")):
+        reason = str(row.get("reasonCode") or row.get("code") or "machine.projection.service-gap")
+        try:
+            validate_code(reason)
+        except ValueError:
+            reason = "machine.projection.service-gap"
+        value = gap_record(
+            reason,
+            details={
+                key: cast(Any, row[key])
+                for key in ("path", "symbol", "source", "target", "boundaryId", "relationId")
+                if key in row
+            },
+        ).to_dict()
+        record_id = str(value["recordId"])
+        records.append(
+            CatalogRecord(
+                f"!gap:{record_id}", value, f"services/gaps/{_digest_path(record_id)}.json"
+            )
+        )
     return write_catalog(
         directory,
         catalog="services",
@@ -307,15 +328,27 @@ def _evidence_record(
         if isinstance(value, list):
             value = value[:32]
         keep[name] = cast(Any, value)
+    identity: tuple[object, ...] = (
+        path,
+        raw.get("entryId") or raw.get("id") or raw.get("source"),
+        raw.get("target"),
+        raw.get("kind") or raw.get("relation"),
+        location.get("startLine") or witness_raw.get("startLine"),
+    )
+    if record_type == "authoringSignal":
+        # 同一行可同时加锁、保存数据和发送消息。规则及命中值也是信号身份，
+        # 不能让文件级去重静默覆盖这些不同事实；普通入口/关系身份保持不变。
+        identity += (
+            symbol,
+            raw.get("ruleId"),
+            raw.get("evidenceKind"),
+            raw.get("contract"),
+            raw.get("value"),
+            raw.get("observation"),
+        )
     return _positive_record(
         kind,
-        identity=(
-            path,
-            raw.get("entryId") or raw.get("id") or raw.get("source"),
-            raw.get("target"),
-            raw.get("kind") or raw.get("relation"),
-            location.get("startLine") or witness_raw.get("startLine"),
-        ),
+        identity=identity,
         candidate_ids=candidate_ids,
         resolution=str(raw.get("resolution") or ("exact" if kind == "entry" else "unresolved")),
         source_layer=str(raw.get("sourceLayer") or "cst"),

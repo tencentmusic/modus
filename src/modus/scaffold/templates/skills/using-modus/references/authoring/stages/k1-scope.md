@@ -1,0 +1,21 @@
+# K1：范围建模
+
+把当前源码、已有知识和用户材料转成完整且稳定的 Domain/Module 范围。新一轮 init/reinit 从这里开始；续作先走[上下文保存与恢复](../context-continuity.md)，不重新调查已确认范围。
+
+## 输入与必读
+
+- 输入：当前工作流、用户授权、已有知识树、本轮构建结果或不可用原因。
+- 读取[证据原则](../evidence/index.md)、[机器证据合同](../evidence/machine-packet.md)、[范围与执行卡](../evidence/scope-modeling.md)。
+- reinit 同时读取现有 Domain/Module 身份、人工材料和相关正文，按稳定身份比较变化。
+
+## 执行
+
+1. 单仓每轮同步执行至多一次 `modus internal init-analysis build --root . --compiler auto --json`，等待自然完成，记录双摘要及构建回执的覆盖/诊断摘要。init 请求 `scope-discovery`，reinit 请求 `reinit-diff`；只经 context/select 消费机器证据。失败或结果不可确认时记录原因，回当前源码，不重试构建或读取旧包。
+2. 按[材料覆盖](../evidence/index.md#材料覆盖)盘点全部已确认材料，逐步读完相关子目录、子文档及授权网页功能；不能用机器包或网页目录代替内容核验。将来源缺失、冲突和影响写入执行卡。
+3. 核对 packet 的范围库存、候选、remainder/needs-split、coverageGaps 和省略；按机器合同定向补齐会影响边界的条目，记录其处置。为全部公开入口族确定正式 Domain/Module、跨域平台能力、共享基础设施或有理由的排除；未决项具名记录。以业务结果、权威对象和变更责任划分，不能从目录、类名或聚类直接生成业务域。
+4. 建立唯一 `modus/.cache/knowledge-authoring/scope-confirmation.md`，按范围合同初始化 `schemaVersion: 2`，保留完整调查、稳定 ID、selector、Surface、证据会话与 `pending` 状态。按[跨域协作](../cross-domain.md)记录已知依赖和主定义归属，未知边界不猜测。
+5. init 合并确认完整结构；reinit 只确认真实新增、拆并、迁移、改名或已证明退役。按范围合同输出完整表格和执行选项；已有完整授权直接沿用。并行必须有明确授权，不能因确认范围自动委派。
+
+## 产出与出口
+
+执行卡中的完整范围、入口处置、材料清单和授权依据足以复核后，进入 [K2 创作计划](k2-plan.md)。确认尚未取得时保留调查结果，等待用户；不写正式正文。身份或边界争议留在 K1，资料细节缺口交 K3 定向补证。

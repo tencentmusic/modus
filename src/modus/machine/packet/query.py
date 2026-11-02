@@ -101,6 +101,9 @@ def _boundary_match(record: EvidenceRecord, boundary_ids: set[str]) -> bool:
 def _record_kind_match(
     record: EvidenceRecord, record_types: set[str], evidence_kinds: set[str]
 ) -> bool:
+    # 缺口属于所选源码范围，不因只取某一正向记录类别而消失。
+    if isinstance(record, CoverageGap):
+        return True
     details = record.details
     return (not record_types or str(details.get("recordType") or "") in record_types) and (
         not evidence_kinds or str(details.get("evidenceKind") or "") in evidence_kinds
@@ -220,6 +223,9 @@ def _selection_records(
         if requested_candidates and capabilities
         else requested_candidates or capability_candidates
     )
+    # 显式能力没有归属或与候选不相交时，所有视图都必须保持空集。
+    if capabilities and not candidates:
+        return []
     boundaries = set(request.boundary_ids)
     paths = set(request.paths)
     symbols = set(request.symbols)
@@ -227,8 +233,28 @@ def _selection_records(
     evidence_kinds = set(request.evidence_kinds)
     selected: list[tuple[str, EvidenceRecord]] = []
     if request.view == "scope":
+        if paths or symbols:
+            # 源码选择器通过已发布的记录找归属，不只匹配摘要的代表锚点。
+            matches = _selection_records(
+                bundle,
+                EvidenceQuery(
+                    view="evidence",
+                    candidate_ids=request.candidate_ids,
+                    capability_ids=request.capability_ids,
+                    paths=request.paths,
+                    symbols=request.symbols,
+                ),
+            )
+            source_candidates = {
+                candidate_id for _, record in matches for candidate_id in record.candidate_ids
+            }
+            candidates = (
+                candidates.intersection(source_candidates) if candidates else source_candidates
+            )
+            if not candidates:
+                return []
         summaries = _parse_unique([_prefix_records(bundle, "scope", "!summary:")])
-        if requested_candidates or capabilities:
+        if requested_candidates or capabilities or paths or symbols:
             if not candidates:
                 return []
             details = [
@@ -242,7 +268,12 @@ def _selection_records(
             selected = [
                 (key, record)
                 for key, record in parsed
-                if _candidate_match(record, candidates) and _capability_match(record, capabilities)
+                if _candidate_match(record, candidates)
+                and _capability_match(record, capabilities)
+                and (
+                    record.details.get("recordType") == "candidateSummary"
+                    or (_path_match(record, paths) and _symbol_match(record, symbols))
+                )
             ]
         else:
             selected.extend(summaries)
@@ -324,17 +355,8 @@ def _selection_records(
                 )
             )
     elif request.view == "services":
-        service_ranges = (
-            [
-                _prefixes_records(
-                    bundle,
-                    "services",
-                    [f"boundary:{boundary_id}:" for boundary_id in boundaries],
-                )
-            ]
-            if boundaries
-            else [load_catalog_range(bundle, "services")]
-        )
+        # 边按发起方存储；只读被查询边界的前缀会漏掉指向它的入边。
+        service_ranges = [load_catalog_range(bundle, "services")]
         parsed = _parse_unique(service_ranges)
         selected = [
             (key, record)
@@ -342,14 +364,17 @@ def _selection_records(
             if _boundary_match(record, boundaries)
             and _candidate_match(record, candidates)
             and _path_match(record, paths)
+            and _symbol_match(record, symbols)
             and (
-                bool(boundaries or candidates or paths)
+                bool(boundaries or candidates or paths or symbols)
+                or "serviceRelation" in record_types
                 or record.details.get("recordType") == "serviceBoundary"
+                or isinstance(record, CoverageGap)
             )
         ]
         # 无过滤的服务首屏只展示边界概要，关系细节留待指定范围读取。
         # 全局服务计数对应实际返回的边界集合。
-        if not (boundaries or candidates or paths):
+        if not (boundaries or candidates or paths or symbols):
             selected.append(
                 (
                     "!services:summary",
@@ -357,7 +382,10 @@ def _selection_records(
                         bundle,
                         record_type="servicesSummary",
                         count_name="boundaryCount",
-                        count=len(selected),
+                        count=sum(
+                            record.details.get("recordType") == "serviceBoundary"
+                            for _, record in selected
+                        ),
                         records=[record for _, record in selected],
                     ),
                 )

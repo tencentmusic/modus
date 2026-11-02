@@ -10,6 +10,7 @@ typed card schema.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import PurePosixPath
 from typing import Final
 
 from ..knowledge_reader import BoundKnowledgeReadError, read_bound_regular_text
@@ -112,6 +113,40 @@ def _non_empty_selector(value: object) -> bool:
     )
 
 
+def _source_selector(value: object, *, machine: bool) -> bool:
+    """校验声明的语法和源码边界，不将语法通过解释成查询已执行。"""
+    if not _non_empty_selector(value):
+        return False
+    values = [value] if isinstance(value, str) else value
+    if not isinstance(values, list):
+        return False
+    for expression in values:
+        for term in str(expression).split(" OR "):
+            term = term.strip()
+            kind, separator, reference = term.partition(":")
+            if separator and kind in {"candidate", "capability", "symbol"}:
+                if not reference.strip():
+                    return False
+                continue
+            if separator and kind == "path":
+                path = reference.strip()
+            elif machine:
+                return False
+            else:
+                path = term
+            parts = PurePosixPath(path).parts
+            if (
+                not parts
+                or path.startswith("/")
+                or "\\" in path
+                or ":" in path
+                or ".." in parts
+                or parts[:2] in {("modus", "knowledge"), ("modus", ".cache")}
+            ):
+                return False
+    return True
+
+
 # 模块状态与证据状态分别核验，已写正文不代表证据已就绪。
 # requestedScope 必须精确绑定当前领域和模块，避免复用相邻模块回执。
 # 选择器记录实际取证范围，不能仅声明使用了机器分析。
@@ -187,6 +222,16 @@ def verify_module_execution(
                 f"Module {domain}/{module} 需要精确的证据选择器",
             )
         )
+    elif mode != "business-material" and not _source_selector(
+        evidence.get("selector"), machine=mode == "machine-context"
+    ):
+        findings.append(
+            finding(
+                CARD_DOCUMENT,
+                "authoring-module-selector-invalid",
+                f"Module {domain}/{module} 需要源码范围的有效 selector",
+            )
+        )
     reason = evidence.get("reason")
     if mode in {"source-fallback", "business-material"} and (
         not isinstance(reason, str) or not reason.strip()
@@ -242,6 +287,14 @@ def verify_domain_coverage(domain: str, raw: object) -> list[VerificationFinding
                 CARD_DOCUMENT,
                 "authoring-coverage-selector-missing",
                 f"Domain {domain!r} 需要提供覆盖审查所用的源码选择器",
+            )
+        )
+    elif not _source_selector(coverage.get("selector"), machine=mode == "machine-context"):
+        findings.append(
+            finding(
+                CARD_DOCUMENT,
+                "authoring-coverage-selector-invalid",
+                f"Domain {domain!r} 不能用生成知识、缓存或无效 selector 证明覆盖",
             )
         )
     reason = coverage.get("reason")

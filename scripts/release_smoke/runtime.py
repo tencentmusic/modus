@@ -210,6 +210,15 @@ def _exercise_authoring_contract() -> None:
         "skills/modus-init/SKILL.md",
         "skills/modus-reinit/SKILL.md",
         "skills/using-modus/references/authoring/index.md",
+        "skills/using-modus/references/authoring/stages/k1-scope.md",
+        "skills/using-modus/references/authoring/stages/k2-plan.md",
+        "skills/using-modus/references/authoring/stages/k3-evidence.md",
+        "skills/using-modus/references/authoring/stages/k4-domain.md",
+        "skills/using-modus/references/authoring/stages/k5-system.md",
+        "skills/using-modus/references/authoring/stages/k6-publish.md",
+        "skills/using-modus/references/authoring/context-continuity.md",
+        "skills/using-modus/references/authoring/cross-domain.md",
+        "skills/using-modus/references/authoring/domain-worker-prompt.md",
         "skills/using-modus/references/authoring/evidence/index.md",
         "skills/using-modus/references/authoring/evidence/machine-packet.md",
         "skills/using-modus/references/authoring/evidence/scenario-closure.md",
@@ -311,6 +320,28 @@ def _exercise_init_analysis(
     )
     require(selection.get("schemaVersion") == 1, "证据筛选结果模式无效")
     require(isinstance(selection.get("items"), list), "证据筛选没有条目")
+    packet = _parse_json_object(
+        project.invoke(
+            "internal",
+            "init-analysis",
+            "context",
+            "--root",
+            str(project.root),
+            "--bundle-digest",
+            bundle_digest,
+            "--baseline-digest",
+            snapshot_digest,
+            "--intent",
+            "coverage-audit",
+            "--path",
+            "main.py",
+        ),
+        source="internal init-analysis context",
+    )
+    require(packet.get("schemaVersion") == 1, "创作上下文模式无效")
+    require(bool(packet.get("evidence")), "源码范围审计没有交付库存/入口证据")
+    require(isinstance(packet.get("coverageGaps"), list), "创作上下文缺少覆盖缺口")
+    require(bool(packet.get("expansionQueries")), "创作上下文缺少精确展开条件")
     require(
         _snapshot_markdown(project.root / "modus") == retained_knowledge,
         "初始化分析修改了保留的知识正文",

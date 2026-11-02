@@ -16,6 +16,8 @@
 | `using-modus/references/authoring/evidence/` | machine-packet、scope-modeling、scenario-closure、语言证据适配 |
 | `.../authoring/framework/` | 布局、运行形态、自然语言、图文、各 deliverable 的读者任务 |
 | `.../authoring/framework/editorial.md`、`examples.md` | 稳定的阅读排版合同与随包成对片段；按问题加载，不复制教学业务事实 |
+| `.../authoring/stages/k1-scope.md` 至 `k6-publish.md` | 六个执行入口：输入、必读细则、动作、产出与退回条件；init/reinit 共用 |
+| `.../authoring/context-continuity.md`、`cross-domain.md` | 原卡检查点、压缩摘要与恢复；共享基线、依赖顺序和变更传播 |
 | `.../authoring/execution-strategy.md` | 可替换的上下文、成文和读者测试组织方式，不降低质量合同、不新增状态 |
 | `.../authoring/publication.md` | 回读、核验、读时哈希、发布与执行卡清理 |
 | `.../authoring/parallel-domain-authoring.md`、domain-worker-prompt | 用户明确授权时完整 Domain 委派，根作者拥有执行卡与共享产物 |
@@ -24,7 +26,11 @@
 
 ## 六阶段创作
 
+实际路线为 K1 → 全局 K2 → 逐域 K2/K3/K4 → K5/K6；每阶段入口链接共享细则，不是六份重复规范。init/reinit 默认串行，初始化质量要求包含逐模块案例/关键流程图、每份状态/协作文档配图；局部维护不因此扩范围。
+
 K1：调查能力/公开入口族，决定领域与模块，保持稳定身份；K2：规划唯一主定义、模块选择器、图表、读时哈希与执行卡；K3：按真实场景闭合方法体/配置/测试证据；K4：完成一个领域的六专题、模块场景与 router；K5：校准跨域权威、方向、完成信号与根概览；K6：语义回读、机械/publication、CAS 与发布后回读。
+
+K3 的 `scenario-closure.md` 维护机器线索到正文的投影路线：区分各 intent 的信号位置，以来源和实际条件连接主定义、场景、案例与图。K3/K4 按完整工作单元交替，当前场景主定义稳定后立即成文并跨页核对，不等全域六专题写完才开始模块；域级全量对账、回读与预览仍不可省略。
 
 模块围绕“触发→输入→前置/决策→编排→权威写入/产物→同步返回/异步交接→最终可见结果→残留/恢复”。九类读者问题是评审维度，不是九个固定标题。backend/frontend/cli/library/worker/data/infrastructure/plugin 是运行形态，语言与框架是另一个轴。
 
@@ -36,11 +42,11 @@ K1：调查能力/公开入口族，决定领域与模块，保持稳定身份�
 
 ## 不同工作流的关键差异
 
-init/reinit 单仓每轮至多构建一次初始化包，失败直接用当前源码并记录缺口，不重复 build 或读旧包。init 先 scope-discovery，reinit 先 reinit-diff；逐模块 module-authoring 需精确 selector，域 coverage-audit 用已确认源码范围。
+init/reinit 单仓每轮至多构建一次初始化包，失败直接用当前源码并记录缺口，不重复 build 或读旧包。init 先 scope-discovery，reinit 先 reinit-diff；逐模块 module-authoring 需精确 selector，域 coverage-audit 用独立的已确认源码请求取结果并集。K2/K5 明确消费服务关系，K3 按需消费规则信号；原卡保存知识 ID 与机器请求的映射、证据处置和正文落点，K6 双向对账。reinit-diff 只提供当前基线，不替作者计算变化。
 
 update/sync 不构建或消费初始化 bundle。sync 只有本轮实际实现变化影响长期语义时才发生，不能接管已有脏改动；无影响静默结束，不固定执行 noop 检查。普通项目消费材料不等于授权持久保存材料。
 
-Scope 一次完整确认，已有完整授权复用；reinit 仅合并确认真实新增/拆并/迁移/退役，不因锚点/标题变化反复确认。执行卡只由主作者维护，保留完整调查状态；不能丢失后从输出重建缩小的全 reviewed 卡。并行领域创作需明确授权，串行确认不授权委派。
+Scope 一次完整确认，已有完整授权复用；reinit 仅合并确认真实新增/拆并/迁移/退役，不因锚点/标题变化反复确认。执行卡只由主作者维护，保留完整调查状态；不能丢失后从输出重建缩小的全 reviewed 卡。并行领域创作需明确授权，串行确认不授权委派。固定委托文本只替换事实定位，完整输入和实际发送文本保存在原卡；共享基线变化及时传播并重验受影响页，不能到 K5 才拼接跨域信息。
 
 ## 扩展与验证
 
