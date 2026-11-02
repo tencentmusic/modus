@@ -83,7 +83,7 @@ def render_skill_index(skills: Sequence[Skill], heading: str) -> str:
     if maintenance is not None:
         lines.extend(
             [
-                "**确认影响后的知识维护（自动执行）：**",
+                "**知识影响调查与维护（自动执行）：**",
                 _skill_line(maintenance),
                 "",
             ]

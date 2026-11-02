@@ -340,12 +340,14 @@ After upgrading the CLI, run `modus update --project` to deliver the latest comm
 
 Full authoring follows K1–K6: scope and material → definition planning → evidence closure → Domain and Module prose → project constraints → system overview and publication. Team standards are authored separately after domain facts are reviewed; the overview then uses both final outputs. Existing human standards remain protected, and first-time initialization only fills a missing document or an unchanged framework seed. See the [authoring contract](../docs/authoring-contract.md) for stage ownership and review requirements.
 
-Incremental updates and automatic sync share the prose and publication rules. They trace changed definitions to affected consumers, cross-domain handoffs, and navigation without reading initialization bundles. Engineering changes trigger a review of applicable team standards; editing those standards requires explicit intent. Unchanged prose is not rewritten, and per-file conflicts preserve successful writes.
+Incremental updates and automatic sync share the prose and publication rules. They trace actual changes through scenarios, primary definitions, consumers, platform implementations, and relevant navigation, repairing verified historical errors within affected scenarios. Existing modules are maintained automatically. Real structural changes reuse existing authorization or are confirmed together in the current task, which then continues without another maintenance command. Engineering changes trigger a review of applicable team standards; editing those standards requires explicit intent.
+
+The workflow reuses task evidence without initialization bundles, execution cards, persistent task queues, or host-specific steps. Accurate prose is left unchanged, uncertain impacts receive targeted investigation, and resolvable conflicts are handled in the current task. When user decisions, external evidence, or tool recovery are required, the remaining knowledge work is reported explicitly. This does not guarantee discovery of untouched historical gaps or recovery independent of conversation context.
 
 ### Automatic knowledge capabilities
 
 - `using-modus` progressively loads knowledge only when a task needs project facts, then decides whether a modifying task caused durable knowledge impact.
-- `modus-sync-knowledge` performs the smallest in-place, verifiable prose revision only after a positive impact decision.
+- `modus-sync-knowledge` investigates known or uncertain lasting impacts and makes the smallest in-place, verifiable prose revision.
 
 These are agent lifecycle capabilities, not extra workflows that users must remember and invoke on every task.
 

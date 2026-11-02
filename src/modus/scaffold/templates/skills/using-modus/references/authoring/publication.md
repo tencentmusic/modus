@@ -9,7 +9,7 @@
 
 发布分成三个不能互相替代的层次：Agent 语义回读、确定性机械核验、安全写入。
 
-init/reinit 执行完整的领域与全局验收，并使用原执行卡完成 publication 和清理。update/sync 以[增量维护流程](incremental.md)确定受影响页面及关联上下文，只复用对应的回读、预览、普通 verify 与 CAS 规则，不新建执行卡或执行全量抽查。
+init/reinit 执行完整的领域与全局验收，并使用原执行卡完成 publication 和清理。update/sync 以[增量维护流程](incremental.md)确定受影响页面及关联上下文，只复用对应的回读、预览、普通 verify 与 CAS 规则，不新建执行卡或执行全量抽查；下述执行卡记录、机器 coverage 和阶段状态仅适用于 init/reinit，增量结构确认与结束结论回到增量流程。
 
 ## 语义回读
 

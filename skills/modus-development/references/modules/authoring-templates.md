@@ -12,7 +12,7 @@
 | `skills/modus-init/SKILL.md`、references/workspace-init.md | 首次完整知识、工作区盘点/确认 |
 | `skills/modus-reinit/SKILL.md` | 既有完整快照复核、稳定身份、真实变化与精确退役 |
 | `skills/modus-update-knowledge/SKILL.md` | 明确材料或局部新事实的增量维护 |
-| `skills/modus-sync-knowledge/SKILL.md` | 当前代码任务确有长期影响后的静默最小修订 |
+| `skills/modus-sync-knowledge/SKILL.md` | 当前代码任务已知或未明影响的定向调查、最小修订与结束判断 |
 | `using-modus/references/authoring/evidence/` | machine-packet、scope-modeling、scenario-closure、语言证据适配 |
 | `.../authoring/framework/` | 布局、运行形态、自然语言、图文、各 deliverable 的读者任务 |
 | `.../authoring/framework/editorial.md`、`examples.md` | 稳定的阅读排版合同与随包成对片段；按问题加载，不复制教学业务事实 |
@@ -44,7 +44,7 @@ K3 的 `scenario-closure.md` 维护机器线索到正文的投影路线：区分
 
 init/reinit 单仓每轮至多构建一次初始化包，失败直接用当前源码并记录缺口，不重复 build 或读旧包。init 先 scope-discovery，reinit 先 reinit-diff；逐模块 module-authoring 需精确 selector，域 coverage-audit 用独立的已确认源码请求取结果并集。K2/K6 明确消费服务关系，K3 按需消费规则信号，K5 按机制/使用者复用或定向补齐约束证据；原卡保存知识 ID 与机器请求的映射、证据处置和正文落点，K6 双向对账。reinit-diff 只提供当前基线，不替作者计算变化。
 
-update/sync 共用 `using-modus/references/authoring/incremental.md`，不构建或消费初始化 bundle。从变化的主定义追踪消费者、跨域交接与导航，工程机制变化核对规范适用性；Team Standard 仍需明确维护授权。新增已确认域复用业务种子服务，落盘后按影响范围运行普通 verify，不使用要求执行卡的 publication。sync 只有本轮实际实现变化影响长期语义时才发生，不能接管已有脏改动；无影响静默结束，冲突与部分成功必须报告。普通项目消费材料不等于授权持久保存材料。
+update/sync 共用 `using-modus/references/authoring/incremental.md`，不构建或消费初始化 bundle，不增加执行卡、持久待办或宿主专用步骤。sync 调查本轮实际变化中的已知或未明影响，修复受影响场景内已证实的错漏，不能接管已有脏改动；候选为空和机械 noop 不证明无影响。从变化的主定义追踪场景、消费者、平台差异与导航，真实结构变化沿用授权或在当前任务中合并确认后继续。工程机制变化核对规范适用性；Team Standard 仍需明确维护授权。新增已确认域复用业务种子服务，落盘后按影响范围运行普通 verify，不使用要求执行卡的 publication。结束区分无需写入、同步完成与仍未完成，可解决的缺口和冲突继续处理，具体规则以共享流程为准。普通项目消费材料不等于授权持久保存材料。
 
 Scope 一次完整确认，已有完整授权复用；reinit 仅合并确认真实新增/拆并/迁移/退役，不因锚点/标题变化反复确认。执行卡只由主作者维护，保留完整调查状态；不能丢失后从输出重建缩小的全 reviewed 卡。并行领域创作需明确授权，串行确认不授权委派。固定委托文本只替换事实定位，完整输入和实际发送文本保存在原卡；共享基线变化及时传播并重验受影响页，不能到 K6 才拼接跨域信息。
 
