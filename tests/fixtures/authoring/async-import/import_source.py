@@ -196,26 +196,26 @@ def demonstrate():
     """以确定性示例复核正反例、部分成功、幂等和有条件恢复。"""
     system = ContactImporter()
     rows = [
-        {"name": "林禾", "email": "LIN@example.test"},
-        {"name": "周宁", "email": "bad-address"},
-        {"name": "林禾（更新）", "email": "lin@example.test"},
+        {"name": "联系人甲", "email": "ALPHA@example.test"},
+        {"name": "联系人乙", "email": "bad-address"},
+        {"name": "联系人甲（更新）", "email": "alpha@example.test"},
     ]
-    accepted = system.submit("team-a", "batch-a", rows)
+    accepted = system.submit("tenant-demo-a", "batch-a", rows)
     job_id = accepted["job_id"]
     assert accepted["status"] == "queued" and accepted["processed"] == 0
-    assert system.submit("team-a", "batch-a", rows) == accepted
+    assert system.submit("tenant-demo-a", "batch-a", rows) == accepted
     final = system.run_next()
     assert (final["status"], final["written"], final["rejected"]) == ("partial", 2, 1)
     assert [r["outcome"] for r in final["results"]] == ["created", "rejected", "updated"]
     assert len(system._contacts) == 1  # 两次写入不等于两个独立联系人。
-    assert system.submit("team-a", "batch-a", rows) == final
+    assert system.submit("tenant-demo-a", "batch-a", rows) == final
     assert system.run_next() is None  # 重复提交没有产生额外待执行任务。
     errors = []
     for operation, expected in [
-        (lambda: system.submit("team-a", "batch-a", rows[:1]), IdempotencyConflict),
-        (lambda: system.submit("team-a", "empty", []), InvalidRequest),
-        (lambda: system.query("team-b", job_id), JobNotFound),
-        (lambda: system.retry("team-a", job_id), RetryNotAllowed),
+        (lambda: system.submit("tenant-demo-a", "batch-a", rows[:1]), IdempotencyConflict),
+        (lambda: system.submit("tenant-demo-a", "empty", []), InvalidRequest),
+        (lambda: system.query("tenant-demo-b", job_id), JobNotFound),
+        (lambda: system.retry("tenant-demo-a", job_id), RetryNotAllowed),
     ]:
         try:
             operation()
@@ -224,23 +224,23 @@ def demonstrate():
         else:
             raise AssertionError(f"预期异常 {expected.__name__}")
     recovery_rows = [
-        {"name": "陈青", "email": "chen@example.test"},
-        {"name": "许白", "email": "xu@example.test"},
+        {"name": "联系人丙", "email": "gamma@example.test"},
+        {"name": "联系人丁", "email": "delta@example.test"},
     ]
-    recovery = system.submit("team-a", "batch-b", recovery_rows)
+    recovery = system.submit("tenant-demo-a", "batch-b", recovery_rows)
     failed = system.run_next(fail_before_row=1)
     assert (failed["processed"], failed["retryable"], failed["attempts"]) == (1, True, 1)
-    requeued = system.retry("team-a", recovery["job_id"])
+    requeued = system.retry("tenant-demo-a", recovery["job_id"])
     assert requeued["processed"] == 1 and requeued["status"] == "queued"
     recovered = system.run_next()
     assert recovered["status"] == "succeeded" and recovered["attempts"] == 2
     assert [r["outcome"] for r in recovered["results"]] == ["created", "created"]
-    exhausted = system.submit("team-a", "batch-c", recovery_rows)
+    exhausted = system.submit("tenant-demo-a", "batch-c", recovery_rows)
     system.run_next(fail_before_row=0)
-    system.retry("team-a", exhausted["job_id"])
+    system.retry("tenant-demo-a", exhausted["job_id"])
     exhausted = system.run_next(fail_before_row=0)
     assert exhausted["status"] == "failed" and not exhausted["retryable"]
-    invalid = system.submit("team-a", "batch-d", [{"name": "", "email": "x"}])
+    invalid = system.submit("tenant-demo-a", "batch-d", [{"name": "", "email": "x"}])
     invalid = system.run_next()
     assert invalid["error"] == "all_rows_rejected" and not invalid["retryable"]
     return {

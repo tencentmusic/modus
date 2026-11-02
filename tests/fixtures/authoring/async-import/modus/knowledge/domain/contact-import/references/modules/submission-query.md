@@ -39,16 +39,21 @@ anchors:
 
 ## 场景一：提交三行，确认已经受理
 
-本场景使用新建的空导入器实例，联系人为空且没有更早排队任务。运营者希望导入林禾、周宁两位联系人，并用第三行更新林禾的姓名。提交者传入租户 `team-a`、幂等键 `batch-a` 和三行列表。前提是每行恰好包含字符串 `name` 与 `email`，行数在 1–100 之间；租户必须非空白，幂等键长度为 1–64。
+本场景使用新建的空导入器实例，联系人为空且没有更早排队任务。运营者希望导入联系人甲、联系人乙两位联系人，并用第三行更新联系人甲的姓名。提交者传入租户 `tenant-demo-a`、幂等键 `batch-a` 和三行列表。前提是每行恰好包含字符串 `name` 与 `email`，行数在 1–100 之间；租户必须非空白，幂等键长度为 1–64。
+
+宿主将运营者整理的数据转换为 Python 行列表，保存稳定的租户和本次请求键；教学实现不读取 CSV，也不从登录用户自动取得租户。先约定由谁显式执行同一实例的队列，否则提交者只能看到一直等待。以下代码可在教学项目目录按顺序执行。
 
 ```python
 # 示例输入：同一归一化邮箱出现两次，中间有一行坏邮箱。
+from import_source import ContactImporter
+
+importer = ContactImporter()
 rows = [
-    {"name": "林禾", "email": "LIN@example.test"},
-    {"name": "周宁", "email": "bad-address"},
-    {"name": "林禾（更新）", "email": "lin@example.test"},
+    {"name": "联系人甲", "email": "ALPHA@example.test"},
+    {"name": "联系人乙", "email": "bad-address"},
+    {"name": "联系人甲（更新）", "email": "alpha@example.test"},
 ]
-accepted = importer.submit("team-a", "batch-a", rows)
+accepted = importer.submit("tenant-demo-a", "batch-a", rows)
 ```
 
 系统先做整体结构检查，再查同租户幂等键。新请求会保存输入副本和任务，追加任务号到队列，并返回 `queued`。此时 `total=3`、`processed=0`、`written=0`、`attempts=0`。示例中的坏邮箱并不阻止受理，因为行值校验将在执行时发生。
@@ -59,16 +64,16 @@ accepted = importer.submit("team-a", "batch-a", rows)
 
 ```mermaid
 flowchart TD
-    A[提交租户、键和输入行] --> B{整体结构有效吗}
+    A["提交租户与键<br/>携带有序输入行"] --> B{整体结构有效吗}
     B -->|否| X[返回请求错误，不创建任务]
-    B -->|是| C{同租户同键存在吗}
-    C -->|否| D[保存输入副本并排队]
+    B -->|是| C{"同租户同键<br/>已有任务?"}
+    C -->|否| D[保存输入并入队]
     C -->|是| E{原始载荷相同吗}
     E -->|否| Y[返回幂等冲突，保留旧任务]
-    E -->|是| F[返回旧任务当前快照]
-    D --> G[返回等待状态和任务号]
+    E -->|是| F["返回旧任务<br/>当前快照"]
+    D --> G[返回等待快照]
     G --> H[调度者显式执行]
-    H --> I[查询逐行结果和完成阶段]
+    H --> I[查询结果与阶段]
 ```
 
 这张图帮助提交者决定该等待、纠正请求还是读取旧任务。旧任务快照可能仍在等待，也可能已经完成；同键同载荷不会再次进入执行路径。图中的显式执行由另一个模块承担，它不是查询自动触发的动作。
@@ -77,32 +82,52 @@ flowchart TD
 
 提交者不确定上一次调用是否已被业务层受理时，可以用完全相同的租户、键和原始行列表再次调用。任务存在且指纹相同，就返回原任务当前快照；队列不会增加第二份工作。首次执行前返回 `queued`，执行结束后则返回最终结果。
 
-这个幂等约束关注原始请求，不关注最终联系人是否相同。将 `LIN@example.test` 改成小写，或者给姓名增加空格，即使执行时归一化后相同，原键重提仍会冲突。只调整每行对象键的排列不冲突，因为指纹计算会统一键顺序。
+这个幂等约束关注原始请求，不关注最终联系人是否相同。将 `ALPHA@example.test` 改成小写，或者给姓名增加空格，即使执行时归一化后相同，原键重提仍会冲突。只调整每行对象键的排列不冲突，因为指纹计算会统一键顺序。
 
 发生 `IdempotencyConflict` 后，先核对是否错误复用了键。若确实是新请求，使用新键；若只是想知道旧请求结果，查询旧任务。系统没有以同键修改已受理输入的入口。完整比较规则见[规则 R2](../rule.md#r2幂等键保护同一次请求不修改旧请求)。
 
 ## 场景三：读懂部分成功，并完成坏行修正
 
-教学调度者调用一次执行后，三行依次得到：第一行 `created`，第二行 `rejected` 且原因为 `invalid_email`，第三行 `updated`。查询结果是 `partial`，`processed=3`、`written=2`、`rejected=1`。联系人现值只有一条，姓名为“林禾（更新）”。
-
-这里的“2”表示两行有效写入，不表示新增两个人。`processed` 包含被拒绝行，所以处理进度已经达到 3/3。`partial` 是本批终结结果，系统不会继续尝试修复周宁的邮箱；原任务恢复也不允许用于这一状态。
-
-提交者从行结果定位原始第 2 行，修正邮箱为示例值 `zhou@example.test`，使用新键 `batch-a-fix` 提交单行请求。调度者执行新任务后，该行被创建，新任务为 `succeeded`。旧任务仍为 `partial`，保留原批次的真实记录，不会因为新任务成功而改写历史结果。
+教学调度者调用一次执行后，三行依次得到：第一行 `created`，第二行 `rejected` 且原因为 `invalid_email`，第三行 `updated`。查询结果是 `partial`，`processed=3`、`written=2`、`rejected=1`。联系人现值只有一条，姓名为“联系人甲（更新）”。
 
 ```python
-fixed = importer.submit("team-a", "batch-a-fix", [
-    {"name": "周宁", "email": "zhou@example.test"},
+executed = importer.run_next()
+observed = importer.query("tenant-demo-a", accepted["job_id"])
+assert executed["job_id"] == accepted["job_id"]
+assert (observed["status"], observed["written"], observed["rejected"]) == ("partial", 2, 1)
+```
+
+这里的“2”表示两行有效写入，不表示新增两个人。`processed` 包含被拒绝行，所以处理进度已经达到 3/3。`partial` 是本批终结结果，系统不会继续尝试修复联系人乙的邮箱；原任务恢复也不允许用于这一状态。
+
+提交者从行结果定位原始第 2 行，修正邮箱为示例值 `beta@example.test`，使用新键 `batch-a-fix` 提交单行请求。调度者执行新任务后，该行被创建，新任务为 `succeeded`。旧任务仍为 `partial`，保留原批次的真实记录，不会因为新任务成功而改写历史结果。
+
+```python
+fixed = importer.submit("tenant-demo-a", "batch-a-fix", [
+    {"name": "联系人乙", "email": "beta@example.test"},
 ])
-# 显式执行后，再用 fixed["job_id"] 查询新任务完成情况。
+importer.run_next()
+fixed_result = importer.query("tenant-demo-a", fixed["job_id"])
+assert (fixed_result["status"], fixed_result["written"]) == ("succeeded", 1)
 ```
 
 这条修正路径只补需要修正的行，减少对已写联系人的再次覆盖；它是调用方可以选择的操作方式，系统没有自动挑选坏行或自动创建补偿任务。
 
+| 核对对象 | 原批次 | 修正批次 |
+| --- | --- | --- |
+| 请求身份 | `batch-a / import-1` | `batch-a-fix / import-2` |
+| 输入范围 | 甲、坏邮箱的乙、更新甲，共 3 行 | 修正后的乙，共 1 行 |
+| 完成结果 | `partial`，写入 2 行、拒绝 1 行 | `succeeded`，写入 1 行、拒绝 0 行 |
+| 业务影响 | 甲的姓名为更新值，乙尚未写入 | 甲保持不变，新增乙，实例现有两位联系人 |
+
+这张表以本节的空实例和顺序调用为前提，其他实例的任务号和已有联系人数量可能不同。完成核对时同时保留两个批次：新任务成功证明修正行处理结束，旧任务继续说明原来的拒绝原因。
+
 ## 查询失败和等待不动时怎样定位
 
-查询需要正确任务号，且传入租户必须与原租户完全相等。`team-a` 和 ` team-a ` 不会自动合并，错误租户与不存在任务都得到 `JobNotFound`。租户字段只用于分区，不能当成真实权限凭证。
+查询需要正确任务号，且传入租户必须与原租户完全相等。`"tenant-demo-a"` 和 `" tenant-demo-a "` 不会自动合并，错误租户与不存在任务都得到 `JobNotFound`。租户字段只用于分区，不能当成真实权限凭证。
 
 如果一直得到 `queued`，先确认是否有人调用执行，以及队列前面是否还有其他批次。不要通过重复提交试图推动执行，也不要把长时间等待解释为系统自动重试。执行中的 `running` 是单线程调用内部阶段，普通顺序查询不会在执行调用中途插入观察。
+
+提交失败也要按阶段处理：缺字段或多字段得到 `InvalidRequest`，本次没有任务号；结构正确但复用旧键修改邮箱得到 `IdempotencyConflict`，应保留旧任务并为真实的新请求换键。两者均不会撤销已有联系人。接口的逐入口参数、异常与完整响应见[接口契约](../api.md)。
 
 若查询得到 `failed`，根据 `error` 区分全行拒绝与模拟存储故障。前者修正数据后建新任务；后者查看 `retryable` 并进入[恢复场景](execution-recovery.md#场景二在第二行前失败后继续剩余行)。失败任务可能已经写入前序联系人，不能把错误响应解释成整批回滚。
 

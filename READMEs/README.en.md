@@ -45,41 +45,21 @@ Modus organizes source and business material into verifiable project knowledge. 
 
 ---
 
-<!--
-Keep product claims aligned with the executable command surface.
--->
-
 ## Core features
 
 Modus treats project knowledge as a maintainable engineering asset: local analysis provides leads, agents and people confirm business meaning, Markdown carries durable conclusions, and everyday tasks use and revise them as needed.
-
-<!--
-The evidence map describes observations, not completed business authoring.
--->
 
 ### Build a project map from evidence
 
 During initialization, local analysis extracts bounded evidence from source, build context, and available toolchains to locate entry points, relationships, and key behavior. The agent then rereads source, tests, configuration, and business material to confirm system architecture, domain boundaries, and real scenarios, recording its conclusions in the system overview, Domain, Module, and topic documents.
 
-<!--
-Context budgets and explicit degradation qualify every completeness claim.
--->
-
 ### Assemble task context progressively
 
 When development, debugging, or review requires project facts, the agent moves from the system overview into relevant Domains, Modules, and scenarios, reads team constraints as needed, and checks current source. Retrieval organizes knowledge and implementation excerpts around the question and makes evidence gaps explicit. Everyday use reads repository Markdown and current source directly without rerunning initialization analysis.
 
-<!--
-The review workflow uses Markdown and version control, without a separate knowledge service.
--->
-
 ### Bring knowledge into code review
 
 Durable knowledge lives as Markdown beside code. Stable Domain and Module identities, knowledge links, and structured source anchors form a traceable path. Human-maintained business knowledge and team constraints have clear ownership; integrity checks cover structure, links, and anchors, giving knowledge changes a clear review boundary.
-
-<!--
-Preserve the distinction between durable meaning and transient implementation details.
--->
 
 ### Maintain knowledge as durable meaning changes
 
@@ -88,10 +68,6 @@ After a code change, the agent checks whether responsibilities, contracts, rules
 ## Quick start
 
 Install the CLI from source, connect a target repository, then have your agent author its first project knowledge from evidence. The CLI handles host integration; reviewed Markdown is the durable result kept in the repository.
-
-<!--
-Keep installation examples aligned with distribution metadata and the command name.
--->
 
 ### 1. Install the CLI
 
@@ -103,10 +79,6 @@ uv tool install .
 
 You can also install the published package from PyPI with `uv tool install openmodus`. When developing Modus, `uv tool install --editable .` makes source changes take effect directly. The installed command is `modus` in either case. See [Installation and connection options](#installation-and-connection-options) for other methods and index configuration.
 
-<!--
-Installation owns framework assets; user-authored knowledge has a separate owner.
--->
-
 ### 2. Connect a project
 
 Enter the repository where you want to use Modus:
@@ -117,10 +89,6 @@ modus init
 ```
 
 In an interactive terminal, select Claude Code, Codex, Cursor, CodeBuddy, or DeepSeek Harness (preview). The CLI installs platform-neutral Skills and commands into the project, projects them through the selected host adapter, and records ownership of managed files. See [Installation and connection options](#installation-and-connection-options) for scripted and multi-platform setup and installation checks.
-
-<!--
-Document initialization and ongoing maintenance as separate entry points.
--->
 
 ### 3. Author project knowledge
 
@@ -135,10 +103,6 @@ This is the knowledge-authoring workflow, distinct from the `modus init` Shell c
 When the workflow finishes, `.modus/` holds platform-neutral integration assets, `modus/knowledge/` holds Markdown knowledge reviewed alongside code, and `modus/.cache/` holds disposable initialization evidence. Everyday tasks read the relevant knowledge and current source without rerunning initialization analysis. See the [User guide](#user-guide) for first-run review and later maintenance.
 
 ## Why Modus
-
-<!--
-Capability tables must retain unsupported-provider and degraded-mode limits.
--->
 
 ### What you get
 
@@ -157,10 +121,6 @@ The knowledge is readable, editable, and removable Markdown in the repository. I
 
 Modus supports Python 3.11–3.14, and the installed command is `modus`. The supported hosts and language evidence levels are listed below.
 
-<!--
-Maintain platform claims alongside installed-artifact acceptance checks.
--->
-
 #### Coding-agent platforms
 
 <p align="center">
@@ -171,10 +131,6 @@ Maintain platform claims alongside installed-artifact acceptance checks.
 </p>
 
 Each adapter declares its Skill directory, resident instructions, and Hook layout. The shared installer owns deterministic writes, the ownership manifest, upgrade reconciliation, and safe uninstall behavior.
-
-<!--
-Language recognition, structural extraction and compiler evidence have distinct precision.
--->
 
 #### Language capabilities
 
@@ -265,10 +221,6 @@ The full lifecycle deliberately protects three boundaries:
 
 Consider a project where an order callback's retry behavior needs changing. Within the analyzed coverage, initialization evidence can point to the callback entry point, state writes, and relevant source. The author must still reread implementation, tests, and available business agreements to decide what a duplicate notification should return. Once confirmed, idempotency conditions, failure recovery, and verification entry points belong in the Module and the rule and state topics according to their responsibilities. A later developer follows the Domain and Module to those conclusions, checks current source, and makes the change. If the retry contract or state transitions change, they revise the primary definitions and references in place; an internal refactor needs no added knowledge.
 
-<!--
-Translation must preserve stable identities and protocol field names.
--->
-
 ### Knowledge model
 
 After setup, `.modus/` holds the host control plane, `modus/knowledge/` holds durable knowledge, and `modus/.cache/` holds disposable analysis state. The knowledge model is not a document tree grouped by file type. It combines four task-oriented views. They are perspectives for reading and modeling a project, not physical layers that every repository must reproduce.
@@ -313,10 +265,6 @@ Everyday retrieval builds a temporary index from current Markdown. It first foll
 
 Modus favors knowledge that is **highly reusable, high risk, or hard to infer** instead of generating a summary for every function. Public contracts, core objects, state transitions, downstream handoffs, compatibility boundaries, and verification standards merit durable treatment; routine implementation detail that is cheap to recover stays in source. `business/` and `constraint/` are human-owned by default, so automation cannot overwrite organizational knowledge with scan output. Changes to generated knowledge are guarded by read-time hashes and checked for path identity, link, and anchor integrity.
 
-<!--
-Architecture diagrams follow real dependencies, ownership and failure semantics.
--->
-
 ### Code architecture
 
 Modus follows the boundaries it advocates: the entry surface stays narrow, application orchestration is separate from retrieval algorithms, declarative adapters contain host differences, and durable knowledge uses a different directory and write contract from disposable analysis state.
@@ -345,10 +293,6 @@ The public PyPI distribution is named `openmodus`; no private index is required.
 `modus init` selects a host in an interactive terminal. For scripts or noninteractive terminals, specify one with `modus init --platform codex`, repeat `--platform` for several hosts, or use `modus init --all-platforms`. A first noninteractive run without a platform selection connects all supported hosts. The same neutral Skill contracts are projected into each selected host.
 
 After connecting, run `modus status` in the target repository. The output `Installation: installed` means the project assets are in place. The CLI places starter files in `modus/knowledge/`, but you still need `/modus-init` in an agent to author the prose. The knowledge document count reported by `status` includes starter files and does not by itself show that authoring is complete.
-
-<!--
-Keep command examples synchronized with registered options and exit behavior.
--->
 
 DeepSeek Harness (preview) uses `modus init --platform dsh` for project workflows. The native plugin `@modus-ai/modus` adds context, status, knowledge-impact, and verification tools. Install the Python CLI from source containing the DSH integration, and install the native plugin from npm. Supported DSH versions are `0.2.1-rc.3` / `0.2.2-alpha.2`; see the [installation guide](../integrations/dsh/README.md) and [integration architecture](../integrations/dsh/architecture.md) (Chinese).
 
@@ -392,6 +336,8 @@ On the first `/modus-init` run, you can give the agent known project boundaries,
 
 For existing knowledge, use `/modus-reinit` when overall boundaries change or a full review is needed. To incorporate specific new material or local facts, use `/modus-update-knowledge` and provide the material path and affected scope. Ordinary coding tasks do not need these authoring workflows rerun.
 
+Full authoring follows K1–K6: scope and material → definition planning → evidence closure → Domain and Module prose → project constraints → system overview and publication. Team standards are authored separately after domain facts are reviewed; the overview then uses both final outputs. Existing human standards remain protected, and first-time initialization only fills a missing document or an unchanged framework seed. See the [authoring contract](../docs/authoring-contract.md) for stage ownership and review requirements.
+
 ### Automatic knowledge capabilities
 
 - `using-modus` progressively loads knowledge only when a task needs project facts, then decides whether a modifying task caused durable knowledge impact.
@@ -400,10 +346,6 @@ For existing knowledge, use `/modus-reinit` when overall boundaries change or a 
 These are agent lifecycle capabilities, not extra workflows that users must remember and invoke on every task.
 
 In everyday use, give the agent a concrete task, such as “Check the order callback's duplicate-notification and retry rules, find the implementation and verification entry points, and fix the confirmed issue.” The agent reads relevant knowledge through the overview, Domain, and Module as needed, then checks current source. It revises the corresponding prose before delivery only if the change affects a durable contract, rule, state, or source anchor. You can also follow links from `architecture-overview.md` yourself; if documentation and implementation disagree, use current source to verify the fact and update the knowledge accordingly.
-
-<!--
-Reproducible local checks do not imply that every supported platform was exercised.
--->
 
 ## Development and contribution
 

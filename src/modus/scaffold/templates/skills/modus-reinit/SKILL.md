@@ -23,8 +23,8 @@ description: 全面评审并重建知识快照，保留稳定业务身份及人�
 | K2 | [创作计划](../using-modus/references/authoring/stages/k2-plan.md) | 全面盘点目标与保护内容，记录分类、写前哈希和跨域影响 |
 | K3 | [证据闭环](../using-modus/references/authoring/stages/k3-evidence.md) | 对变化/content-repair 模块精确取证；未变结论也须核对当前依据，不能沿用失效证据 |
 | K4 | [领域成稿](../using-modus/references/authoring/stages/k4-domain.md) | 原主定义修订，逐篇核对；不追加 changelog，不因模板措辞重排全库 |
-| K5 | [系统组装](../using-modus/references/authoring/stages/k5-system.md) | 核对全部交接，按真实影响修订根概览；保护已有 Team Standard/business，新增域补种子 |
-| K6 | [核验发布](../using-modus/references/authoring/stages/k6-publish.md) | 全范围终态、publication、发布后回读；有待验项保留原卡 |
+| K5 | [项目约束](../using-modus/references/authoring/stages/k5-constraints.md) | 复核规范适用性与偏差，默认保护 Team Standard；明确委托时才维护，缺失不自动补建 |
+| K6 | [系统概览与发布](../using-modus/references/authoring/stages/k6-publish.md) | 核对全部交接，按 K4/K5 的真实影响修订概览，新增域补 business 索引；全局验收及发布 |
 
 先做全局 K2，再逐域 K2 → K3 ↔ K4，最后 K5/K6。进入阶段完整读取其适用细则，逐域保留相同深度；默认串行，仅明确授权后按[并行协议](../using-modus/references/authoring/parallel-domain-authoring.md)和固定委托合同执行。
 

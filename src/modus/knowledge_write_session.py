@@ -70,12 +70,11 @@ def write_document(
     initialize_team_standard: bool = False,
     allow_team_standard: bool = False,
 ) -> Path:
-    """Write one selected document; neither metadata nor a cache grants permission.
+    """按所有权与读时摘要写入；元数据和缓存均不授予修改权限。
 
-    Only first-time init authors opt into initialize_team_standard. Even with
-    that flag, existing prose cannot be replaced. Update and sync never opt in.
-    Explicit user-directed team-standard maintenance can opt in separately;
-    ordinary generated writes never acquire that permission from a path alone.
+    首次 init 作者通过更新入口显式选择 initialize_team_standard，只能填充
+    缺失文件或精确种子。后续人工正文维护使用独立授权，普通 reinit/update/
+    sync 工作流不自动启用任一种权限。锁内复查种子与摘要，防止调查后的人工作品被覆盖。
     """
     from .knowledge_identity import _target_parts
 

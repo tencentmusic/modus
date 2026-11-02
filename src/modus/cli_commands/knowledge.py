@@ -232,6 +232,7 @@ def knowledge_update_cmd(
             expected_hashes=data.get("expectedHashes"),
             deletions=data.get("deletions", []),
             allow_team_standard=data.get("allowTeamStandard", False),
+            initialize_team_standard=data.get("initializeTeamStandard", False),
         )
     except (ValueError, UnicodeError) as exc:
         raise typer.BadParameter(str(exc), param_hint="--input") from exc

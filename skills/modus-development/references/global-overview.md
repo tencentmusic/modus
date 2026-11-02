@@ -16,7 +16,7 @@ flowchart TD
     H[日常开发或排障任务] --> I[当前知识与源码检索]
     G --> I
     J[当前项目源码] --> I
-    I --> K[任务上下文与约束]
+    I --> K[上下文及约束]
 ```
 
 三条生命周期的完成含义不同：安装以受管清单发布为提交标记；分析以认证证据包原子发布为完成；知识需要语义回读、机械核验与写入保护。日常检索不重新打开初始化包。
@@ -81,6 +81,6 @@ flowchart TD
 
 机器链：`corpus.freeze → facts.observe → resolution.resolve → capability.compose → projection.project → packet.package`。后段消费前段产物；`store/runtime` 是横切支撑；`pipeline.py` 只编排。
 
-创作链：K1 范围决策 → K2 主定义与创作计划 → K3 场景证据闭环 → K4 领域成稿 → K5 跨域组装 → K6 核验与发布。这条链由助手模板协议执行，不能描述为 Python 已全自动生成业务正文。
+创作链：K1 范围决策 → K2 主定义与创作计划 → K3 场景证据闭环 → K4 领域成稿 → K5 项目约束 → K6 系统概览与发布。这条链由助手模板协议执行，不能描述为 Python 已全自动生成业务正文。
 
 设计主定义为 `ARCHITECTURE.md`、`src/modus/machine/ARCHITECTURE.md`、`docs/knowledge-lifecycle-boundary.md`、`docs/authoring-contract.md`；具体机制以当前实现及测试核对。

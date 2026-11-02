@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
 import yaml
+from typer.testing import CliRunner
 
 from modus import knowledge_write_session as session
+from modus.cli import app
 from modus.commands.seed_business import seed_domain_business
 from modus.knowledge_update import update_knowledge
 from modus.orchestrator import knowledge_sync
@@ -192,6 +195,8 @@ def test_write_conflict_defers_retirement_without_rolling_back_other_writes(tmp_
         {"deletions": [OLD, OLD], "expected_hashes": {OLD: _digest("old")}},
         {"deletions": [MODULE], "expected_hashes": {MODULE: _digest("old")}},
         {"allow_team_standard": "true"},
+        {"initialize_team_standard": "true"},
+        {"initialize_team_standard": True, "allow_team_standard": True},
     ],
 )
 def test_invalid_batch_is_rejected_before_any_write(tmp_path: Path, extra: dict) -> None:
@@ -350,3 +355,96 @@ def test_explicit_team_standard_maintenance_requires_opt_in_and_current_digest(
     )
     assert stale["status"] == "partial"
     assert target.read_text(encoding="utf-8") == "# Revised standard\n"
+
+
+@pytest.mark.parametrize("seed_exists", [False, True])
+def test_cli_initializes_team_standard_once_and_preserves_it_on_retry(
+    tmp_path: Path, seed_exists: bool
+) -> None:
+    """真实 CLI 必须连接窄权限；初始化重试不能获得人工正文维护权限。"""
+    seed = TemplateCatalog().read("knowledge/constraint/team-standard.md")
+    if seed_exists:
+        _put(tmp_path, TEAM, seed)
+    replacement = "# 团队规范\n\n当前项目约束。\n"
+    payload = {
+        "documents": {TEAM: replacement},
+        "expectedHashes": {TEAM: _digest(seed) if seed_exists else None},
+    }
+    request = tmp_path / "initialize.json"
+    runner = CliRunner()
+
+    def invoke() -> tuple[int, dict]:
+        request.write_text(json.dumps(payload), encoding="utf-8")
+        result = runner.invoke(
+            app, ["-C", str(tmp_path), "knowledge", "update", "--input", str(request)]
+        )
+        return result.exit_code, json.loads(result.output)
+
+    code, result = invoke()
+    assert code == 1, result
+    assert result["writes"] == []
+    if seed_exists:
+        assert (tmp_path / TEAM).read_text(encoding="utf-8") == seed
+    else:
+        assert not (tmp_path / TEAM).exists()
+
+    payload["initializeTeamStandard"] = True
+    code, result = invoke()
+    assert code == 0, result
+    assert result["writes"] == [TEAM]
+    assert (tmp_path / TEAM).read_text(encoding="utf-8") == replacement
+
+    code, result = invoke()
+    assert code == 0, result
+    assert result["status"] == "noop"
+    assert result["unchanged"] == [TEAM]
+
+    payload["documents"] = {TEAM: "# 不能通过首次填充重写\n"}
+    payload["expectedHashes"] = {TEAM: _digest(replacement)}
+    code, result = invoke()
+    assert code == 1, result
+    assert result["writes"] == []
+    assert (tmp_path / TEAM).read_text(encoding="utf-8") == replacement
+
+
+@pytest.mark.parametrize("content", ["", "# 旧版种子\n", "# 人工规范\n"])
+def test_initialization_rejects_non_seed_even_with_current_digest(
+    tmp_path: Path, content: str
+) -> None:
+    target = _put(tmp_path, TEAM, content)
+    result = update_knowledge(
+        str(tmp_path),
+        {TEAM: "# 首次规范\n"},
+        expected_hashes={TEAM: _digest(content)},
+        initialize_team_standard=True,
+    )
+    assert result["status"] == "partial"
+    assert result["conflicts"][0]["path"] == TEAM
+    assert target.read_text(encoding="utf-8") == content
+
+
+def test_initialization_rechecks_seed_after_preflight(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """调查和预读之后发生人工修改，最终锁内检查仍须阻止覆盖。"""
+    from modus import knowledge_update
+
+    seed = TemplateCatalog().read("knowledge/constraint/team-standard.md")
+    target = _put(tmp_path, TEAM, seed)
+    human = seed + "\n人工补充。\n"
+    original_write = knowledge_update.write_document
+
+    def concurrent_edit(*args, **kwargs):
+        target.write_text(human, encoding="utf-8")
+        return original_write(*args, **kwargs)
+
+    monkeypatch.setattr(knowledge_update, "write_document", concurrent_edit)
+    result = update_knowledge(
+        str(tmp_path),
+        {TEAM: "# 首次规范\n"},
+        expected_hashes={TEAM: _digest(seed)},
+        initialize_team_standard=True,
+    )
+    assert result["status"] == "partial"
+    assert result["writes"] == []
+    assert target.read_text(encoding="utf-8") == human

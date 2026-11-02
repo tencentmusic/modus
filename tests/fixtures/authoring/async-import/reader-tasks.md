@@ -40,6 +40,9 @@ anchors:
 10. 错误租户查不到任务，是否足以说明系统具备真正的用户权限校验？
 11. 某次执行 `written=2`，重启进程后新实例找不到任务。能否恢复？为什么？
 12. `run_next` 返回 `None` 与 `query` 抛出 `JobNotFound` 分别说明什么？是否都是执行失败？
+13. 队列原为 A、B，A 在第二行前故障后重新排队，下一次执行的是谁？若 B 更新 A 已写过的联系人，A 恢复后会将它改回吗？
+14. 首次执行写完一条有效行、在下一条坏邮箱行前故障。恢复没有再遇故障，最终一定是 `succeeded` 吗？
+15. 故障耗尽后只补未处理行，能否直接把旧任务的 `results` 当作新请求？需要保留什么输入？
 
 ## 审阅者使用的参考答案
 
@@ -90,6 +93,14 @@ anchors:
 ### 12：空队列与任务不可见
 
 `run_next` 返回 `None` 是队列当前没有任务，并未执行失败任务；`query` 的 `JobNotFound` 表示指定任务在该租户中不存在或不可见，不说明队列是否为空。依据：[执行接口](modus/knowledge/domain/contact-import/references/api.md#驱动教学执行)、[查询接口](modus/knowledge/domain/contact-import/references/api.md#查看可观察结果)。
+
+新增边界任务的审核答案如下，单独测试读者时仍只提供上面的题目。
+
+| 题号 | 操作判断与依据 |
+| --- | --- |
+| 13 | B 先执行；A 重排到队尾，恢复时跳过已有结果的第一行，不改回 B 的现值。依据：[两批次交接](modus/knowledge/domain/contact-import/references/downstream.md#存储故障怎样暂停交接) |
+| 14 | 不是。剩余坏行会被拒绝，最终为 `partial`、处理数 2、写入数 1、拒绝数 1；故障恢复不等于行数据全部有效。依据：[恢复状态案例](modus/knowledge/domain/contact-import/references/state_machine.md#贯穿案例保留第一行后继续第二行) |
+| 15 | 不能。结果缺少姓名，未处理行也没有结果条目；需保留原输入，通过行下标和处理数核对后为新请求选择剩余行。依据：[不可恢复场景](modus/knowledge/domain/contact-import/references/modules/execution-recovery.md#场景三判断不能恢复的失败) |
 
 ## 怎样根据失败回修正文
 

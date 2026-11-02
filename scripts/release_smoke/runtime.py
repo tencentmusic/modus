@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import json
 import shlex
@@ -181,6 +182,28 @@ def _exercise_knowledge_paths(project: SmokeProject) -> dict[Path, bytes]:
         result.get("status") == "completed",
         f"知识更新未完成：{result!r}",
     )
+    # 通过安装后的 CLI 填充随包种子，防止底层能力存在而公开入口漏接。
+    team = paths.team_standard
+    team_relative = team.relative_to(project.root).as_posix()
+    authored_standard = "# 团队规范\n\n教学项目的约束正文。\n"
+    request = project.root / "initialize-standard.json"
+    request.write_text(
+        json.dumps(
+            {
+                "documents": {team_relative: authored_standard},
+                "expectedHashes": {team_relative: hashlib.sha256(team.read_bytes()).hexdigest()},
+                "initializeTeamStandard": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    initialized = _parse_json_object(
+        project.invoke("knowledge", "update", "--input", str(request)),
+        source="knowledge update",
+    )
+    require(initialized.get("writes") == [team_relative], "安装后的 CLI 未填充团队规范种子")
+    require(team.read_text(encoding="utf-8") == authored_standard, "团队规范正文未实际落盘")
+    request.unlink()
     verification = project.runner.invoke(
         project.app,
         ["-C", str(project.root), "knowledge", "verify", "--json"],
@@ -214,7 +237,7 @@ def _exercise_authoring_contract() -> None:
         "skills/using-modus/references/authoring/stages/k2-plan.md",
         "skills/using-modus/references/authoring/stages/k3-evidence.md",
         "skills/using-modus/references/authoring/stages/k4-domain.md",
-        "skills/using-modus/references/authoring/stages/k5-system.md",
+        "skills/using-modus/references/authoring/stages/k5-constraints.md",
         "skills/using-modus/references/authoring/stages/k6-publish.md",
         "skills/using-modus/references/authoring/context-continuity.md",
         "skills/using-modus/references/authoring/cross-domain.md",

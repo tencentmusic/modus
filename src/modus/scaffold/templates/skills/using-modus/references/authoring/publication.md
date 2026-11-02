@@ -64,6 +64,8 @@ Domain 作者必须逐篇完整回读本轮本域全部目标正文，包括六�
 
 不用复制全部正文或工具日志；简单页可以用一条短记录，复杂页按接口或场景分组。路径清单加“全部通过”不足以说明实际验收。未读页、未展开接口/字段、只有目录的复杂场景必须回到原作者补齐；“证据缺失”须有已查范围和具体影响，不能掩盖尚未调查。
 
+K5 的逐条对账还核对规则性质、原始机制、使用者、反例与验证入口，区分首次填充、保留和明确委托维护；K6 核对概览实际消费的 K4/K5 版本、跨域交接与规范摘要。共享产物的验收记录保存在原卡正文，不给它们伪造 Domain/Module 身份或新增状态。下层变动影响概览或规范适用性时，重新核对受影响引用后才能收尾。
+
 按[事实投影](evidence/scenario-closure.md#从机器线索到正文主定义)检查已核验事实是否真的进入读者可见内容。例如已找到锁和消息发送，却只在元数据留了方法锚点，正文仍写“保存成功即完成”，属于事实未消费；六专题都有该方法名也不能通过。再选案例中的实际输入，逐步核对命中条件、字段前后值、返回阶段、最终信号和失败残留，与图和操作步骤相互校验；每个场景的差异应能解释，不能只复述相同流程句式。
 
 每篇依次完成三类工作：
@@ -115,11 +117,14 @@ init/reinit 终稿在删除执行卡之前运行一次 `modus knowledge verify -
   "documents": {"modus/knowledge/domain/example/references/rule.md": "修订后的完整 Markdown"},
   "expectedHashes": {"modus/knowledge/domain/example/references/rule.md": "读取原正文时记录的 SHA-256"},
   "deletions": [],
-  "allowTeamStandard": false
+  "allowTeamStandard": false,
+  "initializeTeamStandard": false
 }
 ```
 
 摘要按原正文的 UTF-8 编码计算，例如 `hashlib.sha256(before.encode("utf-8")).hexdigest()`；`before` 必须是本轮理解、修订所依据的完整读取结果。新建文件的预期摘要为 `null`，删除已有生成正文时在 `deletions` 列出路径并提供原摘要。普通同步保留 `allowTeamStandard: false`，不写人工约束或业务资料。退出码 `1` 表示存在逐文件冲突，已成功的写入不会回滚；检查报告的 `writes`、`unchanged`、`deleted` 和 `conflicts`，重读冲突正文后重新判断，不能只刷新摘要重试。
+
+Team Standard 的两种写入方式互斥，默认均为 `false`：首次 init 的 K5 使用 `initializeTeamStandard: true`，仅填充缺失文件或与当前随包模板完全相同的种子；明确委托维护已有内容时才使用 `allowTeamStandard: true`。二者必须为布尔值，同时启用在首个写入前拒绝整批请求。普通 reinit/update/sync 不自动选择这两种权限。首次填充遇到人工改动或旧版种子时保留实际内容，不能以“仍有种子注释”为由覆盖。
 
 1. 完整读取目标并记录哈希；内容不变就跳写。
 2. 新增先写目标并回读；更新保持原语义位置，不追加日期式 changelog。

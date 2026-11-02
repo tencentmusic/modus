@@ -1,8 +1,8 @@
 {
-  "checked_on": "2026-10-24",
+  "checked_on": "2026-11-02",
   "timezone": "Asia/Shanghai",
   "python": "3.14.2",
-  "source_sha256": "7476b25377b0482b843a93d90c68dbd55ecd65ec2d894c836fcb6e79641517a8",
+  "source_sha256": "c1c9401869159c8c40498e6473c05b33bb24b12fd170c4de85f57ca3940602de",
   "core_demo": {
     "accepted": {
       "job_id": "import-1",
@@ -29,7 +29,7 @@
       "results": [
         {
           "row_index": 0,
-          "email": "lin@example.test",
+          "email": "alpha@example.test",
           "outcome": "created",
           "reason": null
         },
@@ -41,7 +41,7 @@
         },
         {
           "row_index": 2,
-          "email": "lin@example.test",
+          "email": "alpha@example.test",
           "outcome": "updated",
           "reason": null
         }
@@ -66,7 +66,7 @@
       "results": [
         {
           "row_index": 0,
-          "email": "chen@example.test",
+          "email": "gamma@example.test",
           "outcome": "created",
           "reason": null
         }
@@ -85,13 +85,13 @@
       "results": [
         {
           "row_index": 0,
-          "email": "chen@example.test",
+          "email": "gamma@example.test",
           "outcome": "created",
           "reason": null
         },
         {
           "row_index": 1,
-          "email": "xu@example.test",
+          "email": "delta@example.test",
           "outcome": "created",
           "reason": null
         }
@@ -131,52 +131,235 @@
   },
   "additional_checks": [
     {
-      "check": "整体结构拒绝、无任务副作用及100行上限",
+      "check": "核心示例：受理、幂等、部分成功、行前故障、恢复和次数耗尽",
       "passed": true
     },
     {
-      "check": "键顺序无关、原始邮箱大小写有关、租户分区独立",
+      "check": "结构拒绝不改四份资源；100 行允许、101 行拒绝",
       "passed": true
     },
     {
-      "check": "输入和输出深拷贝、查询不推进执行",
+      "check": "对象键重排不冲突；大小写、行序、姓名空格改变请求身份",
       "passed": true
     },
     {
-      "check": "恢复保留先前拒绝结果、重排不计次、重复重排拒绝",
+      "check": "受理输入及嵌套响应隔离，查询不推进执行",
       "passed": true
     },
     {
-      "check": "第二次存储故障和全行拒绝均不允许恢复",
+      "check": "租户原样分区、空白幂等键当前合法、错误租户查询及恢复拒绝",
       "passed": true
     },
     {
-      "check": "故障参数检查不出队、越界不注入及FIFO顺序",
+      "check": "姓名优先、坏行继续、简化正则接受 a@b..c",
+      "passed": true
+    },
+    {
+      "check": "故障参数先于出队校验，越界不注入，空队列返回 None",
+      "passed": true
+    },
+    {
+      "check": "恢复保留拒绝行、重排不计次、重复重排拒绝、已处理下标不触发故障",
+      "passed": true
+    },
+    {
+      "check": "故障恢复后仍可因坏行终结为部分成功",
+      "passed": true
+    },
+    {
+      "check": "双批次 FIFO：恢复排队在后，已有行不覆盖其他批次的新现值",
+      "passed": true
+    },
+    {
+      "check": "已有联系人上的两次中断：更新结果保留、次数耗尽且拒绝原任务恢复",
+      "passed": true
+    },
+    {
+      "check": "缺参及错误的位置参数产生 Python TypeError",
+      "passed": true
+    },
+    {
+      "check": "API 与两个模块的全部 Python 片段按页顺序执行；三个完整 JSON 响应逐值核对",
+      "passed": true
+    },
+    {
+      "check": "全部正文与随包片段：本地链接、源码精确锚点、元数据、章节、表格、围栏及合成数据检查",
       "passed": true
     }
   ],
-  "visual_review": "not_run_by_fixture_author",
   "document_integrity": {
-    "markdown_files": 12,
-    "valid_local_links": 62,
+    "fixture_markdown_files": 15,
+    "bundled_example_files": 1,
+    "valid_local_links": 119,
     "valid_source_anchors": 52,
-    "mermaid_blocks": 5,
+    "mermaid_blocks": 8,
+    "frontmatter_and_headings_preserved": true,
     "code_fences_balanced": true,
-    "mermaid_rendered": false
+    "mermaid_rendered": true,
+    "tables_checked": true
+  },
+  "executable_document_examples": {
+    "modus/knowledge/domain/contact-import/references/api.md": 3,
+    "modus/knowledge/domain/contact-import/references/modules/submission-query.md": 3,
+    "modus/knowledge/domain/contact-import/references/modules/execution-recovery.md": 3
+  },
+  "independent_reader_review": "not_run",
+  "visual_review": {
+    "status": "author_reviewed",
+    "renderer": {
+      "markdown": "marked 16.4.2",
+      "mermaid": "12.2.0",
+      "automation": "Playwright 1.62.1",
+      "browser": "Google Chrome 156.0.8078.74",
+      "viewport": {
+        "width": 1280,
+        "height": 1000
+      },
+      "content_width": 1040,
+      "network_requests": "blocked"
+    },
+    "scope": "全部 15 份夹具 Markdown 和 1 份随包示例；全文截图回读、逐图核对，修改位置复看",
+    "pages_rendered": 16,
+    "fixture_diagrams": 6,
+    "bundled_example_diagrams": 2,
+    "render_errors": [],
+    "horizontal_overflow": [],
+    "corrections": [
+      "缩短系统及对象图标签，避免单字换行",
+      "恢复图标明显式 retry 触发，模块图按词组分行",
+      "租户空白差异用带引号的代码值展示，防止 Markdown 吞掉首尾空格"
+    ],
+    "limitations": [
+      "本地 Chrome 预览，不代表所有 Markdown 阅读器均兼容",
+      "未开展独立读者评审"
+    ],
+    "documents": [
+      {
+        "path": "tests/fixtures/authoring/README.md",
+        "sha256": "b8236fd1a3bed5f8665736297e6b5311f2d2068852ff8bf558ed6d335dfd6d83",
+        "diagrams": 0,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "tests/fixtures/authoring/async-import/README.md",
+        "sha256": "24dedc2484dee23d04da07dfa53a2f959754dadc86be8f9ed412e499362b7e3d",
+        "diagrams": 0,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "tests/fixtures/authoring/async-import/evidence.md",
+        "sha256": "8ac31e724871745cc608a2d07dbe596c15077ae2ae0b6fc2850c80ecd0cbf549",
+        "diagrams": 0,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "tests/fixtures/authoring/async-import/modus/knowledge/architecture-overview.md",
+        "sha256": "65d4591f4571aa4bb0230dd3d29f838c1ecfcec098d403fe63546b4c8277bc9e",
+        "diagrams": 1,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "tests/fixtures/authoring/async-import/modus/knowledge/constraint/team-standard.md",
+        "sha256": "fc843dd09dca94bbf3f3b9e39f58f96f6ea062a69446d6d6901229d9c1ae9ae3",
+        "diagrams": 0,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "tests/fixtures/authoring/async-import/modus/knowledge/domain/contact-import/SKILL.md",
+        "sha256": "5f92d4639b41028ec1a38c5202f861ca176c0424c25f801927907cd558a290cd",
+        "diagrams": 0,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "tests/fixtures/authoring/async-import/modus/knowledge/domain/contact-import/references/api.md",
+        "sha256": "cc78072e72c5894407c1780f0105241f983db61b24167de33bca099fa53f6fe6",
+        "diagrams": 0,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "tests/fixtures/authoring/async-import/modus/knowledge/domain/contact-import/references/downstream.md",
+        "sha256": "18a8ae8b2a1ee15b14714573774880e7f3dc1112fddaea060fc9e0b54a21d85d",
+        "diagrams": 1,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "tests/fixtures/authoring/async-import/modus/knowledge/domain/contact-import/references/infrastructure.md",
+        "sha256": "c65f46113775f8990be578703c9ac97b926dcd814905145d45f697d1ed423c12",
+        "diagrams": 0,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "tests/fixtures/authoring/async-import/modus/knowledge/domain/contact-import/references/modules/execution-recovery.md",
+        "sha256": "516b7fae99b65448fc4ab26728c8db0c54a99e9e5daf0649992a8766906f8236",
+        "diagrams": 1,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "tests/fixtures/authoring/async-import/modus/knowledge/domain/contact-import/references/modules/submission-query.md",
+        "sha256": "e47409192222a58e3e908f8994a86a0e54760bc0d1bc6ab71d52ff8adb1a878e",
+        "diagrams": 1,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "tests/fixtures/authoring/async-import/modus/knowledge/domain/contact-import/references/object.md",
+        "sha256": "c08637eadcdc847acf5faec985f24aa5eec193e1fb2c6cdb9efb378b6e973b8a",
+        "diagrams": 1,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "tests/fixtures/authoring/async-import/modus/knowledge/domain/contact-import/references/rule.md",
+        "sha256": "3e9e4ca0645ebe6d3d5e5cb2ac4c7114d6019b39954d645c796af6fc8ac7ead7",
+        "diagrams": 0,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "tests/fixtures/authoring/async-import/modus/knowledge/domain/contact-import/references/state_machine.md",
+        "sha256": "0e269527d169d6f4bf8e4be7121b71be61db94da6e0fbb0f2228542a16babcf6",
+        "diagrams": 1,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "tests/fixtures/authoring/async-import/reader-tasks.md",
+        "sha256": "ba283fed0501e317da5a135c4d0bdfa94470363ec44a983bb3b5fcb12c0d6816",
+        "diagrams": 0,
+        "full_page_reviewed": true
+      },
+      {
+        "path": "src/modus/scaffold/templates/skills/using-modus/references/authoring/framework/examples.md",
+        "sha256": "4350ad95cfcba257696688611815e1d3317efd29ddb0f8f8934886dc41ba73ea",
+        "diagrams": 2,
+        "full_page_reviewed": true
+      }
+    ]
+  },
+  "content_review": {
+    "status": "author_reviewed",
+    "scope": {
+      "domains": 1,
+      "reference_topics": 6,
+      "modules": 2,
+      "root_documents": 2
+    },
+    "api": "四个公开入口逐一核对；三组完整响应与运行结果一致；参数、失败、幂等和完成阶段齐全",
+    "object": "输入、任务、行结果、联系人及快照逐字段对照源码，核对空值、默认值、游标与统计",
+    "rule": "R1—R7 对照源码责任、校验顺序、正反例及复核索引",
+    "state_and_collaboration": "五个状态、两类失败、保留结果恢复、恢复后部分成功、FIFO 与跨批次现值变化相互一致",
+    "infrastructure": "四份内存资源及三项常量策略；生命周期、故障窗口、调度和容量边界与实现一致",
+    "modules": "两个模块均有完整场景、可执行片段、流程图、异常及定位入口",
+    "root_documents": "领域路由、系统概览及工程约束与六专题的最终定义一致"
   },
   "existing_domain_verifier": {
-    "function": "run_verify_knowledge",
-    "domain": "contact-import",
+    "command": "python -m modus knowledge verify --root tests/fixtures/authoring/async-import --json",
     "publication": false,
     "result": {
       "schemaVersion": 1,
       "status": "clean",
       "scope": {
-        "domain": "contact-import"
+        "domain": null
       },
       "counts": {},
       "findings": [],
-      "checkedDocuments": 9
+      "checkedDocuments": 11
     }
   },
   "type_check": {
@@ -184,5 +367,30 @@
     "target": "import_source.py",
     "status": "passed",
     "files_checked": 1
+  },
+  "lint": {
+    "tool": "ruff",
+    "target": "import_source.py",
+    "status": "passed"
+  },
+  "repository_regression": {
+    "command": "python -m pytest tests/test_scaffold.py tests/test_project_lifecycle.py tests/test_release_smoke.py -q",
+    "passed": 31
+  },
+  "data_review": {
+    "status": "passed",
+    "source": "从零合成，无真实数据抽样",
+    "scope": [
+      "教学源码",
+      "全部样稿 Markdown",
+      "验收记录",
+      "随包示例"
+    ],
+    "identifiers": "联系人甲/乙/丙/丁；tenant-demo-a/b；example.test；教学请求键和任务号",
+    "checks": [
+      "清理第二套样稿及所有相关引用",
+      "未发现参考项目标识、内部地址、凭证或本机绝对路径",
+      "教学源码、正文示例和运行输出的数据映射一致"
+    ]
   }
 }

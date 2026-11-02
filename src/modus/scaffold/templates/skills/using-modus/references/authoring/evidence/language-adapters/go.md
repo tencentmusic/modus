@@ -1,7 +1,3 @@
-<!--
-本页只适配取证方法，领域身份、稳定路径与正文职责由共享框架维护。
--->
-
 # Go 证据适配
 
 以 module/workspace、`cmd` 和构建 target 识别单元；从 `main`、Cobra/flag 命令、HTTP/gRPC handler、导出 API、消费者与 worker 发现入口。核对接口绑定、JSON/Protobuf 类型、error 传播、context 取消、goroutine/channel/锁、事务、`defer`、文件/网络资源、配置和测试。

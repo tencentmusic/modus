@@ -65,6 +65,10 @@ anchors:
 | E9：查询与恢复检查租户相等 | `ContactImporter._find` | 错误租户读取任务得到 `JobNotFound`；不证明真实鉴权 |
 | E10：输入和返回值都隔离可变引用 | 输入副本与快照深拷贝 | 修改原列表或响应，不改变已受理任务 |
 | E11：执行是显式、单线程的 | 队列出队与执行入口 | 查询不会推进；`running` 是调用内部阶段 |
+| E12：恢复追加队尾，不锁定已有联系人 | `retry` 追加与 `run_next` 先进先出执行 | A 故障后重排，B 先更新同邮箱，A 只继续剩余行；A 的旧结果不改写 |
+| E13：恢复可以结束为部分成功 | 行结果保留与全批拒绝数判定 | 第一行有效、第二行无效，第二行前故障后恢复，终结为 `partial` |
+
+样稿中的姓名代号、`tenant-demo-a/b`、邮箱与请求键均从零合成。源码、接口 JSON、模块代码及验收记录使用相同数据映射，便于比较大小写、重复邮箱和顺序覆盖；不从真实联系人或内部业务日志抽样。正文对当前行为的结论来自本例源码，参考文档仅影响组织和表达方式。
 
 ## 图中关系逐组对应什么事实
 
@@ -79,6 +83,7 @@ anchors:
 | [协作时序](modus/knowledge/domain/contact-import/references/downstream.md) | 提交保存任务再入队、返回受理快照 | E1、E2；只画首次合法提交主路径 |
 | 协作时序 | 显式执行出队、有效行写入、无效行拒绝、更新任务 | E4、E5、E11；同一实例内的职责交接 |
 | 协作时序 | 查询任务并返回结果 | E9、E10；快照读取，不是执行触发 |
+| [协作的两批次对照](modus/knowledge/domain/contact-import/references/downstream.md#存储故障怎样暂停交接) | 重排到队尾、其他任务先写、恢复跳过旧行 | E7、E12；队列顺序不提供跨批次隔离 |
 | [提交模块流程](modus/knowledge/domain/contact-import/references/modules/submission-query.md) | 结构检查、幂等存在与载荷分支、入队或旧快照 | E1、E2、E3；不同错误不产生新的工作 |
 | 提交模块流程 | 新任务受理后由调度执行、查询结果 | E11；调度是另一次明确调用 |
 | [恢复模块流程](modus/knowledge/domain/contact-import/references/modules/execution-recovery.md) | 计次、从结果长度继续、行处理循环 | E4、E7、E11；失败前已有结果保留 |

@@ -51,17 +51,17 @@ anchors:
 
 ```mermaid
 flowchart TD
-    A[执行队列最早任务] --> B[尝试次数加一]
-    B --> C[从已有结果数对应的行开始]
-    C --> D{本行前命中故障注入吗}
-    D -->|否| E[校验本行并记录写入或拒绝结果]
+    A[执行队首任务] --> B[尝试次数加一]
+    B --> C["从已有结果数<br/>定位未处理行"]
+    C --> D{"本行前<br/>命中故障注入?"}
+    D -->|否| E["校验与处理本行<br/>追加逐行结果"]
     E --> F{还有未处理行吗}
     F -->|有| C
-    F -->|无| G[根据全部结果终结任务]
-    D -->|是| H[保留前序写入和结果，标记失败]
-    H --> I{已执行次数小于两次吗}
-    I -->|是| J[允许显式重新排队]
-    J --> Q[追加到等待队列，保留已有结果]
+    F -->|无| G[按全部结果终结]
+    D -->|是| H["保留写入与结果<br/>标记失败"]
+    H --> I{执行次数小于 2?}
+    I -->|是| J[允许显式重排]
+    J -->|调用 retry| Q["追加队尾<br/>保留已有结果"]
     Q -->|后续显式调度到本任务| A
     I -->|否| K[停止原任务恢复]
 ```
@@ -70,26 +70,40 @@ flowchart TD
 
 ## 场景二：在第二行前失败后继续剩余行
 
-本场景从新建的空导入器实例开始，联系人为空且没有更早排队任务。提交者希望导入陈青和许白两位联系人。两行均合法，使用示例租户 `team-a` 和新键 `batch-b` 受理。教学调度者希望检查“已经写完第一行，第二行前发生故障”时是否能够继续，因此指定绝对下标 1。
+本场景从新建的空导入器实例开始，联系人为空且没有更早排队任务。提交者希望导入联系人丙和联系人丁两位联系人。两行均合法，使用示例租户 `tenant-demo-a` 和新键 `batch-b` 受理。教学调度者希望检查“已经写完第一行，第二行前发生故障”时是否能够继续，因此指定绝对下标 1。
 
 ```python
-job = importer.submit("team-a", "batch-b", [
-    {"name": "陈青", "email": "chen@example.test"},
-    {"name": "许白", "email": "xu@example.test"},
+from import_source import ContactImporter
+
+importer = ContactImporter()
+job = importer.submit("tenant-demo-a", "batch-b", [
+    {"name": "联系人丙", "email": "gamma@example.test"},
+    {"name": "联系人丁", "email": "delta@example.test"},
 ])
 failed = importer.run_next(fail_before_row=1)
 ```
 
-在本案例队列没有更早任务的前提下，第一行先创建陈青并追加 `created` 结果，第二行开始前命中故障。返回值为 `failed`，`error=storage_unavailable`、`processed=1`、`written=1`、`attempts=1`、`retryable=true`。许白尚未写入，陈青已经存在，不发生整批回滚。
+在本案例队列没有更早任务的前提下，第一行先创建联系人丙并追加 `created` 结果，第二行开始前命中故障。返回值为 `failed`，`error=storage_unavailable`、`processed=1`、`written=1`、`attempts=1`、`retryable=true`。联系人丁尚未写入，联系人丙已经存在，不发生整批回滚。
 
 调用方随后用相同租户和任务号请求恢复。恢复入口检查任务是失败状态且允许重试，清除当前错误、设回等待并追加队列，保留第一行结果和已写联系人。
 
 ```python
-queued = importer.retry("team-a", job["job_id"])
+queued = importer.retry("tenant-demo-a", job["job_id"])
 finished = importer.run_next()
 ```
 
-第一个返回值的 `processed` 仍为 1，`attempts` 仍为 1；它只表示等待继续。第二个调用才增加次数并从下标 1 执行许白。最终 `succeeded`、`processed=2`、`written=2`、`attempts=2`，两条结果均为 `created`。第一条没有变成 `updated`，说明当前恢复流程没有重做它。
+第一个返回值的 `processed` 仍为 1，`attempts` 仍为 1；它只表示等待继续。第二个调用才增加次数并从下标 1 执行联系人丁。最终 `succeeded`、`processed=2`、`written=2`、`attempts=2`，两条结果均为 `created`。第一条没有变成 `updated`，说明当前恢复流程没有重做它。
+
+操作时应依次保存失败快照、检查恢复资格、重新排队、核对实际执行的任务号、查询最终结果。这个案例没有其他待执行批次，因此可直接用下面的断言核对完成；存在其他批次时，恢复任务位于队尾，须按[协作中的两批次案例](../downstream.md#存储故障怎样暂停交接)继续调度。
+
+```python
+assert queued["status"] == "queued" and queued["processed"] == 1
+assert queued["attempts"] == 1 and queued["error"] is None
+assert finished["job_id"] == job["job_id"]
+assert finished["status"] == "succeeded" and finished["attempts"] == 2
+assert finished["results"][0] == failed["results"][0]
+assert importer.query("tenant-demo-a", job["job_id"]) == finished
+```
 
 这项保证来自输入副本、按顺序追加的行结果以及仅在行处理前注入故障。它不能证明真实存储中“联系人已写但进度未记”时也能安全恢复，更不承诺进程重启后找回这些内存记录。
 
@@ -100,6 +114,10 @@ finished = importer.run_next()
 另一种不可恢复情况是第二次执行再次命中存储故障。任务保留已有结果，错误仍为 `storage_unavailable`，但 `attempts=2`、`retryable=false`。调用恢复会被拒绝；系统没有第三次尝试、自动延期、补偿任务或人工强制重置接口。
 
 这时调用方应先核对每条已有结果和未处理行，再决定新的业务请求。若用新键重新提交整批，会再次覆盖其中已成功的联系人；若只补剩余行，可减少重复写入，但这是调用方的选择，不是系统自动策略。无论如何，都不能将不可恢复解释为此前写入已经消失。
+
+**示例数据：** 在同一实例新建另一批联系人丙、丁，第一次和第二次执行都指定 `fail_before_row=1`。第一次把丙记为 `updated`（前一场景已经创建过该邮箱），第二行未处理；重排后第二次仍停在下标 1，结果数保持 1，次数变为 2，原任务不能再恢复。若决定只补丁，提交者需从自己保存的原输入取得下标 1 对应的行，用新键提交并等待执行；任务快照没有原始姓名，不能只复制行结果当作新输入。
+
+如果恢复时前面另有更新丙的批次，它可以改变丙的现值；恢复只跳过已经有结果的行，不会把丙改回本批输入。这是多个请求顺序写入同一业务键的结果，不能把“已有行不重做”理解成“这些联系人被锁定”。
 
 ## 运行约束与排查
 

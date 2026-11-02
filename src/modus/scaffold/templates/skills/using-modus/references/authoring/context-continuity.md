@@ -13,6 +13,7 @@ init/reinit 的串行作者与已授权 Domain worker 共用本合同。唯一�
 | 证据会话 | build 的实际结果、双摘要或不可用原因、Module ID → 请求/packet requestedScope、已读记录/源码、已核验事实与正文落点、缺口/省略处置 |
 | 覆盖与判断 | 全部目标及未完成项；实现、要求、示例、待确认项的区别；关键条件、否定项、例外和依据 |
 | 跨域边界 | 已接受的协作基线、主定义所有者、输入输出/状态映射、完成与恢复责任、消费者及未决冲突 |
+| 规范与系统 | Team Standard 状态、授权和读时哈希；机制/使用者/反例到规则条目的映射；K4/K5 最终版本、K6 概览引用及待核对交接 |
 | 文件版本 | 写前 CAS 哈希、最近验收版本、已写未验位置、结果未知的写入及并发变化 |
 | 验收债务 | 待补证事实、未预览章节、待渲染 visual id、阅读缺陷及下一动作 |
 
@@ -34,6 +35,8 @@ init/reinit 的串行作者与已授权 Domain worker 共用本合同。唯一�
 4. **适用规范。** 读取[当前阶段](index.md)和完整[框架](framework/index.md)，联读[布局](framework/layout.md)、[Surface](framework/surface-profiles.md)、[本地化](framework/localization.md)、[编辑](framework/editorial.md)、[图文](framework/visual-expression.md)，以及 [Domain](framework/deliverables/domain.md)、[Module](framework/deliverables/module.md)、[六专题](framework/deliverables/topics.md)中本域实际需要的详细合同；按需读取[样稿](framework/examples.md)。索引或上一个域的摘要不能替代适用规范。
 
 范围、证据、正文和规范一致后，从最早未完成动作继续。同一 Domain 未丢失上下文且证据仍可用时复用调查，不为不同专题重复扫描。
+
+恢复 K5/K6 时沿用相同顺序，以共享产物取代“当前域”：K5 读约束计划、原始机制证据、使用者/反例及实际规范；K6 读 K4/K5 验收版本、跨域交接和概览。按工程主题或系统交接恢复精确查询，不强造 Module selector，不因进入共享阶段重跑各域取证。规范、下层主定义或概览在验收后变化时，只重新核对其消费者和相关图表。
 
 ## 中断与异常
 

@@ -56,8 +56,8 @@ modus internal init-analysis select --root . --bundle-digest <bundleDigest> --ba
 | K2 共享边界 | `service-boundary`，按相关 boundary/candidate/path 收窄；`evidence` 中的 serviceRelation 包含入边和出边 | 交接双方、主定义、依赖顺序及待补证的一侧 |
 | K3 场景与规则 | 逐 Module `module-authoring`；涉及规则目的/作用范围时用同范围 `constraint-extraction` | 当前事实、关键条件、反例/限制、源码回读及专题/模块落点 |
 | K4 覆盖审计 | 独立源码请求的 `coverage-audit` 结果并集；`evidence` 中的 sourceFile/sourceEntry/sourceRelation 与 `coverageGaps` | 对照已确认入口清单，查漏落点、遗漏分支及无法证明的关系 |
-| K5 跨域复核 | 按交接范围复用或展开 serviceRelation；首次团队规范复用规则信号 | 用机器关系/当前源码反查最终双方正文，防止双方一致遗漏 |
-| K6 消费对账 | 原卡的查询、事实处置及最终页面；必要时仅重查失效范围 | 每个相关事实或缺口有落点、排除理由或明确未决影响 |
+| K5 项目约束 | 复用 K3 同源 `constraint-extraction` 信号；按机制与使用者范围补充查询，覆盖构建/CI/装配等共享工程路径 | 原始依据、强制机制、反例与适用范围支撑规则性质；K4 正文用于定位使用者，不升级为政策证据 |
+| K6 系统概览与消费对账 | 按交接范围复用 `service-boundary` / serviceRelation，反查 K4/K5 最终文件；仅补查未决或失效范围 | 系统关系、规范入口和完成口径一致；每个相关事实或缺口有落点、排除理由或明确未决影响 |
 
 `reinit-diff` 当前交付的是本轮范围证据，**不计算新旧差分**。作者结合已有稳定知识身份、旧正文与当前源码分类 unchanged/anchor-only/implementation-change/scope-change/content-repair，不能把该 intent 名称当作机器已证明“未变”或“退役”。
 
@@ -66,6 +66,8 @@ packet 的 `requestedScope` 是 candidateIds/capabilityIds/boundaryIds/paths/sym
 复用原卡的场景、结果和缺口部分记录消费处置，不另建 receipt：可按接口族或场景分组记录相关 `recordId`/源码位置、确认的事实与限制、主定义页面/章节，以及用于案例/图的关系；未采用材料写排除理由，待补证项写缺失侧、影响和下一精确查询。无须逐条复制机器数据，但影响范围、完成/恢复或正文结论的证据、反证、歧义及省略必须有处置。已读、已核验、已写入不能混成一个“ready”。
 
 ## 回包解释
+
+K5 按“工程主题 → 机制源码范围 → 机器请求/同源记录 → 已核验使用者和反例 → 规范条目”复用原卡记录；不能把跨域工程主题伪装成某个 Module 的 `requestedScope`，也不能为它新增 Module 状态。现有证据足够时直接复用；共享机制缺口按其源码范围查询，跨 selector 轴仍是交集。K6 用最终版本反查这些映射，规范要求、实际行为和待确认项分别保留。
 
 - 同一种信号在不同 intent 中的位置不同：`module-authoring` 优先放在 `proposals[].authoringSignals[].details`，未绑定候选的放在 `ambiguities[].signal.details`；`constraint-extraction` 和 `coverage-audit` 按 kind 将扁平 `authoringSignal` 分别放在 `proposals`（entry）、`terminalEffects`（effect）、`authoritativeObjects`（resource）。不能只读 `evidence` 或只读候选摘要而漏掉这些材料。按 `recordId` 识别同源记录，结合 `recordType`、`evidenceKind`、来源和精度解释，不能仅凭所在数组把资源线索认作权威实体、把写入线索认作最终完成。
 - `evidence` 保留完整记录身份、kind、resolution、sourceLayer、witness 和 details。scopeSummary/sourceFile 是库存导航；sourceEntry/sourceRelation/serviceRelation 是待核对的声明或关系，均不自动证明业务结论。

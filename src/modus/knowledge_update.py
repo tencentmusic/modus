@@ -1,4 +1,4 @@
-"""Direct, source-attributed material updates without an intake state machine."""
+"""显式知识更新：整批预检、逐文件 CAS 与可恢复的部分成功报告。"""
 
 from __future__ import annotations
 
@@ -84,6 +84,7 @@ def _write_one(
     hashes: _DigestMap,
     *,
     allow_team_standard: bool,
+    initialize_team_standard: bool,
 ) -> tuple[_Outcome, dict[str, str] | None]:
     try:
         try:
@@ -110,6 +111,7 @@ def _write_one(
             expected_hash=hashes.get(target),
             allow_human=True,
             allow_team_standard=allow_team_standard,
+            initialize_team_standard=initialize_team_standard,
         )
         return "written", None
     except (OSError, ValueError, RuntimeError) as exc:
@@ -139,6 +141,7 @@ def validate_update_input(
     expected_hashes: object,
     deletions: object,
     allow_team_standard: object,
+    initialize_team_standard: object = False,
 ) -> None:
     """Validate the entire request's shape before any document can be changed."""
     if not isinstance(documents, Mapping) or not all(
@@ -154,6 +157,10 @@ def validate_update_input(
         raise ValueError("deletions 必须为单个 Markdown 路径组成的列表")
     if not isinstance(allow_team_standard, bool):
         raise ValueError("allowTeamStandard 必须为布尔值")
+    if not isinstance(initialize_team_standard, bool):
+        raise ValueError("initializeTeamStandard 必须为布尔值")
+    if initialize_team_standard and allow_team_standard:
+        raise ValueError("首次填充与人工维护不能同时启用；请选择一种 team-standard 写入方式")
     if len(set(deletions)) != len(deletions):
         raise ValueError("deletions 不能包含重复路径")
     if set(documents) & set(deletions):
@@ -176,16 +183,21 @@ def update_knowledge(
     expected_hashes: Mapping[str, str | None] | None = None,
     deletions: Sequence[str] = (),
     allow_team_standard: bool = False,
+    initialize_team_standard: bool = False,
 ) -> dict[str, Any]:
-    """Apply explicitly requested material documents, preserving unrelated files.
+    """写入调用方已完成的 Markdown，仅改变本次明确选中的文档。
 
-    Callers supply already-authored Markdown with its evidence references. Existing
-    documents require the digest observed when that text was authored, protecting
-    edits made in between. New files use a None digest. Explicit retirements
-    require an observed digest and run only after this batch's writes succeed.
-    Keep batches scoped: failures do not roll back independent completed work.
+    已有正文使用创作时观察的摘要，新文件以 None 表达预期不存在。
+    退役必须提供原摘要，且只在本批写入全部成功后执行。独立文件已完成的
+    写入不回滚；调用方根据逐项结果回读冲突，不能把 partial 当作整批失败。
+
+    首次填充与人工维护分别授权：initialize_team_standard 仅允许缺失或
+    精确框架种子，allow_team_standard 允许明确委托的既有正文修订。
+    两者互斥，均不跳过文档锁内的所有权和内容摘要检查。
     """
-    validate_update_input(documents, expected_hashes, deletions, allow_team_standard)
+    validate_update_input(
+        documents, expected_hashes, deletions, allow_team_standard, initialize_team_standard
+    )
     paths = ModusPaths.for_root(root)
     hashes = expected_hashes or {}
     ledger = _UpdateLedger()
@@ -196,6 +208,7 @@ def update_knowledge(
             content,
             hashes,
             allow_team_standard=allow_team_standard,
+            initialize_team_standard=initialize_team_standard,
         )
         ledger.record(outcome, target, conflict)
     deferred = list(deletions) if ledger.conflicts else []

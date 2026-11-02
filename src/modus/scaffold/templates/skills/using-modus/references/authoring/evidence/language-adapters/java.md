@@ -1,7 +1,3 @@
-<!--
-本页只适配取证方法，领域身份、稳定路径与正文职责由共享框架维护。
--->
-
 # Java 证据适配
 
 以 Maven/Gradle 子项目、source set 和打包目标识别构建单元；从 Controller、RPC、消息监听、任务、CLI 与 public type 发现入口。核对 Bean 实际装配、DTO/Entity/序列化、代理事务、多数据源、线程池、资源关闭、配置绑定与集成测试。

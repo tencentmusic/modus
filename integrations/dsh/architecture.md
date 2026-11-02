@@ -8,7 +8,7 @@
 
 ```mermaid
 flowchart TB
-    Install[modus init --platform dsh] --> Adapter[Python 平台适配器]
+    Install[DSH 项目接入] --> Adapter[Python 平台适配器]
     Adapter --> Skills[.dsh/skills 与 AGENTS.md 受管区块]
     Agent[DSH 任务] --> Tools[四个只读工具]
     Tools --> Runner[会话执行器]
@@ -21,7 +21,7 @@ flowchart TB
     Update --> Knowledge[长期 Markdown 知识]
 ```
 
-项目接入走既有安装事务、清单与卸载机制。运行时工具走 DSH Shell；模型确认长期语义变化后，再按共享 Skill 的 CAS 协议维护知识。四个工具不拥有写入能力，影响候选也不构成改写授权。
+`modus init --platform dsh` 接入项目时复用既有安装事务、清单与卸载机制。运行时工具走 DSH Shell；模型确认长期语义变化后，再按共享 Skill 的 CAS 协议维护知识。四个工具不拥有写入能力，影响候选也不构成改写授权。
 
 | 所有者 | 拥有的状态与决定 | 边界 |
 | --- | --- | --- |
@@ -119,10 +119,11 @@ npm run smoke:registry -- @modus-ai/modus@1.0.0
 默认测试使用锁文件中的 DSH 依赖。验证另一版已安装宿主时，可使用 `test/runtime-resolver.mjs` 将 `@deepseek-ai/` 导入导向该运行时。macOS 桌面版使用其内置 Electron 读取 ASAR 模块：
 
 ```bash
+dsh_app_contents='/Applications/DeepSeek Harness.app/Contents'
 ELECTRON_RUN_AS_NODE=1 \
-MODUS_DSH_RUNTIME_ANCHOR='/Applications/DeepSeek Harness.app/Contents/Resources/app.asar/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js' \
+MODUS_DSH_RUNTIME_ANCHOR="$dsh_app_contents/Resources/app.asar/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js" \
 MODUS_TEST_EXECUTABLE=/absolute/path/to/modus/.venv/bin/modus \
-'/Applications/DeepSeek Harness.app/Contents/MacOS/DeepSeek Harness' \
+"$dsh_app_contents/MacOS/DeepSeek Harness" \
   --expose-internals --import ./test/runtime-resolver.mjs \
   --test --test-isolation=none test/*.test.mjs
 ```
