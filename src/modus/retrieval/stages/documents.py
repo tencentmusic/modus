@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ...knowledge_identity import is_team_standard_path
 from ...knowledge_reader import BoundKnowledgeReadError, read_bound_regular_text
 from ...knowledge_seeds import is_constraint_seed
 from ...paths import ModusPaths
@@ -113,7 +114,7 @@ def classify_document(relative: str) -> tuple[str, str, dict[str, str | None]]:
     if relative.endswith("/handbook/SKILL.md"):
         return "workspace-router", "routing-authority", scope
     if "/knowledge/constraint/" in f"/{relative}":
-        if relative.endswith("/constraint/team-standard.md"):
+        if is_team_standard_path(relative):
             return "project-constraint", "document-declaration", scope
         return "project-constraint", "human-authority", scope
     if relative.endswith("/knowledge/architecture-overview.md"):
@@ -257,6 +258,8 @@ def classify_section_facet(
     }:
         return declared
     path = Path(relative)
+    if is_team_standard_path(relative):
+        return "rule"
     stem = path.stem
     if stem in _FACET_STEMS:
         return _FACET_STEMS[stem]

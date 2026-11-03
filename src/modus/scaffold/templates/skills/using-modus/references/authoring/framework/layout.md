@@ -14,7 +14,8 @@ modus/knowledge/
 ├── architecture-overview.md
 ├── constraint/
 │   ├── global-standard.md
-│   └── team-standard.md
+│   ├── team-standard.md
+│   └── team-standard/<topic>.md       # 按真实复杂度增加，人工所有
 └── domain/<domain>/
     ├── SKILL.md
     └── references/
@@ -31,6 +32,8 @@ modus/knowledge/
             ├── experience/index.md
             └── scenario/index.md
 ```
+
+Team Standard 的入口与可选专题遵循[团队规范合同](deliverables/team-standard.md)，共享声明身份及人工保护；内置规范模块不是项目产物目录模板。
 
 六专题根文件始终是稳定入口。事实密度确实影响导航时，`api.md` 与 `object.md` 可以增加同名一级分片目录；按调用目的、所有权、生命周期或稳定表示族分组，不按单个接口、DTO、类或源码文件分片。
 

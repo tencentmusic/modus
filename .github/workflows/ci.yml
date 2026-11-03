@@ -47,6 +47,10 @@ jobs:
       - name: Compile and test with the real Modus CLI
         working-directory: integrations/dsh
         run: npm test
+      - name: Verify TypeScript authoring example
+        env:
+          MODUS_TEST_TSC: ${{ github.workspace }}/integrations/dsh/node_modules/typescript/lib/tsc.js
+        run: uv run --locked --extra test pytest -q tests/test_team_standard_examples.py -k typescript
       - name: Verify isolated bundle installation
         working-directory: integrations/dsh
         run: npm run smoke:package

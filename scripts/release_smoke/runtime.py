@@ -182,15 +182,18 @@ def _exercise_knowledge_paths(project: SmokeProject) -> dict[Path, bytes]:
         result.get("status") == "completed",
         f"知识更新未完成：{result!r}",
     )
-    # 通过安装后的 CLI 填充随包种子，防止底层能力存在而公开入口漏接。
+    # 安装后的 CLI 先创建专题，再填充入口，核验公开权限与路径身份同时生效。
     team = paths.team_standard
     team_relative = team.relative_to(project.root).as_posix()
-    authored_standard = "# 团队规范\n\n教学项目的约束正文。\n"
+    topic = paths.constraint_dir / "team-standard" / "runtime.md"
+    topic_relative = paths.relative(topic)
+    topic_text = "# 运行约束\n\n性质: 通用建议\n\n保持明确的资源所有权。\n"
+    authored_standard = "# 团队规范\n\n[运行约束](team-standard/runtime.md)\n"
     request = project.root / "initialize-standard.json"
     request.write_text(
         json.dumps(
             {
-                "documents": {team_relative: authored_standard},
+                "documents": {topic_relative: topic_text, team_relative: authored_standard},
                 "expectedHashes": {team_relative: hashlib.sha256(team.read_bytes()).hexdigest()},
                 "initializeTeamStandard": True,
             }
@@ -201,8 +204,12 @@ def _exercise_knowledge_paths(project: SmokeProject) -> dict[Path, bytes]:
         project.invoke("knowledge", "update", "--input", str(request)),
         source="knowledge update",
     )
-    require(initialized.get("writes") == [team_relative], "安装后的 CLI 未填充团队规范种子")
+    require(
+        initialized.get("writes") == [topic_relative, team_relative],
+        "安装后的 CLI 未创建团队规范专题并填充入口种子",
+    )
     require(team.read_text(encoding="utf-8") == authored_standard, "团队规范正文未实际落盘")
+    require(topic.read_text(encoding="utf-8") == topic_text, "团队规范专题未实际落盘")
     request.unlink()
     verification = project.runner.invoke(
         project.app,
@@ -231,6 +238,16 @@ def _exercise_authoring_contract() -> None:
     catalog = TemplateCatalog()
     required_references = (
         "skills/modus-init/SKILL.md",
+        "skills/modus-init/references/constraint-profiles/index.md",
+        "skills/modus-init/references/constraint-profiles/composition.md",
+        "skills/modus-init/references/constraint-profiles/foundation.md",
+        "skills/modus-init/references/constraint-profiles/engineering-types.md",
+        "skills/modus-init/references/constraint-profiles/typescript.md",
+        "skills/modus-init/references/constraint-profiles/capabilities/database.md",
+        "skills/modus-init/references/constraint-profiles/capabilities/configuration.md",
+        "skills/modus-init/references/constraint-profiles/capabilities/concurrency.md",
+        "skills/modus-init/references/constraint-profiles/adapters/spring.md",
+        "skills/modus-init/references/constraint-profiles/adapters/react.md",
         "skills/modus-reinit/SKILL.md",
         "skills/modus-update-knowledge/SKILL.md",
         "skills/modus-sync-knowledge/SKILL.md",

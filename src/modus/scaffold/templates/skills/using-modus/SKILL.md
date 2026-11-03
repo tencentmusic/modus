@@ -30,7 +30,7 @@ description: 当任务需要本项目的源码或实现证据时使用，包括�
 ## 渐进增强
 
 1. 复用用户请求、对话、材料、显式路径和已经核实的证据。已知知识路径、源码路径、接口或符号时直接深入；范围不明时，按[共享检索与降级说明](references/router-details.md)从根 `architecture-overview.md` 选路，再沿 Domain `SKILL.md` 、Module 手册和专题知识渐进读取，最后回到当前源码核验。
-2. 按任务应用 `modus/knowledge/constraint/`、相关域 `references/rule.md` 和模块规则，必要时读[约束使用说明](references/constraint-usage.md)。将适用要求落实到方案、实现和验证，区分当前事实、明确规范、归纳约定和待确认事项。
+2. 按任务应用 `modus/knowledge/constraint/`、相关域 `references/rule.md` 和模块规则，必要时读[约束使用说明](references/constraint-usage.md)。将适用要求落实到方案、实现和验证，区分当前事实、明确规范、归纳约定、通用建议和待确认事项。编码前沿 Team Standard 场景导航取得适用范围、准确复用入口、默认写法、示例前提与例外，核验版本/平台后应用；不要只读风险禁令。
 3. 自动消费默认且只读本轮源码、用户材料和 canonical `modus/knowledge/`。本流程禁止读取 `modus/.cache/init-analysis/`，也不导入、构建或刷新初始化分析；调用链、影响面和拓扑判断从正文导航到当前源码核验。
 4. 阅读片段时保留祖先标题、所属接口/对象/场景、前提和例外；被截断时沿准确的条目范围续读。新人理解优先 Module 因果主线，改规则联读相关判定与契约/对象，排障联读失败现象、状态与依赖；不是固定文件清单。得到足以完成目标的证据后回到原任务，已有证据不重复检索。
 

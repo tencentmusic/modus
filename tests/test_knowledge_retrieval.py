@@ -54,6 +54,43 @@ def test_constraint_templates_enter_retrieval_only_after_authoring(
     assert any(row["path"] == relative for row in index["sections"])
 
 
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "team-standard.md",
+        "team-standard/concurrency.md",
+        "team-standard/legacy/concurrency.md",
+        "team-standard/api.md",
+    ],
+)
+def test_team_example_retrieval_preserves_scope_and_declaration_authority(
+    tmp_path: Path,
+    filename: str,
+) -> None:
+    """示例续读带回平台、规则性质与例外，专题不能升级成人工强制政策。"""
+    paths = ModusPaths.for_root(tmp_path)
+    relative = f"modus/knowledge/constraint/{filename}"
+    target = tmp_path / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        "# 团队规范\n## 批量查询\n### 有界执行\n"
+        '<a id="item-bounded"></a>\n性质: 通用建议\n状态: current\n'
+        "适用: server/，Java 8，共享 executor；不适用于 UI。\n"
+        "#### 示例\n使用已注入 Executor；get 接收剩余预算。\n"
+        "#### 例外\ncancel 不保证中断任务；不能关闭共享池。\n"
+        '### 页面请求\n<a id="item-ui"></a>\n只适用于浏览器。\n',
+        encoding="utf-8",
+    )
+    index = scan_index(paths, kind="project")
+    example = next(row for row in index["sections"] if row["heading"] == "示例")
+    assert example["authority"] == "document-declaration"
+    assert example["facet"] == "rule"
+    entry = runtime._entry_refs(index, [example])[0]
+    assert "Java 8" in entry["excerpt"] and "通用建议" in entry["excerpt"]
+    assert "cancel 不保证中断" in entry["excerpt"]
+    assert "只适用于浏览器" not in entry["excerpt"]
+
+
 # 不同长度与字符的代码围栏都不应产生知识标题。
 # 子条目交付需带回前提、失败和恢复说明，同时排除相邻独立操作。
 def test_fences_are_not_headings_and_children_keep_entry_context(tmp_path: Path) -> None:

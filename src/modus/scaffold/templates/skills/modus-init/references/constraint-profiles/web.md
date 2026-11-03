@@ -1,5 +1,7 @@
 # 前后端主流栈约束调查
 
+本页保留跨框架取证。语言分别从 [JavaScript](javascript.md) 或 [TypeScript](typescript.md) 进入，再选[工程类型](engineering-types.md)与专项；[React](adapters/react.md)维护编码差异。浏览器、SSR、Node 与各类 Worker 分别选择，不以 Web 总类覆盖全仓。
+
 以下是取证维度，不是 Team Standard 的固定 H2 模板；最终章节按项目真实机制组织。
 
 先读[共享方法](../constraint-extraction.md)。以 package.json、唯一实际使用的锁文件、workspace、框架配置和启动入口确认版本及运行边界。按项目组合 React/Vue/Angular/Svelte、Next/Nuxt 与 Express/Nest；其他栈沿用共同调查方法。框架支持某能力不证明项目启用它。

@@ -6,6 +6,7 @@ import hashlib
 import os
 import re
 import stat
+from contextlib import ExitStack
 from enum import Enum
 from pathlib import Path
 from typing import Final, Self
@@ -84,6 +85,31 @@ def _is_team_standard_seed(text: str) -> bool:
     return is_constraint_seed("modus/knowledge/constraint/team-standard.md", text)
 
 
+def _assert_team_standard_write_allowed(
+    paths: ModusPaths,
+    mode: TeamStandardWriteMode,
+    *,
+    is_entry: bool,
+    existing: str,
+    digest: str | None,
+) -> None:
+    """在所需文档锁内检查实际变更；只有入口享有精确种子的填充例外。"""
+    if mode is TeamStandardWriteMode.MAINTAIN:
+        return
+    if mode is TeamStandardWriteMode.PROTECTED:
+        raise KnowledgeWriteSessionError(
+            "Team Standard 入口及专题仅在首次初始化时生成；后续修改需要用户明确要求维护"
+        )
+    if digest is not None and not (is_entry and _is_team_standard_seed(existing)):
+        raise KnowledgeWriteSessionError("Team Standard 已包含保留内容；首次初始化不能覆盖它")
+    if not is_entry:
+        entry_text, entry_digest = _read_existing(paths, paths.team_standard)
+        if entry_digest is not None and not _is_team_standard_seed(entry_text):
+            raise KnowledgeWriteSessionError(
+                "Team Standard 入口已包含保留内容；新增专题需要明确维护授权"
+            )
+
+
 def write_document(
     paths: ModusPaths,
     target: str,
@@ -97,10 +123,11 @@ def write_document(
     """按所有权与读时摘要写入；元数据和缓存均不授予修改权限。
 
     首次 init 作者通过更新入口显式选择 initialize_team_standard，只能填充
-    缺失文件或精确种子。后续人工正文维护使用独立授权，普通 reinit/update/
-    sync 工作流不自动启用任一种权限。锁内复查种子与摘要，防止调查后的人工作品被覆盖。
+    缺失入口或精确入口种子；缺失专题还要求入口仍未成稿。后续人工正文维护
+    使用独立授权，普通 reinit/update/sync 工作流不自动启用任一种权限。
+    锁内复查种子与摘要，防止调查后的人工作品被覆盖。
     """
-    from .knowledge_identity import _target_parts
+    from .knowledge_identity import _target_parts, is_team_standard_path
 
     team_standard_mode = TeamStandardWriteMode.from_flags(
         initialize=initialize_team_standard, maintain=allow_team_standard
@@ -116,23 +143,33 @@ def write_document(
     if human and not allow_human:
         raise KnowledgeWriteSessionError(f"自动同步不能修改人工知识： {target}")
     destination = paths.root / target
-    with required_reentrant_file_lock(paths.knowledge_document_lock(destination)):
+    team_target = is_team_standard_path(target)
+    team_entry = parts[2:] == ("constraint", "team-standard.md")
+    with ExitStack() as locks:
+        # 首次专题先锁入口再锁专题，防止入口已交还人工后继续扩写。
+        # 保持逐文件 CAS；此锁序不提供多文件事务或自动回滚。
+        if (
+            team_target
+            and not team_entry
+            and team_standard_mode is TeamStandardWriteMode.INITIALIZE
+        ):
+            locks.enter_context(
+                required_reentrant_file_lock(paths.knowledge_document_lock(paths.team_standard))
+            )
+        locks.enter_context(
+            required_reentrant_file_lock(paths.knowledge_document_lock(destination))
+        )
         existing, digest = _read_existing(paths, destination)
         _assert_cas(destination, digest, expected_hash)
         needs_write = digest is None or existing != text
-        if parts[2:] == ("constraint", "team-standard.md") and needs_write:
-            if team_standard_mode is TeamStandardWriteMode.PROTECTED:
-                raise KnowledgeWriteSessionError(
-                    "team-standard.md 仅在首次初始化时生成；后续修改需要用户明确要求维护"
-                )
-            if (
-                team_standard_mode is TeamStandardWriteMode.INITIALIZE
-                and digest is not None
-                and not _is_team_standard_seed(existing)
-            ):
-                raise KnowledgeWriteSessionError(
-                    "team-standard.md 已包含保留内容；首次初始化不能覆盖它"
-                )
+        if team_target and needs_write:
+            _assert_team_standard_write_allowed(
+                paths,
+                team_standard_mode,
+                is_entry=team_entry,
+                existing=existing,
+                digest=digest,
+            )
         if needs_write:
             atomic_write_text(destination, text)
     return destination

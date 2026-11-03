@@ -1,5 +1,29 @@
 # Java 约束调查
 
+## 编码默认方案
+
+组合[公共基础](foundation.md)与实际专项。以下为通用建议；项目封装与团队写法经核验后细化。源码级别、字节码、运行 JDK 和依赖 API 分别确认。
+
+- 字符串/集合工具核对完整包名、版本、blank/empty/null 语义；没有适用依赖时用 JDK，不为两次判空新增库。包装数值用值比较并处理拆箱空值；BigDecimal 的数值与 scale 相等分开。
+- 纯转换用简短 Stream；校验、外部调用、异常分流用显式循环。保序去重、分组、唯一索引分别选择结构，唯一索引检测重复。DTO 复用真实 converter/基类；Lombok 相等/日志/继承核对生成行为。
+- 异步先核验共享 executor 的负载与拒绝，再使用带 executor 的 CompletableFuture。使用参数化 Future；allOf 不限流也不收集结果。Java 8 使用 get(timeout, unit)，不能生成 Java 9 的 orTimeout。总预算、中断恢复、同步拒绝和池所有权见[并发专项](capabilities/concurrency.md)；cancel 不保证中断正在运行的 CompletableFuture 任务。
+- 局部 AutoCloseable 用 try-with-resources；容器资源由容器关闭。语言惯用法不授权改变团队注入、排版或公开契约。
+
+**通用建议示例（JDK 8 标准库）**：非 null 的 `List<String> ids` 允许重复且要保序；非法项拒绝，不 trim/改变大小写。返回集合是新建可变列表。
+
+```java
+Set<String> unique = new LinkedHashSet<>();
+for (String id : ids) {
+    if (id == null || id.isEmpty()) {
+        throw new IllegalArgumentException("id is required");
+    }
+    unique.add(id);
+}
+List<String> orderedIds = new ArrayList<>(unique);
+```
+
+导入为 java.util.List/Set/LinkedHashSet/ArrayList。有项目错误模型时替换通用异常；空白 ID 是否有效由契约决定，唯一关系不能用去重掩盖重复。检查空集合、非法项、顺序及输入未变。并发语义参考 [JDK 8 CompletableFuture](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletableFuture.html)。
+
 以下是取证维度，不是 Team Standard 的固定 H2 模板；最终章节按项目真实机制组织。
 
 先读[共享方法](../constraint-extraction.md)。以实际 POM/Gradle、锁定依赖、源码和配置确定版本与模块；Spring、Dubbo、Feign、gRPC、MyBatis/JPA 仅在项目确实使用时调查。下面是查证问题，不是默认施加给所有 Java 项目的规范。

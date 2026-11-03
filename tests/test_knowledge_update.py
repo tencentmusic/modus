@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from pathlib import Path
+from threading import Event
 
 import pytest
 import yaml
@@ -377,25 +379,187 @@ def test_team_standard_initialization_preserves_authored_content(
 
 # 团队规范需要类别授权与当前摘要两道独立条件。
 # 显式授权不取消并发保护，过时摘要仍然必须拒绝。
+@pytest.mark.parametrize(
+    "target_name",
+    [
+        TEAM,
+        "modus/knowledge/constraint/team-standard/tasks.md",
+        "modus/knowledge/constraint/team-standard/legacy/tasks.md",
+    ],
+)
 def test_explicit_team_standard_maintenance_requires_opt_in_and_current_digest(
     tmp_path: Path,
+    target_name: str,
 ) -> None:
-    target = _put(tmp_path, TEAM, "# Team's existing standard\n")
-    hashes = {TEAM: _digest(target.read_text(encoding="utf-8"))}
-    denied = update_knowledge(str(tmp_path), {TEAM: "# Revised standard\n"}, expected_hashes=hashes)
+    target = _put(tmp_path, target_name, "# Team's existing standard\n")
+    hashes = {target_name: _digest(target.read_text(encoding="utf-8"))}
+    denied = update_knowledge(
+        str(tmp_path), {target_name: "# Revised standard\n"}, expected_hashes=hashes
+    )
     assert denied["status"] == "partial"
     accepted = update_knowledge(
         str(tmp_path),
-        {TEAM: "# Revised standard\n"},
+        {target_name: "# Revised standard\n"},
         expected_hashes=hashes,
         allow_team_standard=True,
     )
-    assert accepted["writes"] == [TEAM]
+    assert accepted["writes"] == [target_name]
     stale = update_knowledge(
-        str(tmp_path), {TEAM: "# Overwrite\n"}, expected_hashes=hashes, allow_team_standard=True
+        str(tmp_path),
+        {target_name: "# Overwrite\n"},
+        expected_hashes=hashes,
+        allow_team_standard=True,
     )
     assert stale["status"] == "partial"
     assert target.read_text(encoding="utf-8") == "# Revised standard\n"
+
+
+@pytest.mark.parametrize("nested", [False, True])
+def test_team_topic_initialization_is_missing_only_and_not_machine_owned(
+    tmp_path: Path, nested: bool
+) -> None:
+    """拆成专题不解除人工保护；入口种子也不能充当专题的覆盖凭据。"""
+    from modus.knowledge_identity import KnowledgePathIdentity
+
+    topic = "modus/knowledge/constraint/team-standard/" + (
+        "legacy/concurrency.md" if nested else "concurrency.md"
+    )
+    body = "# 并发\n\n性质: 通用建议\n"
+    denied = update_knowledge(str(tmp_path), {topic: body})
+    assert denied["status"] == "partial"
+    assert not (tmp_path / topic).exists()
+    created = update_knowledge(str(tmp_path), {topic: body}, initialize_team_standard=True)
+    assert created["writes"] == [topic]
+    assert update_knowledge(str(tmp_path), {topic: body})["status"] == "noop"
+    identity = KnowledgePathIdentity.classify(ModusPaths.for_root(tmp_path), topic)
+    assert identity is not None and identity.ownership_plane == "human"
+
+    for existing in (body, TemplateCatalog().read("knowledge/constraint/team-standard.md")):
+        _put(tmp_path, topic, existing)
+        result = update_knowledge(
+            str(tmp_path),
+            {topic: "# Replacement\n"},
+            expected_hashes={topic: _digest(existing)},
+            initialize_team_standard=True,
+        )
+        assert result["status"] == "partial"
+        retired = update_knowledge(
+            str(tmp_path),
+            {},
+            deletions=[topic],
+            expected_hashes={topic: _digest(existing)},
+        )
+        assert retired["status"] == "partial"
+        assert (tmp_path / topic).read_text(encoding="utf-8") == existing
+
+
+def test_initialization_cannot_add_topics_after_entry_is_human_owned(tmp_path: Path) -> None:
+    """不能把新增文件当作绕过既有团队规范维护授权的入口。"""
+    _put(tmp_path, TEAM, "# 人工规范\n")
+    topic = "modus/knowledge/constraint/team-standard/database.md"
+    result = update_knowledge(str(tmp_path), {topic: "# 数据库\n"}, initialize_team_standard=True)
+    assert result["status"] == "partial"
+    assert not (tmp_path / topic).exists()
+    maintained = update_knowledge(str(tmp_path), {topic: "# 数据库\n"}, allow_team_standard=True)
+    assert maintained["writes"] == [topic]
+    assert (tmp_path / TEAM).read_text(encoding="utf-8") == "# 人工规范\n"
+
+
+@pytest.mark.parametrize("seed_exists", [False, True])
+def test_team_topics_publish_before_entry_and_retry_without_maintenance(
+    tmp_path: Path, seed_exists: bool
+) -> None:
+    """专题先发布，入口最后成稿；原请求重试不需要升级人工维护授权。"""
+    seed = TemplateCatalog().read("knowledge/constraint/team-standard.md")
+    if seed_exists:
+        _put(tmp_path, TEAM, seed)
+    topic = "modus/knowledge/constraint/team-standard/database.md"
+    documents = {topic: "# 数据库\n", TEAM: "# 团队规范\n\n[数据库](team-standard/database.md)\n"}
+    hashes = {topic: None, TEAM: _digest(seed) if seed_exists else None}
+
+    published = update_knowledge(
+        str(tmp_path), documents, expected_hashes=hashes, initialize_team_standard=True
+    )
+    assert published["status"] == "completed"
+    assert published["writes"] == [topic, TEAM]
+    retried = update_knowledge(
+        str(tmp_path), documents, expected_hashes=hashes, initialize_team_standard=True
+    )
+    assert retried["status"] == "noop"
+    assert retried["unchanged"] == [topic, TEAM]
+
+
+def test_failed_entry_publication_preserves_completed_topic(tmp_path: Path) -> None:
+    """CAS 冲突只影响入口；调用者可回读后继续发布，不回滚已完成专题。"""
+    seed = TemplateCatalog().read("knowledge/constraint/team-standard.md")
+    _put(tmp_path, TEAM, seed)
+    topic = "modus/knowledge/constraint/team-standard/database.md"
+    documents = {topic: "# 数据库\n", TEAM: "# 团队规范\n"}
+    partial = update_knowledge(
+        str(tmp_path),
+        documents,
+        expected_hashes={TEAM: _digest("# 过时种子\n")},
+        initialize_team_standard=True,
+    )
+    assert partial["status"] == "partial"
+    assert partial["writes"] == [topic]
+    assert partial["conflicts"][0]["path"] == TEAM
+    assert (tmp_path / topic).read_text(encoding="utf-8") == documents[topic]
+    assert (tmp_path / TEAM).read_text(encoding="utf-8") == seed
+
+    retried = update_knowledge(
+        str(tmp_path),
+        documents,
+        expected_hashes={TEAM: _digest(seed)},
+        initialize_team_standard=True,
+    )
+    assert retried["status"] == "completed"
+    assert retried["unchanged"] == [topic]
+    assert retried["writes"] == [TEAM]
+
+
+def test_topic_initialization_observes_entry_published_while_waiting_for_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """入口锁串行化交接：专题等待期间入口成稿，唤醒后必须重新判定权限。"""
+    paths = ModusPaths.for_root(tmp_path)
+    seed = TemplateCatalog().read("knowledge/constraint/team-standard.md")
+    _put(tmp_path, TEAM, seed)
+    topic = "modus/knowledge/constraint/team-standard/database.md"
+    entry_lock = paths.knowledge_document_lock(paths.team_standard)
+    original_lock = session.required_reentrant_file_lock
+    waiting = Event()
+
+    @contextmanager
+    def observed_lock(path: Path):
+        if path == entry_lock:
+            waiting.set()
+        with original_lock(path):
+            yield
+
+    monkeypatch.setattr(session, "required_reentrant_file_lock", observed_lock)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with original_lock(entry_lock):
+            pending = pool.submit(
+                update_knowledge,
+                str(tmp_path),
+                {topic: "# 数据库\n"},
+                initialize_team_standard=True,
+            )
+            assert waiting.wait(timeout=5), "专题初始化必须先取得入口锁"
+            session.write_document(
+                paths,
+                TEAM,
+                "# 已发布规范\n",
+                expected_hash=_digest(seed),
+                allow_human=True,
+                initialize_team_standard=True,
+            )
+        result = pending.result(timeout=5)
+
+    assert result["status"] == "partial"
+    assert "入口已包含保留内容" in result["conflicts"][0]["reason"]
+    assert not (tmp_path / topic).exists()
 
 
 @pytest.mark.parametrize("seed_exists", [False, True])

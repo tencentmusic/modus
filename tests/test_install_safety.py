@@ -81,6 +81,9 @@ def test_update_delivers_workflow_changes_to_every_host_and_retains_user_edits(
     edited = ".agents/skills/modus-reinit/SKILL.md"
     (tmp_path / edited).write_bytes(b"# User-owned workflow\n")
     paths.team_standard.write_bytes(b"# Human team policy\n")
+    topic = paths.constraint_dir / "team-standard/concurrency.md"
+    topic.parent.mkdir()
+    topic.write_bytes(b"# Human task policy\n")
 
     result = run_update(tmp_path)
 
@@ -92,6 +95,7 @@ def test_update_delivers_workflow_changes_to_every_host_and_retains_user_edits(
         assert actual == (b"# User-owned workflow\n" if relative == edited else content), relative
         assert_local_markdown_links_resolve(tmp_path / relative, root=tmp_path)
     assert paths.team_standard.read_bytes() == b"# Human team policy\n"
+    assert topic.read_bytes() == b"# Human task policy\n"
 
     retry = run_update(tmp_path)
     assert retry["status"] == "partial"

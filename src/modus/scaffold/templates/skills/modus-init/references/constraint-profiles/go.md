@@ -1,5 +1,11 @@
 # Go 约束调查
 
+## 编码默认方案
+
+组合[公共基础](foundation.md)和专项，以下为通用建议。nil slice/map、空集合和接口持有 typed nil 分别核验；map 迭代不提供业务排序，唯一索引检测重复。错误沿已有类型和 errors.Is/As 传播，不靠字符串匹配；包装与日志责任层保持一致。
+
+创建成功后登记 defer 清理，长循环不要让资源堆到整个函数返回才释放。goroutine 有启动者、停止条件和结果消费者，channel 关闭者明确；复用有界执行能力，context 传递 deadline/取消，cancel 释放派生资源。捕获循环变量前核对工具链与语言版本行为；没有 errgroup 依赖不凭空 import。检查取消、慢依赖、错误链、Rows.Err 与退出等待。
+
 以下是取证维度，不是 Team Standard 的固定 H2 模板；最终章节按项目真实机制组织。
 
 先读[共享方法](../constraint-extraction.md)。以 `go.mod/go.work`、构建标签、启动装配和实际包依赖确定调查范围；Gin/Echo/Chi/Kratos、gRPC、GORM/sqlx/sqlc 只在存在时选读。不要把 Java 分层名称强加给 Go 包。

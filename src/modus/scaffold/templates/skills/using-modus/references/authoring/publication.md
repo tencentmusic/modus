@@ -126,7 +126,9 @@ init/reinit 终稿在删除执行卡之前运行一次 `modus knowledge verify -
 
 摘要按原正文的 UTF-8 编码计算，例如 `hashlib.sha256(before.encode("utf-8")).hexdigest()`；`before` 必须是本轮理解、修订所依据的完整读取结果。新建文件的预期摘要为 `null`，删除已有生成正文时在 `deletions` 列出路径并提供原摘要。普通同步保留 `allowTeamStandard: false`，不写人工约束或业务资料。退出码 `1` 表示存在逐文件冲突，已成功的写入不会回滚；检查报告的 `writes`、`unchanged`、`deleted` 和 `conflicts`，重读冲突正文后重新判断，不能只刷新摘要重试。
 
-Team Standard 的两种写入方式互斥，默认均为 `false`：首次 init 的 K5 使用 `initializeTeamStandard: true`，仅填充缺失文件或与当前随包模板完全相同的种子；明确委托维护已有内容时才使用 `allowTeamStandard: true`。二者必须为布尔值，同时启用在首个写入前拒绝整批请求。普通 reinit/update/sync 不自动选择这两种权限。首次填充遇到人工改动或旧版种子时保留实际内容，不能以“仍有种子注释”为由覆盖。
+Team Standard 的两种写入方式互斥，默认均为 `false`：首次 init 的 K5 使用 `initializeTeamStandard: true`，仅填充缺失入口或与当前随包模板完全相同的入口种子；缺失专题还要求入口仍缺失或为精确种子。已有专题不享有种子覆盖例外。明确委托维护时才使用 `allowTeamStandard: true`，入口成稿后新增专题也属于维护。完整条件见[团队规范契约](framework/deliverables/team-standard.md#稳定入口与可选专题)。
+
+二者必须为布尔值，同时启用在首个写入前拒绝整批请求。普通 reinit/update/sync 不自动选择这两种权限。首次填充遇到人工改动或旧版种子时保留实际内容，不能以“仍有种子注释”为由覆盖。先发布专题并确认成功，再单独更新入口导航；请求中的逐文件写入不构成事务，前一项冲突也不会自动阻止后续写入。
 
 1. 完整读取目标并记录哈希；内容不变就跳写。
 2. 新增先写目标并回读；更新保持原语义位置，不追加日期式 changelog。

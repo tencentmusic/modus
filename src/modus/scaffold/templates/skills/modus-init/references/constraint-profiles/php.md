@@ -1,5 +1,11 @@
 # PHP 约束调查
 
+## 编码默认方案
+
+组合[公共基础](foundation.md)和专项，以下为通用建议。确认 PHP 版本、strict_types 与 FPM/常驻 worker；不能把请求结束清理假设套到常驻进程。null、空串、零与 false 分别处理，empty/宽松比较可能合并不同语义；数组键转换、覆盖与顺序需核验。
+
+复用项目 service/container、DTO/validator、异常和 DB；简单映射用惯用表达，副作用显式循环。资源沿 try/finally 或真实框架生命周期清理；事务异常沿现有模型传播，长驻 worker 清理请求级状态。检查转换、重复键、跨请求状态、失败与释放，不生成目标版本不支持的语法。
+
 以下是取证维度，不是 Team Standard 的固定 H2 模板；最终章节按项目真实机制组织。
 
 先读[共享方法](../constraint-extraction.md)。从 composer.json/lock、autoload、启动脚本、路由与容器配置确定 PHP/框架版本；Laravel、Symfony、ThinkPHP、Hyperf/Swoole/Octane 等只查项目实际使用的机制。区分 PHP-FPM 请求与常驻进程生命周期。

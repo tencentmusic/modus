@@ -188,9 +188,10 @@ def update_knowledge(
     退役必须提供原摘要，且只在本批写入全部成功后执行。独立文件已完成的
     写入不回滚；调用方根据逐项结果回读冲突，不能把 partial 当作整批失败。
 
-    首次填充与人工维护分别授权：initialize_team_standard 仅允许缺失或
-    精确框架种子，allow_team_standard 允许明确委托的既有正文修订。
-    两者互斥，均不跳过文档锁内的所有权和内容摘要检查。
+    首次填充与人工维护分别授权：initialize_team_standard 仅填缺失入口或
+    精确入口种子，并可在入口尚未成稿时创建缺失专题。先提交专题并确认成功，
+    再发布入口导航。allow_team_standard 允许明确委托的正文维护。两者互斥，
+    均不跳过文档锁内的所有权和内容摘要检查。
     """
     validate_update_input(
         documents, expected_hashes, deletions, allow_team_standard, initialize_team_standard
