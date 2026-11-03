@@ -49,4 +49,3 @@ export async function createHarness(t, { execute, config, policy = true, sandbox
     call: (name, args = {}, execution = exec) => ctx.tools.get(name).execute(args, execution),
   }
 }
-

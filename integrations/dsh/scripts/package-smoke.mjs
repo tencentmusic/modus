@@ -68,7 +68,7 @@ async function verifyInstalledPlugin() {
     await copyFile(new URL(`../test/${file}`, import.meta.url), join(root, 'test', file))
   }
   await cp(new URL('../test/support/', import.meta.url), join(root, 'test/support'), { recursive: true })
-  for (const fixture of ['simple_service', 'authoring/simple-reservation']) {
+  for (const fixture of ['simple_service', 'authoring/async-import']) {
     await cp(new URL(fixture, fixtureRoot), join(root, 'fixtures', fixture), { recursive: true })
   }
   const behavior = await execute(process.execPath, [

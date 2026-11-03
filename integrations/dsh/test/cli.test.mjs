@@ -31,12 +31,14 @@ test('real CLI round trip preserves project bytes and shell metacharacters', req
 })
 
 test('published tools retrieve CAS updates and preserve rejected writes', requiresCli, async t => {
-  const { root, cli, call } = await createCliProject(t, 'authoring/simple-reservation/')
-  const document = 'modus/knowledge/domain/reservation/references/modules/create-reservation.md'
+  // 复用当前保留的联系人导入样稿，源码测试与隔离安装共同验证知识写入边界。
+  const { root, cli, call } = await createCliProject(t, 'authoring/async-import/')
+  const document = 'modus/knowledge/domain/contact-import/references/modules/submission-query.md'
   const original = await readFile(join(root, document), 'utf8')
   const digest = createHash('sha256').update(original).digest('hex')
-  const clarification = '预约记录仅存于服务实例内存，进程退出后不会持久保存。'
-  const updated = `${original.trimEnd()}\n\n${clarification}\n`
+  const clarification = 'DSH_CAS_MEMORY_BOUNDARY：导入任务仅存于导入器实例内存，进程退出后不会持久保存。'
+  // 使用独有检索标识定位新增事实，避免长篇样稿的其他相关片段挤占预算。
+  const updated = original.replace(/^(# .+)$/m, `$1\n\n${clarification}`)
   const knowledgeBefore = await snapshot(join(root, 'modus/knowledge'))
   const request = join(root, 'knowledge-update.json')
   const update = async payload => {
@@ -45,7 +47,7 @@ test('published tools retrieve CAS updates and preserve rejected writes', requir
   }
 
   const impact = await call('modus_knowledge_impact', {
-    changedFiles: ['reservation_source.py'], validation: 'passed',
+    changedFiles: ['import_source.py'], validation: 'passed',
   })
   assert.ok(impact.result.candidates.some(candidate => candidate.path === document))
   assert.deepEqual(impact.result.writes, [])
@@ -57,10 +59,10 @@ test('published tools retrieve CAS updates and preserve rejected writes', requir
   assert.deepEqual(written.writes, [document])
   assert.equal(await readFile(join(root, document), 'utf8'), updated)
   const context = await call('modus_context', {
-    request: '创建预约的数据持久化边界', paths: ['reservation_source.py'],
+    request: 'DSH_CAS_MEMORY_BOUNDARY', paths: ['import_source.py'],
   })
-  assert.ok(JSON.stringify(context.result).includes(clarification))
-  const verification = await call('modus_verify_knowledge', { domain: 'reservation' })
+  assert.ok(JSON.stringify(context.result).includes(clarification), JSON.stringify(context.result))
+  const verification = await call('modus_verify_knowledge', { domain: 'contact-import' })
   assert.equal(verification.exitCode, 0)
   assert.equal(verification.result.status, 'clean')
 
@@ -75,7 +77,7 @@ test('published tools retrieve CAS updates and preserve rejected writes', requir
   })
   const readme = await readFile(join(root, 'README.md'))
   await assert.rejects(update({ documents: {
-    'modus/knowledge/domain/reservation/references/new.md': '# Must not be written\n',
+    'modus/knowledge/domain/contact-import/references/new.md': '# Must not be written\n',
     'README.md': '# Outside knowledge\n',
   } }), error => error.code === 2)
   assert.deepEqual(await snapshot(join(root, 'modus/knowledge')), afterWrite)
