@@ -21,8 +21,17 @@ Already installed? Run `modus update`
   <img src="https://img.shields.io/badge/Go-semantic-00ADD8?logo=go&logoColor=white" alt="Go semantic provider" />
   <img src="https://img.shields.io/badge/C%2FC%2B%2B-semantic-00599C?logo=cplusplus&logoColor=white" alt="C and C++ semantic provider" />
   <img src="https://img.shields.io/badge/TypeScript-semantic-3178C6?logo=typescript&logoColor=white" alt="TypeScript semantic provider" />
+</p>
+
+<p>
+  <strong>Language capabilities · dedicated structural parsing</strong><br />
+  <img src="https://img.shields.io/badge/JavaScript-structure-F7DF1E?logo=javascript&logoColor=111111" alt="JavaScript structural parsing" />
+  <img src="https://img.shields.io/badge/Kotlin-structure-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin structural parsing" />
+  <img src="https://img.shields.io/badge/Swift-structure-F05138?logo=swift&logoColor=white" alt="Swift structural parsing" />
+  <img src="https://img.shields.io/badge/Objective--C-structure-438EFF" alt="Objective-C structural parsing" />
+  <img src="https://img.shields.io/badge/C%2B%2B-structure-00599C?logo=cplusplus&logoColor=white" alt="C++ structural parsing" />
   <br />
-  <sub>Structural extraction also covers JavaScript, Kotlin, PHP, C#/.NET, Rust, Astro/Svelte, and more. <a href="#language-capabilities">See the full scope</a></sub>
+  <sub>Structural extraction also covers PHP, C#/.NET, Rust, Astro/Svelte, and more. <a href="#language-capabilities">See the full scope</a></sub>
 </p>
 
 [![PyPI](https://img.shields.io/pypi/v/openmodus?label=PyPI&color=3775A9)](https://pypi.org/project/openmodus/)
@@ -37,9 +46,9 @@ Already installed? Run `modus update`
 
 [Core features](#core-features) · [Quick start](#quick-start) · [Why Modus](#why-modus) · [Technical principles](#technical-principles) · [User guide](#user-guide) · [Contributing](#development-and-contribution)
 
-**New to a project and changing a critical flow? Where are the rules and code, and how will you verify the result?**
+**Changing a business rule in an unfamiliar project? How do you find the code that enforces it and the tests that verify it?**
 
-Modus organizes source and business material into verifiable project knowledge. It helps coding agents read source, business material, and team constraints together, record business scenarios, design tradeoffs, and change boundaries as verifiable Markdown in the repository, then use that knowledge progressively during later coding tasks and update it when needed.
+Modus builds a project knowledge base that coding agents can trace back to source. Local analysis locates entry points, calls, and state writes. The agent checks those leads against implementation, tests, business material, and team constraints. In Markdown alongside the code, it records when a rule applies, how failures are handled, and how to verify the behavior. On the next change, developers and agents can follow the rule back to the current implementation.
 
 > The open-source release currently covers Modus's project knowledge base. Its broader AI workflow solution is also evolving, and we will share updates as it develops.
 
@@ -136,7 +145,7 @@ For older projects, `modus update --project` removes manifest-tracked Modus hook
 
 #### Language capabilities
 
-Evidence depth is explicit. Recognizing a file extension is never presented as complete semantic support.
+The current source distinguishes which files enter analysis, which structures their syntax reveals, and which symbols a local toolchain can bind.
 
 **Compiler or type-system enhancement**
 
@@ -148,7 +157,9 @@ Evidence depth is explicit. Recognizing a file extension is never presented as c
   <img src="https://img.shields.io/badge/TypeScript-semantic-3178C6?logo=typescript&logoColor=white" alt="TypeScript semantic provider" />
 </p>
 
-Python, Java, Go, C/C++, and TypeScript can add local compiler or type-checker observations to structural evidence. An unavailable toolchain lowers only the affected evidence; it does not block the whole project.
+Python, Java, Go, C/C++, and TypeScript can add local compiler or type-checker observations to structural evidence. In automatic mode, a missing optional toolchain leaves a coverage gap for the affected scope. When compiler semantics are explicitly required, a required provider failure stops the run.
+
+For example, Java structural analysis can locate a method call in source. With the project’s build context and a local JDK available, Modus also uses `javac` to identify the method declaration that the call resolves to, recording both the call site and the target identity. [Java compiler adapter](../src/modus/machine/facts/provider_assets/ModusJavaAnalyzer.java)
 
 **Dedicated structural extraction**
 
@@ -156,6 +167,8 @@ Python, Java, Go, C/C++, and TypeScript can add local compiler or type-checker o
   <img src="https://img.shields.io/badge/JavaScript%20%2F%20TypeScript-structure-F7DF1E?logo=javascript&logoColor=111111" alt="JavaScript and TypeScript" />
   <img src="https://img.shields.io/badge/Java-structure-ED8B00?logo=openjdk&logoColor=white" alt="Java" />
   <img src="https://img.shields.io/badge/Kotlin-structure-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin" />
+  <img src="https://img.shields.io/badge/Swift-structure-F05138?logo=swift&logoColor=white" alt="Swift" />
+  <img src="https://img.shields.io/badge/Objective--C-structure-438EFF" alt="Objective-C" />
   <img src="https://img.shields.io/badge/Python-structure-3776AB?logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/badge/Go-structure-00ADD8?logo=go&logoColor=white" alt="Go" />
   <img src="https://img.shields.io/badge/PHP-structure-777BB4?logo=php&logoColor=white" alt="PHP" />
@@ -165,11 +178,27 @@ Python, Java, Go, C/C++, and TypeScript can add local compiler or type-checker o
   <img src="https://img.shields.io/badge/Astro%20%2F%20Svelte-template-FF5D01?logo=astro&logoColor=white" alt="Astro and Svelte templates" />
 </p>
 
-Objective-C, Objective-C++, and Swift have dedicated structural extraction, including OC selectors/categories/protocols, Swift extensions and argument labels, and content-based `.h` dispatch. Objective-C++ combines separate OC and C++ observations with explicit partial coverage. Kotlin adds packages, imports, extension functions, and Compose trailing closures; C++ adds namespaces, header declarations, and template calls. Ordinary source retrieval also includes `.m`, `.mm`, `.hh`, and `.hxx`.
+| Language or format | Structures extracted from source |
+| --- | --- |
+| Java | Extracts classes, interfaces, fields, methods, and call sites. Syntax nodes provide parameter types and array dimensions, as well as explicit nullability annotations and serialized field names. |
+| Python | Extracts classes, functions, import aliases, and scopes, and records call sites inside function bodies. |
+| JavaScript, TypeScript (including JSX and TSX) | Identifies imports, exports, functions, and call sites. TypeScript observations also include explicitly declared type members and whether they are optional. |
+| Go | Records packages, import paths and aliases, function declarations, and calls, including calls made through an import alias. |
+| C | Extracts function definitions, calls, and `#include` directives with their source locations. |
+| C++ | Preserves namespaces, distinguishes method prototypes from definitions, and extracts calls on template receivers. Unexpanded registration macros leave a coverage gap. |
+| C# (.NET) | Extracts types, method declarations, and calls inside method bodies in `.cs` files. |
+| PHP | Extracts class and method names, signatures, enclosing scopes, and source locations. |
+| Rust | Extracts structs, functions, `use` imports, and calls, preserving explicit type arguments in generic calls. |
+| Kotlin | Extracts packages, aliased imports, extension receivers, and calls in Compose DSL blocks. Multiple possible targets across source sets remain candidates. |
+| Swift | Preserves argument labels and the type an extension belongs to, and distinguishes declarations of same-name overloads. |
+| Objective-C | Recognizes multipart selectors, categories, class and instance methods, and the source locations of message sends. |
+| Objective-C++ | Extracts Objective-C message sends and C++ calls from mixed-language files. Observations retain the original byte coordinates and carry a partial-coverage marker. |
+| Vue, Svelte, Astro | Extracts JavaScript or TypeScript from component script blocks and Astro frontmatter, preserving positions in the original component. |
+| Markdown (including MDX and QMD) | Extracts document sections and line numbers from Markdown headings so authors can locate supporting material. |
 
-These observations are not Xcode, Swift, or Kotlin compiler semantics. They do not automatically resolve every build variant, macro expansion, or IDL/JNI bridge. Native and Kotlin evidence guides direct agents to verify generated origins, registrations, Action/State flows, and client lifecycles; missing relations remain candidate or unresolved evidence.
+For `.h` files, Modus uses syntax in the frozen source to distinguish C, C++, Objective-C, and Objective-C++. In `.mm` files it can extract both languages’ structures and marks coverage as partial. Ordinary source navigation and retrieval also recognize `.m`, `.mm`, `.hh`, and `.hxx`. Where a call target depends on type inference or dynamic dispatch, Modus retains candidates or records a gap. [Language visitor regression cases](../tests/machine/test_mobile_adapters.py)
 
-Other registered source, template, configuration, data-definition, and document formats still enter a bounded generic-evidence path. Modus preserves coverage gaps instead of interpreting a missing provider as proof that the repository has no business behavior.
+Other registered source, template, configuration, data-definition, and document formats still enter a bounded generic-evidence path. Modus preserves coverage gaps instead of interpreting a missing provider as proof that the repository has no business behavior. [Language and extension registry](../src/modus/machine/language-registry.json)
 
 ### Why choose Modus
 
@@ -188,40 +217,73 @@ Modus addresses these problems through an inspectable knowledge-production and m
 
 ## Technical principles
 
-### From evidence to knowledge
+<a id="from-evidence-to-knowledge"></a>
 
-Modus keeps one-off machine analysis separate from durable knowledge. `init/reinit` builds verifiable code evidence for the current authoring run; agents and people interpret that evidence together with business material and current source. Ordinary tasks consume reviewed Markdown and return to the implementation whenever a conclusion must be verified.
+### How the N, K, and C layers work together
 
 ```text
-[One-off evidence production: init / reinit]
-  source + build files + tests/configuration
-    → Source Snapshot (freeze this run's repository inputs)
-    → CST / structural IR / project binding
-    → optional compiler and type-system observations
-    → temporary evidence graph → explicit semantic reconciliation
-    → bounded views of entries, relations, effects, and resources
-    → deterministic, bounded JSON bundle ───────────────┐
-                                                        │
-[Knowledge authoring]                                  ▼
-  business material + team constraints ─→ agent + human judgment ← current source
-                                                        │
-                                                        ▼
-                                      reviewable, traceable Markdown knowledge
-                                                        │
-[Continuous use and maintenance]                        │
-  ordinary task ─→ progressive routing and retrieval ───┤→ act after source check
-  code change ─→ durable-knowledge impact decision ─→ minimal revision if needed
+Project source, build configuration, available toolchains
+  ↓
+N · Evidence    Freeze inputs, resolve relationships, trace entries to effects
+  ↓ Evidence bundle for this run, with locations, precision, and coverage gaps
+K · Authoring   The agent checks sources and confirms domain boundaries with the user
+  ↓ Reviewed Markdown under version control alongside the code
+C · Daily use   Read that knowledge, team constraints, and current source to act and verify
+  └─ If a change affects a durable fact, revise its definition and references
 ```
 
-These are three decoupled phases. Evidence production runs only during `init/reinit`; authoring never promotes a machine relationship directly into a business conclusion; continuous use and maintenance neither rebuild initialization analysis nor create documentation churn for every code edit.
+Consider an order callback. **When the endpoint returns “accepted,” has the order state already been committed?** During `/modus-init` or `/modus-reinit`, N locates the relevant calls and writes. In K, the author establishes what actually signals completion. The next time someone changes the retry policy, C brings that reviewed conclusion and the current implementation to the task.
 
-The full lifecycle deliberately protects three boundaries:
+#### N · From source to an evidence bundle
 
-- **Evidence guides; it does not decide.** `exact`, `candidate`, `heuristic`, and `unresolved` remain distinct. Conflicts become diagnostics, and an agent must reread source, tests, configuration, or supplied material before stating a conclusion.
-- **Analysis state is not the durable product.** The temporary graph is released after projection, and the JSON bundle lives in disposable cache for the current authoring run only. Ordinary tasks never read it; only reviewed Markdown becomes lasting knowledge.
-- **Current source remains authoritative.** Snapshot drift or an integrity failure stops the current analysis, while a local parser or provider gap lowers only the affected evidence. Ordinary use and incremental maintenance read prose together with current source instead of silently falling back to an old conclusion.
+| Stage | Evidence passed to the next stage |
+| --- | --- |
+| N1 Source baseline | Freezes the input bytes, distinguishing implementation, tests, configuration, and other sources. File contents and the analysis environment identify the baseline. Excluded and unreadable inputs are recorded. |
+| N2 Program facts | Language visitors extract declarations, scopes, and references from frozen inputs. Framework observers identify entry points, and available compilers or type checkers contribute bindings. Facts carry their origin and source coordinates. |
+| N3 Relationship resolution | Reconciles structural and compiler observations using declaration identity, owner, and source location. A typed directed multigraph preserves the resolution of each relationship as `exact`, `candidate`, `heuristic`, or `unresolved`. |
+| N4 Capability composition | A bounded breadth-first traversal follows observed relations from public triggers such as HTTP handlers, message consumers, and jobs. It returns representative paths to effects such as a state write or message send, and records cycles, unresolved endpoints, and budget cutoffs separately. |
+| N5 Authoring projections | Proposes candidate scopes based on entry-to-effect behavior and authoritative objects. Structural communities suggest files worth reading together. The projection identifies candidates that need splitting and declarations still unassigned. |
+| N6 Evidence bundle | Verifies the baseline and integrity before publishing the JSON bundle atomically. A query by capability, path, or symbol returns authoring context with `baselineDigest` and `bundleDigest`, what fit within the budget, omission counts, and where to continue. Input drift or failed validation stops publication for this run. |
 
-Consider a project where an order callback's retry behavior needs changing. Within the analyzed coverage, initialization evidence can point to the callback entry point, state writes, and relevant source. The author must still reread implementation, tests, and available business agreements to decide what a duplicate notification should return. Once confirmed, idempotency conditions, failure recovery, and verification entry points belong in the Module and the rule and state topics according to their responsibilities. A later developer follows the Domain and Module to those conclusions, checks current source, and makes the change. If the retry contract or state transitions change, they revise the primary definitions and references in place; an internal refactor needs no added knowledge.
+Projection and packaging consume evidence produced upstream. Authors can expand the observations behind a scope suggestion and check their origin and precision. [Six-stage pipeline](../src/modus/machine/pipeline.py) · [Evidence bundle and query contract](../src/modus/machine/packet/README.md)
+
+**Why add language visitors on top of Tree-sitter?** Tree-sitter builds a concrete syntax tree (CST) from source. Modus visitors interpret language-specific nodes as declarations, scopes, and call sites. In Objective-C++ files, Modus masks Objective-C syntax without shifting byte offsets, so C++ calls can be traced to their original locations in the `.mm` source. Changes to the visitor implementation or grammar package version invalidate cached observations. [Tree-sitter](https://tree-sitter.github.io/tree-sitter/) · [Parser implementation](../src/modus/machine/facts/native_parser.py) · [Mixed-language coordinate test](../tests/machine/test_mobile_integration.py)
+
+**Why keep parallel edges in the evidence graph?** Two branches of the same callback can call the same write method. To review a retry, you need to know which line makes each call. N3 uses NetworkX’s `MultiDiGraph` to represent direction and parallel edges. Modus assigns stable edge identities, records sources and call sites, and decides which targets the evidence can bind. When N4 follows directed edges to an effect, the path inherits the weakest resolution along the way. Even with an exact entry point, a candidate call leaves the whole path open to verification. [Evidence graph and edge identity](../src/modus/machine/resolution/evidence_graph.py) · [Capability traversal](../src/modus/machine/capability/traversal.py)
+
+**Why use a different graph for community detection?** To find files worth investigating together, N5 projects only exact local calls and imports within the same analysis context onto an undirected file graph. Twenty calls between two files count as one dependency. Modus runs NetworkX’s implementation of Louvain independently on each connected component, using modularity to find closely related groups of files. Adding an unrelated component leaves existing groups intact. Stable node and edge order and a fixed random seed make the partition reproducible. [Original Louvain paper](https://arxiv.org/abs/0803.0476) · [Modus community partitioning](../src/modus/machine/projection/community_signal.py)
+
+The analysis records where node, edge, or level budgets limit the partition. Communities provide structural clues. The author checks entry points, writes, and business material before proposing Domain and Module boundaries for confirmation with the user in K1.
+
+#### K · From evidence to reviewable knowledge
+
+| Stage | What the author delivers |
+| --- | --- |
+| K1 Scope modeling | Uses machine suggestions, existing knowledge, and user material to confirm with the user which Domains and Modules the run covers and which stable identities they use. |
+| K2 Authoring plan | Assigns each fact a document that owns its full definition, identifies pages that reference it, and flags cross-domain handoffs that both sides must verify. |
+| K3 Scenario evidence | Checks implementation, tests, configuration, and business material for each scenario. Records its trigger, key decisions, observable outcome, and recovery behavior, along with specific open questions. |
+| K4 Domain authoring | Explains the whole scenario in the Module. Topic documents own the details of interfaces, objects, rules, state, downstream dependencies, and infrastructure. The author checks each page against its sources. |
+| K5 Project constraints | Verifies engineering requirements against code, tests, CI, and team material. Records where each requirement applies, how it is enforced, and its exceptions. Respects ownership of existing team standards. |
+| K6 System overview and publication | Verifies the final accounts on both sides of each cross-domain handoff and writes the overview from the completed domain knowledge and project constraints. The author reviews the prose. Publication checks cover paths, identities, links, and source anchors. |
+
+**What does “accepted” prove about the order callback?** The author traces the branch that returns the response, looks for the transaction or downstream consumer that commits the order state, then checks tests for duplicate notifications and recovery. If the evidence establishes only acceptance, the account stops there and records the completion signal as an open question.
+
+**Where does authoring resume when evidence changes?** Work proceeds one Domain at a time. If a state transition lacks support during K4, the author returns to K3 to investigate, then revises the affected definition. A checkpoint preserves the confirmed scope and progress so an interrupted run can resume at the earliest unfinished step. [Six-stage authoring contract](../docs/authoring-contract.md)
+
+#### C · Use and maintain knowledge on the next change
+
+| Stage | What the task gains |
+| --- | --- |
+| C1 Task scope | Defines the question or behavior to change and identifies unknowns that could affect the result. |
+| C2 Locate knowledge and code | Finds the document that owns the rule, applicable team constraints, implementation entry points, and places to verify the behavior. |
+| C3 Verify evidence | Checks current source and supporting material for the rule’s conditions and exceptions. Identifies what the evidence establishes and which gaps could still change the decision. |
+| C4 Make the decision | Specifies which behaviors to change or preserve, the reasons for the choice, and how to judge the result. |
+| C5 Execute and verify | Carries out the decision and compares actual results with expectations. Records what was verified and which checks remain outstanding. |
+| C6 Assess knowledge impact | Uses the actual diff and verification results to identify affected facts or source anchors and starts a targeted update when needed. |
+
+**How does the agent find the rule that matters for this change?** Everyday tasks read current Markdown and source directly. The initialization bundle serves only its authoring run. Retrieval ranks structural signals such as headings and paths separately from BM25 term matches and combines their ranks using reciprocal rank fusion (RRF). A matching rule comes with its conditions, exceptions, and recovery notes. A truncated entry points to where reading can continue. When existing evidence already supports a decision, the agent can proceed directly to C4. [Retrieval ranking](../src/modus/retrieval/stages/ranking.py)
+
+**What needs updating after a retry policy change?** For the order callback, the agent checks both the response to a duplicate notification and the resulting order state. If the response contract changes, it revises the rule and its references. For an internal refactor, the task can end once the agent confirms that the rule and its source anchors still hold. [Task stages and stopping conditions](../src/modus/scaffold/templates/skills/using-modus/references/consumption.md)
 
 ### Knowledge model
 
@@ -263,7 +325,7 @@ Each carrier has a stable responsibility. A Domain is a capability and ownership
 
 **Structure routes; prose explains.** Stable identities, source anchors, and precise links let an agent move progressively from the root overview into a Domain, Module, and relevant topics. Markdown explains business outcomes, decisions, completion boundaries, failure and recovery, and design tradeoffs. Method-level source evidence belongs only in Modules and topics; the root overview and Domain remain stable routers. One document owns the full definition of a fact; the rest link to it, so the entire knowledge base never has to be loaded at once.
 
-Everyday retrieval builds a temporary index from current Markdown. It first follows links from the root overview, Domains, and Modules to select documents to read, then combines structural signals with BM25 term matching to rank results. Inferred routes adjust relevance without excluding other potentially relevant Modules. Matched sections are reassembled as complete entries so conditions, exceptions, and recovery notes stay together. Current source and team constraints share the same time and output budget. Results identify missing evidence types and where to continue reading after a truncated entry, helping the developer decide what to check rather than treating retrieval as proof.
+Everyday retrieval builds a temporary index from current Markdown for each request. Inferred Domains and Modules influence ranking, and other Modules can still appear in the results. Knowledge, source, and team constraints share a time and output budget. Results identify the evidence types still missing. [Retrieval pipeline](../src/modus/retrieval/README.md)
 
 Modus favors knowledge that is **highly reusable, high risk, or hard to infer** instead of generating a summary for every function. Public contracts, core objects, state transitions, downstream handoffs, compatibility boundaries, and verification standards merit durable treatment; routine implementation detail that is cheap to recover stays in source. `business/` and `constraint/` are human-owned by default, so automation cannot overwrite organizational knowledge with scan output. Changes to generated knowledge are guarded by read-time hashes and checked for path identity, link, and anchor integrity.
 
@@ -280,9 +342,9 @@ Modus follows the boundaries it advocates: the entry surface stays narrow, appli
 | `modus.scaffold` | Packages neutral templates and owns deterministic project installation, upgrade reconciliation, ownership records, and safe uninstall. |
 | `knowledge_verification` / `knowledge_write_session` | Separate mechanical integrity checks, human ownership, compare-and-swap writes, and atomic publication. |
 
-The machine layer moves in one direction: frozen inputs, fact observation, relationship resolution, capability composition, authoring projection, and evidence packaging. Projection and packaging consume prior results rather than observing source again to invent missing facts. If an optional compiler or local parser fails, available leads remain, with their affected scope marked. Projected capability boundaries and behavior paths are candidates for the author to verify, not business conclusions.
+Initialization analysis and knowledge writes each have their own publication boundary. The machine layer verifies a new evidence bundle before replacing the current one. If publication fails, the previous complete bundle remains available. The authoring workflow uses the identity of the current run to determine which evidence it can use. [Analysis failure and publication](../src/modus/machine/README.md#失败与发布)
 
-An evidence bundle is published only after full validation. If source changes during analysis or evidence integrity fails, this run's machine output cannot be treated as verified fact. A failed build does not replace an existing complete bundle, and the current authoring run does not pass off that older bundle as current evidence. Knowledge prose is written under ownership and read-time content protection, then checked for structure, links, and source anchors. This gives local evidence gaps, whole-run analysis failure, and prose write conflicts distinct handling boundaries while letting developers return to current source and available material.
+Knowledge writes check ownership and the read-time content hash for each file. If someone edits the same document after the author reads it, the write reports a conflict so the author can reconsider the change against the latest text. Files that pass these checks are replaced atomically. Verification then checks knowledge links and source anchors. [Knowledge write session](../src/modus/knowledge_write_session.py)
 
 ## User guide
 

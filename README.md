@@ -21,8 +21,17 @@
   <img src="https://img.shields.io/badge/Go-semantic-00ADD8?logo=go&logoColor=white" alt="Go semantic provider" />
   <img src="https://img.shields.io/badge/C%2FC%2B%2B-semantic-00599C?logo=cplusplus&logoColor=white" alt="C and C++ semantic provider" />
   <img src="https://img.shields.io/badge/TypeScript-semantic-3178C6?logo=typescript&logoColor=white" alt="TypeScript semantic provider" />
+</p>
+
+<p>
+  <strong>语言能力 · 专用结构解析</strong><br />
+  <img src="https://img.shields.io/badge/JavaScript-structure-F7DF1E?logo=javascript&logoColor=111111" alt="JavaScript structural parsing" />
+  <img src="https://img.shields.io/badge/Kotlin-structure-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin structural parsing" />
+  <img src="https://img.shields.io/badge/Swift-structure-F05138?logo=swift&logoColor=white" alt="Swift structural parsing" />
+  <img src="https://img.shields.io/badge/Objective--C-structure-438EFF" alt="Objective-C structural parsing" />
+  <img src="https://img.shields.io/badge/C%2B%2B-structure-00599C?logo=cplusplus&logoColor=white" alt="C++ structural parsing" />
   <br />
-  <sub>结构提取还覆盖 JavaScript、Kotlin、PHP、C#/.NET、Rust、Astro/Svelte 等。<a href="#语言能力">查看完整范围</a></sub>
+  <sub>结构提取还覆盖 PHP、C#/.NET、Rust、Astro/Svelte 等。<a href="#语言能力">查看完整范围</a></sub>
 </p>
 
 [![PyPI](https://img.shields.io/pypi/v/openmodus?label=PyPI&color=3775A9)](https://pypi.org/project/openmodus/)
@@ -37,9 +46,9 @@
 
 [核心功能](#核心功能) · [快速开始](#快速开始) · [为什么需要 Modus](#为什么需要-modus) · [技术原理](#技术原理) · [使用手册](#使用手册) · [开发与贡献](#开发与贡献)
 
-**接手陌生项目，要改关键流程：规则在哪、代码在哪、如何验证？**
+**接手陌生项目，要改一条业务规则，如何找到负责它的代码和验证它的测试？**
 
-Modus 将源码与业务材料梳理成可核验的项目知识库，让 Coding Agent 联读源码、业务材料与团队约束，把业务场景、设计取舍和变更边界写成仓库内可核验的 Markdown 知识，并在后续编码中渐进使用、随变更修订。
+Modus 为 Coding Agent 建立可追溯的项目知识库。本地分析把入口、调用和状态写入定位到源码。Agent 沿这些线索核对实现、测试、业务材料与团队约束，把规则成立的条件、失败后的恢复方式和验证入口写进仓库里的 Markdown。下一次改动时，开发者和 Agent 都能从同一条规则回到当前实现。
 
 > 目前开源的是 Modus 的项目知识库部分；配套的 AI 工作流开源方案也在持续完善，后续会更新进展。
 
@@ -136,7 +145,7 @@ Modus 需要 Python 3.11–3.14，安装后的命令是 `modus`。下面按平�
 
 #### 语言能力
 
-不同语言的证据深度明确分层，不以“识别文件后缀”冒充完整语义支持。
+当前源码分别记录文件是否纳入分析、语法结构能提取到什么，以及本地工具链能进一步绑定哪些符号。
 
 **编译器或类型系统增强**
 
@@ -148,7 +157,9 @@ Modus 需要 Python 3.11–3.14，安装后的命令是 `modus`。下面按平�
   <img src="https://img.shields.io/badge/TypeScript-semantic-3178C6?logo=typescript&logoColor=white" alt="TypeScript semantic provider" />
 </p>
 
-Python、Java、Go、C/C++ 和 TypeScript 可以在结构证据之上使用本地编译器或类型检查器观察；工具链不可用时只降低对应证据，不阻塞整个项目。
+Python、Java、Go、C/C++ 和 TypeScript 可在结构解析的基础上补充本地编译器或类型检查器的观察。自动模式下，可选工具链缺失会留下对应的覆盖缺口。显式要求编译语义时，必需的提供方失败会中止本轮分析。
+
+例如，Java 的结构解析可以定位一行方法调用。项目构建上下文和本地 JDK 可用时，Modus 还会通过 `javac` 查询该调用绑定的方法声明，保留调用位置和目标身份。[Java 编译器适配实现](src/modus/machine/facts/provider_assets/ModusJavaAnalyzer.java)
 
 **专门结构提取**
 
@@ -156,6 +167,8 @@ Python、Java、Go、C/C++ 和 TypeScript 可以在结构证据之上使用本�
   <img src="https://img.shields.io/badge/JavaScript%20%2F%20TypeScript-structure-F7DF1E?logo=javascript&logoColor=111111" alt="JavaScript and TypeScript" />
   <img src="https://img.shields.io/badge/Java-structure-ED8B00?logo=openjdk&logoColor=white" alt="Java" />
   <img src="https://img.shields.io/badge/Kotlin-structure-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin" />
+  <img src="https://img.shields.io/badge/Swift-structure-F05138?logo=swift&logoColor=white" alt="Swift" />
+  <img src="https://img.shields.io/badge/Objective--C-structure-438EFF" alt="Objective-C" />
   <img src="https://img.shields.io/badge/Python-structure-3776AB?logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/badge/Go-structure-00ADD8?logo=go&logoColor=white" alt="Go" />
   <img src="https://img.shields.io/badge/PHP-structure-777BB4?logo=php&logoColor=white" alt="PHP" />
@@ -165,11 +178,27 @@ Python、Java、Go、C/C++ 和 TypeScript 可以在结构证据之上使用本�
   <img src="https://img.shields.io/badge/Astro%20%2F%20Svelte-template-FF5D01?logo=astro&logoColor=white" alt="Astro and Svelte templates" />
 </p>
 
-Objective-C、Objective-C++ 和 Swift 提供专门结构提取：保留 OC selector/category/protocol、Swift 扩展与参数标签，并按内容区分 `.h`。Objective-C++ 分别恢复 OC 与 C++ 结构，明确标为部分覆盖；Kotlin 补充包、导入、扩展函数与 Compose 尾随闭包，C++ 补充命名空间、头文件声明与模板调用。日常检索也覆盖 `.m`、`.mm`、`.hh`、`.hxx`。
+| 语言或格式 | 能从源码提取的结构 |
+| --- | --- |
+| Java | 提取类、接口、字段、方法及调用位置。从语法节点读取参数类型和数组维度，也能记录显式的可空注解与序列化字段名。 |
+| Python | 提取类、函数、导入别名和作用域，记录函数体中的调用位置。 |
+| JavaScript、TypeScript（含 JSX、TSX） | 识别导入、导出、函数和调用点。TypeScript 还可记录显式声明的类型成员及其可选性。 |
+| Go | 记录包、导入路径及别名、函数声明和调用，包括通过导入别名发起的调用。 |
+| C | 提取函数定义、调用与 `#include`，保留它们的源码位置。 |
+| C++ | 保留命名空间，区分方法原型与定义，提取模板接收者上的调用。未展开的注册宏会留下覆盖缺口。 |
+| C#（.NET） | 提取 `.cs` 文件中的类型、方法声明和方法体内的调用。 |
+| PHP | 提取类和方法的名称、签名、所属作用域与源码位置。 |
+| Rust | 提取结构体、函数、`use` 导入及调用，保留泛型调用中的显式类型参数。 |
+| Kotlin | 提取包、别名导入、扩展函数的接收者以及 Compose DSL 中的调用。跨 source set 存在多个目标时保留候选。 |
+| Swift | 保留参数标签和扩展的归属，区分同名重载的声明。 |
+| Objective-C | 识别多段 selector、category、类方法与实例方法，记录消息发送的位置。 |
+| Objective-C++ | 在混编文件中分别提取 Objective-C 消息和 C++ 调用，沿用原文件字节坐标，标明部分覆盖。 |
+| Vue、Svelte、Astro | 提取组件内的 JavaScript 或 TypeScript 脚本，也读取 Astro 的前置脚本区，保留脚本在原组件中的位置。 |
+| Markdown（含 MDX、QMD） | 从 Markdown 标题提取文档章节和所在行，供材料定位。 |
 
-这些结构证据不等于 Xcode/Swift/Kotlin 编译语义；不自动解析全部构建变体、宏展开或 IDL/JNI 跨语言桥接。原生和 Kotlin 取证适配会指导 Agent 核对生成来源、注册、Action/State 与端侧生命周期，缺失关系保留为候选或未解析。
+`.h` 依据冻结源码中的语法区分 C、C++、Objective-C 和 Objective-C++。对于 `.mm` 文件，Modus 可提取两种语言的结构，并标明混编解析的覆盖范围。普通源码导航和检索也识别 `.m`、`.mm`、`.hh` 和 `.hxx`。成员调用的实际目标仍可能依赖类型推断或运行时派发，这类关系保留候选或缺口。[语言访问器回归用例](tests/machine/test_mobile_adapters.py)
 
-其余已登记的源码、模板、配置、数据定义和文档格式仍会进入有界通用证据流程。Modus 会如实保留覆盖缺口，而不会因为某个 Provider 缺失就断言仓库没有业务行为。
+其余已登记的源码、模板、配置、数据定义和文档格式仍会进入有界通用证据流程。Modus 会如实保留覆盖缺口，而不会因为某个 Provider 缺失就断言仓库没有业务行为。[语言与后缀注册表](src/modus/machine/language-registry.json)
 
 ### 为什么选择 Modus
 
@@ -188,40 +217,73 @@ Modus 将这些问题落实为一条可检查的知识生产与维护链路：
 
 ## 技术原理
 
-### 从证据到知识
+<a id="从证据到知识"></a>
 
-Modus 把一次性机器分析与长期知识明确分开：`init/reinit` 负责为本轮创作建立可核验的代码证据，Agent 和人负责把证据、业务材料与当前源码共同解释成知识；普通任务直接消费已评审的 Markdown，并在需要时回到当前实现核验。
+### N/K/C 三层如何协作
 
 ```text
-[一次性证据生产：init / reinit]
-  源码 + 构建文件 + 测试/配置
-    → Source Snapshot（冻结本轮仓库输入）
-    → CST / 结构 IR / 项目绑定
-    → 可选编译器与类型语义观察
-    → 临时证据图 → 显式语义协调
-    → 入口、关系、效果与资源的有界证据视图
-    → 确定性、有界 JSON 证据包 ─────────────┐
-                                             │
-[知识创作]                                   ▼
-  业务材料 + 团队约束 ─────────→ Agent + 人工判断 ← 回读当前源码
-                                             │
-                                             ▼
-                               可评审、可追溯的 Markdown 知识
-                                             │
-[持续使用与维护]                             │
-  日常任务 ─→ 渐进路由与检索 ────────────────┤→ 回读当前源码后行动
-  代码变更 ─→ 长期知识影响判断 ─→ 有影响时最小修订
+项目源码、构建配置、可用工具链
+  ↓
+N · 机器举证     冻结输入，解析关系，从公开入口追到可观察的效果
+  ↓ 本轮证据包，附源码位置、解析精度和覆盖缺口
+K · 知识创作     Agent 回读源码、测试和业务材料，与人确认领域边界
+  ↓ 经评审的 Markdown，与项目代码一起版本管理
+C · 日常使用     按任务联读知识、团队约束和当前源码，执行并验收
+  └─ 改动影响长期事实时，修订原定义及其引用
 ```
 
-这里包含三个彼此解耦的阶段。证据生产只在 `init/reinit` 中运行；知识创作不会把机器关系直接改写成业务结论；持续使用与维护既不重建初始化分析，也不会因为每次代码编辑而制造文档噪声。
+以一个订单系统为例，**回调接口返回“已受理”，订单状态就一定已经提交了吗？** 在 `/modus-init` 或 `/modus-reinit` 中，N 定位值得查的调用与写入，K 查明哪一步才算完成。下次有人修改重试策略时，C 使用已评审的结论和当前实现，直接从这个问题继续。
 
-整条链路刻意维护三条边界：
+#### N · 从源码到证据包
 
-- **证据负责导航，不负责裁决。** `exact`、`candidate`、`heuristic` 与 `unresolved` 保持可区分；冲突进入 diagnostics，Agent 必须回读源码、测试、配置或材料后才能陈述结论。
-- **分析状态不是长期产品。** 临时图在投影后释放，JSON bundle 位于可丢弃缓存中并只服务当前创作会话；普通任务明确不读取它，只有经评审的 Markdown 进入长期知识。
-- **当前源码始终权威。** 快照漂移或完整性错误会终止本轮分析，局部解析器或 Provider 缺口只降低受影响证据；普通使用和增量维护始终联合读取正文与当前源码，不会静默回退到旧结论。
+| 阶段 | 交给下一步的证据 |
+| --- | --- |
+| N1 源码基线 | 冻结本轮输入的字节，区分实现、测试、配置等来源。文件内容与分析环境共同确定基线，排除或无法读取的输入也有记录。 |
+| N2 程序事实 | 语言访问器从冻结输入提取声明、作用域和引用，框架观察器定位入口，可用的编译器或类型检查器补充绑定。事实带来源和坐标。 |
+| N3 关系解析 | 按声明身份、所有者与源码位置协调结构和编译器观察，构建带类型的有向多重图。关系保留 `exact`、`candidate`、`heuristic` 或 `unresolved` 的解析精度。 |
+| N4 能力组合 | 从 HTTP、消息、任务等公开入口沿有依据的关系做有界广度优先遍历，交付到达状态写入、消息发送等效果的代表路径，分别记录循环、未解析终点和预算截断。 |
+| N5 创作投影 | 依据入口到效果的能力和权威对象提出范围候选，用结构社区辅助判断哪些文件值得一起读，并标出需要拆分或尚未归属的部分。 |
+| N6 证据打包 | 复核基线与完整性后原子发布 JSON 证据包。按能力、路径或符号查询时，创作上下文携带 `baselineDigest` 与 `bundleDigest`，同时标明预算内交付了什么、省略了多少、从哪里继续查。输入漂移或校验失败会阻止本轮发布。 |
 
-以一个需要修改订单回调重试行为的项目为例：在覆盖范围内，初始化证据可指向回调入口、状态写入及相关源码，但“重复通知应返回什么”仍需作者回读实现、测试和可用的业务约定。确认后，幂等条件、失败恢复和验证入口按各自职责写入 Module 与规则、状态专题。下一位开发者沿 Domain、Module 找到这些结论，核对当前源码后动手；若改动改变了重试契约或状态迁移，就原位修订相应主定义和引用，内部重构则无需增加知识。
+投影与打包只消费前序分析结果。作者收到范围建议时，可以展开它所引用的观察，核对来源和精度。[六阶段管线](src/modus/machine/pipeline.py) · [证据包与查询契约](src/modus/machine/packet/README.md)
+
+**为什么在 Tree-sitter 之上写语言访问器？** Tree-sitter 从源码生成具体语法树（CST）。Modus 的访问器从语言特有的节点提取声明、作用域和调用位置。解析 Objective-C++ 时，Modus 用等长字节遮罩处理 Objective-C 语法，让 C++ 调用仍能按原始坐标定位到 `.mm` 源文件。访问器实现或语法包版本变化时，缓存中的旧观察随之失效。[Tree-sitter](https://tree-sitter.github.io/tree-sitter/) · [解析实现](src/modus/machine/facts/native_parser.py) · [混编坐标测试](tests/machine/test_mobile_integration.py)
+
+**为什么证据图要保留平行边？** 同一个回调函数可能在两个分支调用同一写入方法。审查重试行为时，要能查清每次调用来自哪一行。N3 采用 NetworkX 的 `MultiDiGraph` 表示方向和平行边，由 Modus 为证据边分配稳定身份、记录来源与调用位置，并判断哪些目标可以绑定。N4 沿有向边追到效果时，一条路径的解析精度取沿途最弱证据。即使入口已精确绑定，只要中间一步是候选，整条路径就仍需核对。[证据图与边身份](src/modus/machine/resolution/evidence_graph.py) · [能力遍历](src/modus/machine/capability/traversal.py)
+
+**为什么社区发现要换一张图？** 为了判断哪些文件值得一起读，N5 只选同一分析上下文内已精确绑定的本地调用和导入，投影成无向文件图。两个文件之间即使有二十处调用，也只计一条依赖。Modus 在各连通分量内分别运行 NetworkX 的 Louvain 算法，按模块度寻找联系紧密的文件组。各分量独立划分，加入无关代码不会打乱已有分组。固定节点与边的顺序和随机种子，使同一输入的划分可复现。[Louvain 原论文](https://arxiv.org/abs/0803.0476) · [Modus 的社区划分](src/modus/machine/projection/community_signal.py)
+
+节点、边或层数预算限制了划分时，Modus 记录受影响的范围。社区只作为结构线索，作者结合入口、写入和业务材料提出 Domain/Module 边界，在 K1 与用户确认。
+
+#### K · 从证据到可评审的知识
+
+| 阶段 | 作者交付什么 |
+| --- | --- |
+| K1 范围建模 | 结合机器候选、现有知识和用户材料，与用户确认本轮覆盖的 Domain、Module 及其稳定身份。 |
+| K2 创作计划 | 确定每项事实由哪篇文档完整定义、哪些页面引用它，以及哪些跨域交接需要双方核对。 |
+| K3 证据闭环 | 按场景回读实现、测试、配置与业务材料，记录触发条件、关键判断、可见结果和失败恢复。证据不足时写明待查问题。 |
+| K4 领域成稿 | 用 Module 讲清完整场景，把接口、对象、规则、状态、下游依赖和基础设施的细节放进各自的专题，逐篇对照来源验收。 |
+| K5 项目约束 | 从源码、测试、CI 和团队材料中核实工程要求，说明适用范围、强制检查与例外，尊重已有人工规范的所有权。 |
+| K6 系统概览与发布 | 核对跨域交接双方的最终描述，依据已成稿的领域知识和项目约束编写系统概览。作者回读正文，发布核验检查路径、身份、链接与源码锚点。 |
+
+**订单回调的“已受理”能证明什么？** 作者先查哪条分支返回这个响应，再找真正提交订单状态的事务或下游消费者，最后核对重复通知和失败恢复的测试。如果只能证实请求已受理，正文就只写到受理，把完成信号留作具体待查项。
+
+**证据变化时从哪里继续？** 创作按领域推进。K4 写到某个状态转换却找不到依据，就回到 K3 补查，再修订受影响的主定义。本轮检查点保留已确认的范围和进度，中断后可从最早未完成的工作继续。[六阶段创作契约](docs/authoring-contract.md)
+
+#### C · 在下一次改动中使用和维护知识
+
+| 阶段 | 当前任务得到什么 |
+| --- | --- |
+| C1 任务定界 | 明确要回答的问题或要改变的行为，以及哪些未知会影响结果。 |
+| C2 联合定位 | 找到相关规则的主定义、适用的团队约束、实现入口和验证位置。 |
+| C3 证据收敛 | 回读当前源码和已定位材料，核实规则成立的条件与例外，区分已证实的事实和仍会影响决定的缺口。 |
+| C4 产出决策 | 确定本次改变和保留哪些行为、选择依据是什么，以及怎样验收。 |
+| C5 执行与验收 | 落实决定，把实际结果逐项与预期核对，标明已验证的范围和仍未完成的验证。 |
+| C6 知识留存判断 | 根据实际差异和验收结果，判断哪些长期事实或源码锚点受影响，需要时转入定向维护。 |
+
+**怎样找到这次改动真正需要的规则？** 日常任务直接读取当前 Markdown 与源码，初始化证据包仅服务当轮创作。知识检索把标题、路径等结构信号与 BM25 词项匹配分别排序，再用倒数排名融合（RRF）合并。命中的规则连同适用条件、例外和恢复说明一起交付，截断处给出续读位置。已有证据足以支持决定时，Agent 可以直接进入 C4。[检索排序实现](src/modus/retrieval/stages/ranking.py)
+
+**修改重试策略后，哪些知识要跟着改？** 以订单回调为例，Agent 先核对重复通知的返回值和订单状态的实际变化。若返回契约改变，就修订原规则及其引用。若只重构了函数内部，规则和源码锚点仍准确，核对后即可结束。[日常任务的阶段与停止条件](src/modus/scaffold/templates/skills/using-modus/references/consumption.md)
 
 ### 知识模型
 
@@ -263,7 +325,7 @@ modus/knowledge/
 
 **结构负责路由，正文负责解释。** 稳定身份、源码锚点和精确链接帮助 Agent 渐进地从根概览进入 Domain、Module 与相关专题；Markdown 正文解释业务结果、关键判定、完成边界、失败恢复和设计取舍。方法级源码证据只进入 Module 与专题，根概览和 Domain 保持为稳定路由；一个事实只在一处完整定义，其他位置通过链接复用，避免把整个知识库一次性塞入上下文。
 
-日常检索从当前 Markdown 临时建立索引，优先沿根概览、Domain 与 Module 链接选择待读取的文档，再结合结构信号与 BM25 词项匹配排序；推断出的路由用于调整相关性，不直接排除其他可能相关的模块。命中的小节会按完整条目重组，让条件、异常与恢复说明一起进入上下文；当前源码和团队约束共享同一时间与输出预算。结果会标出未找到的证据类型，并为截断的条目给出继续阅读的范围，供开发者判断还需回读什么，而非把“检索到”当作“已经证实”。
+日常检索按请求从当前 Markdown 临时建立索引。推断出的 Domain 与 Module 影响排序，其他模块仍可命中。正文、源码与团队约束共用时间和输出预算，结果标明哪些证据类型仍然缺失。[检索管线](src/modus/retrieval/README.md)
 
 Modus 优先显式化**高复用、高风险、高隐性**的知识，而不是为每个函数生成摘要。公开契约、核心对象、状态流转、下游交接、兼容红线和验证标准值得长期维护；从当前代码即可低成本读出的普通实现细节仍留在源码中。`business/` 与 `constraint/` 默认受人工所有权保护，自动流程不会用扫描结果覆盖组织经验；生成知识的变更使用读时哈希保护，并接受路径身份、链接与锚点完整性核验。
 
@@ -280,9 +342,9 @@ Modus 自身也遵守它倡导的边界：入口层保持窄，应用编排与�
 | `modus.scaffold` | 打包中立模板，执行确定性项目安装、升级协调、所有权记录与安全卸载。 |
 | `knowledge_verification` / `knowledge_write_session` | 分离机械完整性核验、人工所有权、比较并交换写入和原子发布。 |
 
-机器层按冻结输入、事实观察、关系解析、能力组合、创作投影和证据打包单向推进。投影与打包阶段只消费前序结果，不重新观察源码来补造事实；可选编译器或局部解析失败时，保留仍可用的线索，并标明受影响范围。投影给出的能力边界和行为路径只是作者继续核验的候选，不能直接充当业务结论。
+初始化分析与知识写入各有发布边界。机器层验证新证据包之后才替换当前包。失败时已有完整包仍然保留，创作端依据本轮身份判断证据是否可用。[分析层的失败与发布](src/modus/machine/README.md#失败与发布)
 
-证据包只有在完整校验后才会发布。若源码在分析期间变化，或证据完整性校验失败，本轮机器结果就不能当作已核验的事实；失败构建不会替换已有完整包，本轮创作也不会用旧包冒充当前证据。知识正文则按所有权和读时内容保护写入，完成后检查结构、链接与源码锚点。这样，局部证据缺口、整轮分析失败和正文写入冲突各有明确处理边界，开发者仍能回到当前源码与可用材料继续工作。
+知识写入则逐文件核对所有权和读取时的内容哈希。如果有人在作者准备修改后编辑了同一文档，写入会报告冲突，让作者基于最新正文重新判断。通过核对的文件才原子替换，写完再检查知识链接和源码锚点。[知识写入会话](src/modus/knowledge_write_session.py)
 
 ## 使用手册
 
