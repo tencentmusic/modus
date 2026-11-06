@@ -57,7 +57,7 @@ K1 完整范围 → K2 全局主定义与跨域依赖
 ```
 
 
-运行时路由见[六阶段入口](../src/modus/scaffold/templates/skills/using-modus/references/authoring/index.md)：阶段入口定义输入、动作与出口，共享细则维护唯一规则。编号用于导航和恢复，不新增机器状态。init/reinit 共用此路线；update/sync 仅复用受影响的细则。默认串行，委派须有明确授权。
+运行时路由见[六阶段入口](../src/modus/scaffold/templates/skills/using-modus/references/authoring/index.md)：[开始或恢复](../src/modus/scaffold/templates/skills/using-modus/references/authoring/index.md#开始或恢复)统一判断续作、项目类型和稳定身份，阶段入口定义输入、动作与出口，共享细则维护唯一规则。编号用于导航和恢复，不新增机器状态。init/reinit 共用此路线；update/sync 仅复用受影响的细则。默认串行，委派须有明确授权。
 
 <!--
 范围变更以入口归属和稳定身份为依据；目录移动不应触发领域身份重建。

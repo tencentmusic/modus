@@ -84,6 +84,7 @@ build-backend = "hatchling.build"
 include = [
     "/LICENSE",
     "/ARCHITECTURE.md",
+    "/AGENTS.md",
     "/CONTRIBUTING.md",
     "/README.md",
     "/READMEs/README.en.md",
@@ -101,6 +102,7 @@ include = [
     "/pyproject.toml",
     "/schemas",
     "/scripts",
+    "/skills/modus-development",
     "/tests",
     "/src/modus",
     "/uv.lock",

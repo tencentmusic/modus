@@ -4,7 +4,7 @@
 
 `docs/authoring-contract.md` 是创作设计；`docs/knowledge-lifecycle-boundary.md` 拥有 N/K 交接。安装后的运行协议来自 `src/modus/scaffold/templates/skills/using-modus/references/authoring/`。`TemplateCatalog` 原样读资源，Python 不维护竞争性的正文规范。
 
-修改正文生成、范围确认、机器包消费或收尾规则时，联读设计与对应运行参考。不要只改顶层 SKILL 摘要而留下相反的细则。
+修改正文生成、范围确认、机器包消费或收尾规则时，联读设计与对应运行参考。文件划分、指令写法和行为验证遵循 [Skill 编写规范](../../../../docs/skill-authoring.md)；入口与细则同步维护。
 
 | 模板目录 | 用途 |
 | --- | --- |

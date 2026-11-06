@@ -1,6 +1,6 @@
 ---
 name: modus-init
-description: 基于当前源码与用户材料，初始化完整的项目知识树。
+description: 用户请求首次建立完整项目知识时，基于当前源码与材料初始化知识树；已有稳定 Domain/Module 身份时转入 modus-reinit 全量复核。
 ---
 
 # modus-init
@@ -9,9 +9,7 @@ description: 基于当前源码与用户材料，初始化完整的项目知识�
 
 ## 先判断新任务或续作
 
-开始 status、build 或调查前，先检查唯一执行卡 `modus/.cache/knowledge-authoring/scope-confirmation.md`。接手未完成任务或上下文丢失时，先实际读卡并执行[上下文保存与恢复](../using-modus/references/authoring/context-continuity.md)，再进入记录的阶段。同一作者普通重试且上下文仍完整有效时，按该合同复用，只补缺失或变化的部分；不重跑 build 或重做 Scope。原卡缺失/冲突按恢复合同处理，不凭摘要或已有输出拼装缩小的完成卡。
-
-确属新一轮任务时，复用本轮已有的 `modus status --json` 结果；尚未盘点才只读执行一次。仅当根配置明确 `kind: workspace` 时转入[workspace 流程](references/workspace-init.md)；普通项目进入下表。已有可恢复的稳定 Domain/Module 身份时转 [modus-reinit](../modus-reinit/SKILL.md)，沿用本轮盘点；局部正文缺失不构成从零重建身份的理由。
+开始 status、build 或调查前，先读取并执行[开始或恢复](../using-modus/references/authoring/index.md#开始或恢复)，完成续作、新任务、工作区和稳定身份的判断。只有新一轮普通项目且没有可恢复的 Domain/Module 身份时，才从下表 K1 开始；已有身份转 [modus-reinit](../modus-reinit/SKILL.md)，复用本轮盘点。
 
 ## 六个阶段入口
 

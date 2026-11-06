@@ -363,16 +363,16 @@ The CLI, maintainer guides, and newly authored knowledge default to Simplified C
 
 Start with the [architecture reading guide](../ARCHITECTURE.md) for the dependency map and design boundaries, then [CONTRIBUTING.md](../CONTRIBUTING.md) for conventions and release checks.
 
-Modus supports Python 3.11–3.14. Local development and CI use the same locked dependencies and quality gates:
+For agent-assisted development, start with [AGENTS.md](../AGENTS.md) and use [modus-development](../skills/modus-development/SKILL.md) to locate the implementation. The contribution guide owns code design conventions; the [Skill authoring guide](../docs/skill-authoring.md) covers workflow Markdown structure, writing, and behavioral validation.
+
+Modus supports Python 3.11–3.14. Local development and CI use the same locked dependencies:
 
 ```bash
 uv sync --locked --extra test
-uv run --locked --extra test pytest
-uv run --locked --extra test ruff check .
-uv run --locked --extra test ruff format --check .
-uv run --locked --extra test mypy
-./scripts/wheel-smoke.sh
+uv run --locked --extra test pytest -q
 ```
+
+See the [complete validation commands](../CONTRIBUTING.md#本地开发) for lint, type, and distribution checks before submitting a change.
 
 When contributing, treat the CLI, Skills, schemas, and Markdown contracts as public interfaces. Behavioral changes should include focused tests, language-provider gaps must degrade explicitly, and host adapters must preserve shared ownership and uninstall semantics. Architecture-boundary tests prevent ordinary runtime code from depending on disposable initialization analysis and ensure release artifacts do not reintroduce legacy graph databases or removed commands.
 

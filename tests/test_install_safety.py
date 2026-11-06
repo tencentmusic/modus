@@ -55,6 +55,36 @@ def test_update_preserves_user_edits_and_untracked_collision(tmp_path: Path) -> 
     assert edited.read_text(encoding="utf-8") == "my instructions"
 
 
+def test_update_retires_unused_references_but_preserves_user_changes(tmp_path: Path) -> None:
+    """共享规则归并后，各宿主旧支持文件按原清单退役，用户修改继续保留。"""
+
+    run_init(tmp_path, list(available_platforms()))
+    paths = ModusPaths.for_root(tmp_path)
+    manifest = Manifest.read(paths)
+    template = "skills/modus-init/references/retired-guide.md"
+    old_content = "# Previous guide\n"
+    retired: set[str] = set()
+    for entry in list(manifest.files):
+        if entry.template != "skills/modus-init/SKILL.md":
+            continue
+        relative = (Path(entry.path).parent / "references/retired-guide.md").as_posix()
+        (tmp_path / relative).write_text(old_content, encoding="utf-8")
+        manifest.add_file(relative, old_content, template)
+        retired.add(relative)
+    manifest.write(paths)
+    edited = ".agents/skills/modus-init/references/retired-guide.md"
+    assert edited in retired
+    (tmp_path / edited).write_bytes(b"# User-maintained guide\n")
+
+    result = run_update(tmp_path)
+
+    assert result["status"] == "partial"
+    assert set(result["removedFiles"]) == retired - {edited}
+    assert result["userEditedFiles"] == [edited]
+    assert all(not (tmp_path / relative).exists() for relative in retired - {edited})
+    assert (tmp_path / edited).read_bytes() == b"# User-maintained guide\n"
+
+
 @pytest.mark.parametrize("kind", ["project", "workspace"])
 @pytest.mark.parametrize("installed_version", [__version__, "0.0.4"])
 def test_update_delivers_workflow_changes_to_every_host_and_retains_user_edits(

@@ -1,6 +1,6 @@
 ---
 name: modus-reinit
-description: 全面评审并重建知识快照，保留稳定业务身份及人工材料；只有明确选中的内容才允许修改。
+description: 用户请求全量复核或重建已有项目知识时使用，保留稳定 Domain/Module 身份及人工材料；局部事实更新使用 modus-update-knowledge。
 ---
 
 # modus-reinit
@@ -9,9 +9,7 @@ description: 全面评审并重建知识快照，保留稳定业务身份及人�
 
 ## 先恢复，再判断变化
 
-盘点或构建前先检查唯一执行卡。接手未完成任务或上下文丢失时，先实际读卡，再按[上下文保存与恢复](../using-modus/references/authoring/context-continuity.md)加载证据、已有正文与规范，从最早未完成动作继续。同一作者普通重试且上下文仍完整有效时，按该合同复用，只补缺失或变化的部分；不重跑 build 或重做 Scope。卡片缺失或与请求冲突按恢复合同处理，不凭摘要续写。
-
-确属新一轮时，复用本轮已有的 `modus status --json` 结果；尚未盘点才只读执行一次。根配置明确 `kind: workspace` 时进入[工作区流程](../modus-init/references/workspace-init.md)，不在外层根建立业务 Domain。普通项目没有可恢复的稳定 Domain/Module 身份时转入 [modus-init](../modus-init/SKILL.md)，沿用本轮盘点而不重复执行；部分知识缺失但身份可恢复时仍按 reinit 处理。
+盘点、构建或调查前，先读取并执行[开始或恢复](../using-modus/references/authoring/index.md#开始或恢复)。续作从原任务最早未完成动作继续；新一轮普通项目且身份可恢复时使用下述重建流程。没有可恢复的稳定 Domain/Module 身份时转 [modus-init](../modus-init/SKILL.md)，复用本轮盘点。
 
 新一轮重建完整读取已确认范围的正文与哈希，以稳定身份 → 入口/对象责任 → 语义变化 → 结构变化 → 文件变化判断。目标归为 `unchanged`、`anchor-only`、`implementation-change`、`scope-change`、`content-repair`、疑似退役或人工正文。
 

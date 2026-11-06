@@ -1,6 +1,6 @@
 ---
 name: modus-update-knowledge
-description: 根据源码或用户提供的材料，增量更新受影响的项目知识，无需重跑全仓分析。
+description: 用户明确请求根据源码或材料局部维护项目知识时使用，定向更新受影响正文；全量复核使用 modus-reinit，代码任务内的知识同步使用 modus-sync-knowledge。
 ---
 
 # modus-update-knowledge

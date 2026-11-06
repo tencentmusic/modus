@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from shutil import copytree
 
 import pytest
 
@@ -37,6 +38,29 @@ def test_packaged_template_tree_is_complete_and_self_contained() -> None:
         assert_local_markdown_links_resolve(path, root=templates_dir())
 
 
+def test_workflow_references_are_reachable_from_public_skills() -> None:
+    """支持文档需有实际读取入口，存在于安装包中还不足以被使用。"""
+
+    root = templates_dir().resolve()
+    pending = [root / "skills" / name / "SKILL.md" for name in CORE_SKILLS]
+    visited: set[Path] = set()
+    while pending:
+        path = pending.pop()
+        if path in visited:
+            continue
+        visited.add(path)
+        targets = assert_local_markdown_links_resolve(path, root=root)
+        pending.extend(target for target in targets if target.suffix == ".md")
+
+    references = {
+        path
+        for name in CORE_SKILLS
+        for path in (root / "skills" / name / "references").rglob("*.md")
+    }
+    unreachable = sorted(str(path.relative_to(root)) for path in references - visited)
+    assert not unreachable, f"工作流中没有读取入口的参考文档：{unreachable}"
+
+
 # 空描述会产生无意义的命令入口，必须在渲染前拒绝。
 def test_catalog_rejects_invalid_command_metadata(tmp_path: Path) -> None:
     command = tmp_path / "commands/example.md"
@@ -63,6 +87,76 @@ def test_catalog_rejects_a_template_without_a_trailing_newline(tmp_path: Path) -
 
     with pytest.raises(TemplateFormatError, match="以换行结束"):
         TemplateCatalog(tmp_path).read("plain.md")
+
+
+@pytest.mark.parametrize(
+    "template_id", ["./plain.md", "nested//plain.md", "plain.md/", ".", "bad\x00.md"]
+)
+def test_catalog_rejects_noncanonical_template_ids(tmp_path: Path, template_id: str) -> None:
+    """路径别名不能绕过清单使用的规范身份，非法输入应给出模板诊断。"""
+
+    (tmp_path / "plain.md").write_text("# Template\n", encoding="utf-8")
+    (tmp_path / "nested").mkdir()
+    (tmp_path / "nested/plain.md").write_text("# Nested\n", encoding="utf-8")
+
+    with pytest.raises(TemplateFormatError, match="规范.*POSIX 路径"):
+        TemplateCatalog(tmp_path).read(template_id)
+
+
+def test_catalog_keeps_nested_support_documents_named_skill(tmp_path: Path) -> None:
+    """只有包入口特殊处理，示例中同名的支持文档仍须完整分发。"""
+
+    root = tmp_path / "skills/example"
+    support = root / "references/example/SKILL.md"
+    support.parent.mkdir(parents=True)
+    (root / "SKILL.md").write_text(
+        "---\nname: example\ndescription: Example workflow\n---\n\n# Example\n",
+        encoding="utf-8",
+    )
+    support.write_text("# A referenced example\n", encoding="utf-8")
+
+    skill = TemplateCatalog(tmp_path).load_skills(("example",))[0]
+
+    assert skill.support_files == {
+        "references/example/SKILL.md": support.read_text(encoding="utf-8")
+    }
+
+
+def test_catalog_rejects_skill_without_instructions(tmp_path: Path) -> None:
+    """可发现但没有指令的入口不能作为有效工作流安装。"""
+
+    path = tmp_path / "skills/example/SKILL.md"
+    path.parent.mkdir(parents=True)
+    path.write_text("---\nname: example\ndescription: Example workflow\n---\n\n", encoding="utf-8")
+
+    with pytest.raises(TemplateFormatError, match="正文"):
+        TemplateCatalog(tmp_path).load_skills(("example",))
+
+
+def test_invalid_late_skill_stops_installation_before_any_project_write(tmp_path: Path) -> None:
+    """即使其他模板已通过校验，后续入口损坏也不能留下半次安装。"""
+
+    templates = copytree(templates_dir(), tmp_path / "templates")
+    last_skill = CORE_SKILLS[-1]
+    (templates / "skills" / last_skill / "SKILL.md").write_text(
+        f"---\nname: {last_skill}\ndescription: Incomplete workflow\n---\n\n",
+        encoding="utf-8",
+    )
+    project = tmp_path / "project"
+    project.mkdir()
+    sentinel = project / "existing.txt"
+    sentinel.write_bytes(b"user-owned\n")
+    scaffolder = ProjectScaffolder(
+        ModusPaths.for_root(project),
+        ScaffoldRequest(platforms=("codex",)),
+        TemplateCatalog(templates),
+    )
+
+    with pytest.raises(TemplateFormatError, match="正文"):
+        scaffolder.render()
+
+    assert list(project.iterdir()) == [sentinel]
+    assert sentinel.read_bytes() == b"user-owned\n"
 
 
 # 故意使用缺失目录验证预检顺序：资源不完整时不能留下半次安装。

@@ -1,11 +1,13 @@
 ---
 name: modus-development
-description: 用于开发、评审、排障和解释 Modus 框架自身，以及基于其源码写文章、技术方案或分享材料。按项目概览、模块所有权、实现契约和验证入口渐进加载；以当前 checkout 的实现为准。普通业务项目使用 Modus 的任务应读取该项目的 using-modus。
+description: 开发、评审、排障或解释 Modus 框架自身，包括代码、Skill 工作流和维护文档，以及基于源码的技术写作。普通业务项目使用 Modus 时读取该项目的 using-modus。
 ---
 
 # Modus 开发与写作
 
 这是一套服务于 **Modus 框架自身** 的复合技能。一个入口连接全局认知、模块开发、测试发布和文章写作；模块指南按任务加载，不把整个参考目录一次性塞进上下文。
+
+在源码仓库中，先遵循 [仓库指引](../../AGENTS.md) 与 [贡献指南](../../CONTRIBUTING.md)。本技能负责定位和执行方法，不另存一套代码风格或质量规范。
 
 ## 先确定当前项目
 
@@ -26,6 +28,7 @@ python3.11 "$SKILL_DIR/scripts/inspect_repository.py" --root .
 | 当前任务 | 读取 |
 | --- | --- |
 | 功能开发、修复、重构、源码评审 | [开发流程](references/development.md) + 对应模块 + [验证与发布](references/modules/quality-release.md) |
+| Skill 划分、description、指令与引用维护 | [Skill 编写规范](../../docs/skill-authoring.md) + [知识创作工作流](references/modules/authoring-templates.md) |
 | 帮助、参数、退出码、中文体验、个人包维护 | [CLI 与维护入口](references/modules/cli-maintenance.md) |
 | 接入、升级、卸载、清单、资产冲突、Git 保护 | [项目安装与所有权](references/modules/installation.md) |
 | CodeBuddy / Claude / Cursor / Codex / DSH 接入与运行时 | [平台与常驻指引](references/modules/platforms-hooks.md) |

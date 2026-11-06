@@ -34,15 +34,7 @@ uv run --locked --extra test python -m modus --help
 
 ## 完整检查
 
-提交前遵循当前 CONTRIBUTING：
-
-```bash
-uv run --locked --extra test pytest -q
-uv run --locked --extra test ruff check src tests scripts
-uv run --locked --extra test ruff format --check src tests scripts
-uv run --locked --extra test mypy
-git diff --check
-```
+提交前运行 [贡献指南中的完整检查](../../../../CONTRIBUTING.md#本地开发)。此处只维护按契约选测试的方法，避免多处命令清单逐渐分叉。
 
 依赖改动同步 `pyproject.toml`/`uv.lock` 并审查约束。mypy strict frontier、fixtures 排除、pytest markers 等以 pyproject 为主，不维护第二套工具版本。
 

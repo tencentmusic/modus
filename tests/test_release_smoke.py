@@ -23,6 +23,9 @@ from release_smoke.contracts import (
 from release_smoke.verification import verify_artifact
 
 PUBLIC_SOURCE_DOCS = (
+    "AGENTS.md",
+    "skills/modus-development/SKILL.md",
+    "docs/skill-authoring.md",
     "docs/knowledge-lifecycle-boundary.md",
     "docs/authoring-contract.md",
 )

@@ -361,16 +361,16 @@ modus uninstall --person --dry-run
 
 先阅读[架构导览](ARCHITECTURE.md)了解依赖方向与设计边界，再按[贡献指南](CONTRIBUTING.md)运行检查。CLI 帮助、交互提示、诊断、开发文档及新创作知识默认使用简体中文。命令名、参数、路径和 JSON 字段保持稳定，便于脚本与工具集成。
 
-Modus 支持 Python 3.11–3.14。开发环境和 CI 使用同一组锁定依赖与质量门禁：
+使用 Agent 开发时，从 [AGENTS.md](AGENTS.md) 进入，按 [modus-development](skills/modus-development/SKILL.md) 定位实现。代码设计规范由贡献指南维护；工作流 Markdown 的划分、撰写和行为验收见 [Skill 编写规范](docs/skill-authoring.md)。
+
+Modus 支持 Python 3.11–3.14。开发环境和 CI 使用同一组锁定依赖：
 
 ```bash
 uv sync --locked --extra test
-uv run --locked --extra test pytest
-uv run --locked --extra test ruff check .
-uv run --locked --extra test ruff format --check .
-uv run --locked --extra test mypy
-./scripts/wheel-smoke.sh
+uv run --locked --extra test pytest -q
 ```
+
+提交前的静态、类型和分发检查统一见 [完整验证命令](CONTRIBUTING.md#本地开发)。
 
 贡献代码时，请把 CLI、Skill、Schema 和 Markdown 合同视为公开接口：行为变更应带有聚焦测试，语言 Provider 缺口应保持可解释降级，平台适配不得绕过统一所有权和卸载语义。架构边界测试会阻止普通运行时依赖一次性初始化分析，并核对发布制品不重新引入旧图数据库或废弃命令。
 

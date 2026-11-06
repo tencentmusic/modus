@@ -38,7 +38,7 @@ flowchart TD
 | `workspace.py`、`workspace_maps.py` | 多仓成员只读观察、成员路由、工作区自己的导航投影 |
 | `schemas/`、`schema_resources.py`、`scope_models.py` | 传输协议、Domain/Module 稳定身份、源码锚点 |
 | `tests/`、`scripts/release_smoke/`、`.github/workflows/ci.yml` | 契约测试、跨平台计划、独立安装产物验收 |
-| `ARCHITECTURE.md`、`CONTRIBUTING.md`、`docs/` | 分层、开发规范、N/K 交接和创作设计主定义 |
+| `AGENTS.md`、`ARCHITECTURE.md`、`CONTRIBUTING.md`、`docs/` | Agent 路由、分层、代码与 Skill 编写规范、N/K 交接和创作设计主定义 |
 
 基础支撑：`config.py`（配置验证）、`paths.py`（规范路径）、`manifest.py`（资产所有权）、`artifacts_io.py`（锁与加载）、`atomic_writes.py`（描述符绑定发布）、`knowledge_reader.py`（安全读取）、`knowledge_identity.py` / `scope_resolver.py`（正式知识身份）、`skillmd.py`（有界 frontmatter）、`sensitive_literals.py`（泄漏检测）、`git_hygiene.py`（Git 索引保护）、`source_listing.py`（普通导航盘点）。新增工具逻辑优先查这些已有所有者。
 
