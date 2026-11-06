@@ -27,6 +27,7 @@ _SOURCE_LAYERS = frozenset({"cst", "project-binding", "compiler", "reconciled"})
 # 细分类别允许的种类与必需字段集中维护。
 # 写入器和读取器共享此表，防止产生只能写出却无法读回的目录。
 _DETAIL_CONTRACTS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
+    "materialBlock": (frozenset({"resource"}), frozenset({"materialType", "content"})),
     "scopeSummary": (
         frozenset({"resource"}),
         frozenset(
@@ -254,7 +255,7 @@ def gap_record(
     gap_details = details or {}
     identity: list[JsonValue] = [reason_code, *candidate_ids]
     if witness:
-        identity.extend([witness.path, witness.start_line, witness.symbol])
+        identity.extend([witness.path, witness.start_line, witness.end_line, witness.symbol])
     identity.append(gap_details)
     return CoverageGap(
         stable_record_id("gap", *identity),

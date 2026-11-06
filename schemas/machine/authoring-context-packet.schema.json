@@ -20,11 +20,14 @@
     "coverageReceipt",
     "sourceAnchors",
     "expansionHandles",
-    "omittedCounts"
+    "omittedCounts",
+    "evidence",
+    "coverageGaps",
+    "expansionQueries"
   ],
   "properties": {
     "schemaVersion": {
-      "description": "Wire-contract version. The initial explicit contract includes authenticated bundle identity and exact requested scope.",
+      "description": "Authoring context preserves inventory records, query gaps, provenance, and replayable expansion queries. The contract is updated together with the CLI and authoring templates.",
       "const": 1
     },
     "recordKind": {
@@ -76,7 +79,7 @@
       "$ref": "#/$defs/recordList"
     },
     "coverageReceipt": {
-      "description": "Per-scope execution and completeness receipts retained from upstream analysis layers.",
+      "description": "Delivery completeness and counts of the final packet, not authoring completeness. Upstream receipts remain on proposals.",
       "type": "array",
       "items": {
         "$ref": "#/$defs/coverageReceipt"
@@ -95,6 +98,21 @@
     "omittedCounts": {
       "description": "Counts of records omitted by category to satisfy packet budgets.",
       "$ref": "#/$defs/countMap"
+    },
+    "evidence": {
+      "$ref": "#/$defs/recordList",
+      "description": "Source inventory, entry/relation evidence and service relations with their complete provenance; scopeSummary is navigation only."
+    },
+    "coverageGaps": {
+      "$ref": "#/$defs/recordList",
+      "description": "Deduplicated gaps from all selected pages; omissions remain explicit if byte limits trim details."
+    },
+    "expansionQueries": {
+      "description": "Exact initial select filters. Use cursors returned by select for optional continuation.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/expansionQuery"
+      }
     }
   },
   "additionalProperties": false,
@@ -176,12 +194,27 @@
       },
       "additionalProperties": false
     },
+    "expansionQuery": {
+      "type": "object",
+      "required": ["view", "candidateIds", "capabilityIds", "boundaryIds", "paths", "symbols", "recordTypes", "evidenceKinds"],
+      "properties": {
+        "view": {"enum": ["scope", "services", "evidence"]},
+        "candidateIds": {"$ref": "#/$defs/stringList"},
+        "capabilityIds": {"$ref": "#/$defs/stringList"},
+        "boundaryIds": {"$ref": "#/$defs/stringList"},
+        "paths": {"$ref": "#/$defs/stringList"},
+        "symbols": {"$ref": "#/$defs/stringList"},
+        "recordTypes": {"$ref": "#/$defs/stringList"},
+        "evidenceKinds": {"$ref": "#/$defs/stringList"}
+      },
+      "additionalProperties": false
+    },
     "expansionHandle": {
       "type": "object",
       "required": ["kind", "reference", "hint"],
       "properties": {
         "kind": {
-          "enum": ["candidate", "capability", "path", "symbol", "source-anchor"]
+          "enum": ["candidate", "capability", "path", "symbol", "source-anchor", "boundary"]
         },
         "reference": {
           "type": "string",

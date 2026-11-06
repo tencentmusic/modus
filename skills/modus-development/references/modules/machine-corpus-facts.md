@@ -27,7 +27,7 @@ N2 的生产者为 StructuralExtractor、CompilerProvider、EntryDetector、Boun
 
 ## 语言能力和工具边界
 
-编译提供方当前为 Python、Java、Go、C++、TypeScript；结构能力与通用文本后缀更广。语言证据适配指南存在，不等于该语言拥有精确 compiler provider。实际 tier 由 `capability_for`/注册表和工具链共同决定。
+编译提供方当前为 Python、Java、Go、C++、TypeScript；结构能力与通用文本后缀更广。Kotlin、Swift、Objective-C/Objective-C++ 有专用结构访问器，C++ 补充命名空间、原型和模板调用；头文件按语法分流，移动端绑定仍保留 candidate/partial 边界。语言证据适配指南存在，不等于该语言拥有精确 compiler provider。实际 tier 由 `capability_for`/注册表和工具链共同决定。
 
 compiler mode：`off` 不探测工具；`auto` 局部不可用返回覆盖/诊断；`required` 在必需语义失败后阻止发布。缺失工具不能被记录为能力不存在。一个构建单元的来源/上下文参与缓存，闭包不完整可禁止复用。
 

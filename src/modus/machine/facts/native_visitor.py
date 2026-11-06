@@ -243,7 +243,12 @@ class _FileParser:
         anchor = self.anchor(node)
         body = (expression or node).child_by_field_name("body")
         signature_end = body.start_byte if body is not None else node.end_byte
-        signature = self.raw[node.start_byte : signature_end].decode("utf-8").strip()[:1000]
+        # 专用语法适配器可提供精确签名，但截断与省略量仍由共同边界维护。
+        details = dict(metadata or {})
+        full_signature = details.pop(
+            "signature", self.raw[node.start_byte : signature_end].decode("utf-8").strip()
+        )
+        signature = full_signature[:1000]
         qualified = ".".join((*owners, name))
         inner = self.new_scope(identity, scope["id"], kind, identity)
         record = {
@@ -254,11 +259,39 @@ class _FileParser:
             "body_scope_id": inner["id"],
             "qualified_name": qualified,
             "signature": signature,
+            "signatureOmittedCharacters": max(0, len(full_signature) - len(signature)),
             "exported": bool(node.parent and node.parent.type == "export_statement"),
             "line": anchor["line"],
+            "endLine": anchor["endLine"],
             "column": anchor["column"],
-            **(metadata or {}),
+            "name_line": name_node.start_point.row + 1 if name_node else anchor["line"],
+            **details,
         }
+        if self.language == "java":
+            parameters = node.child_by_field_name("parameters")
+            if parameters is not None:
+                # 参数类型由语法节点确定，修饰符、注解及泛型中的逗号不是类型边界。
+                types = []
+                for parameter in parameters.named_children:
+                    if parameter.type == "formal_parameter":
+                        types.append(
+                            self.text(parameter.child_by_field_name("type"))
+                            + self.text(parameter.child_by_field_name("dimensions"))
+                        )
+                    elif parameter.type == "spread_parameter":
+                        declared = next(
+                            (
+                                child
+                                for child in parameter.named_children
+                                if child.type not in {"modifiers", "variable_declarator"}
+                            ),
+                            None,
+                        )
+                        if declared is None:
+                            break
+                        types.append(self.text(declared) + "...")
+                else:
+                    record["parameterTypes"] = types
         self.declarations.append(record)
         self.bind(scope, name, "declaration", target=identity)
         self.nodes.append(
@@ -675,8 +708,120 @@ class _FileParser:
     # 调用参数中的裸标识额外记录 callback 候选，仍不宣称它实际被调用。
     # JS/Rust 非函数体块建立词法边界，避免局部变量跨兄弟块泄漏。
     # 声明分支已经递归消费子树，通用遍历不能再生成重复观察。
+    def observe_member(self, node, scope, owners: tuple[str, ...]) -> None:
+        """保留显式成员事实，不把缺失初始化解释成业务默认值。"""
+        if scope["kind"] != "type":
+            return
+        parent = node.parent
+        field = node.type in {"public_field_definition", "property_signature", "field_declaration"}
+        variable = (
+            node.type == "variable_declarator" and parent and parent.type == "field_declaration"
+        )
+        enum = node.type == "enum_constant"
+        annotated = node.type == "assignment" and node.child_by_field_name("type") is not None
+        if not (field or variable or enum or annotated):
+            return
+        # Java 的多成员声明由各 variable_declarator 分别拥有，不能只保留首个。
+        if field and any(child.type == "variable_declarator" for child in node.named_children):
+            return
+        name_node = node.child_by_field_name("name") or node.child_by_field_name("left")
+        if name_node is None:
+            return
+        name = self.text(name_node)
+        declaration = parent if variable else node
+        declared_type = declaration.child_by_field_name("type")
+        value = node.child_by_field_name("value") or node.child_by_field_name("right")
+        if enum:
+            value = node.child_by_field_name("arguments")
+        anchor = self.anchor(node)
+        qualified = ".".join((*owners, name))
+        identity = make_id(self.prefix, *owners, name, "member")
+        nullable: list[str] = []
+        serialized = ""
+        if self.language == "java":
+            # 只读真实注解节点；初始化字符串、注释和其他注解的参数不是声明注解。
+            modifiers = next(
+                (child for child in declaration.named_children if child.type == "modifiers"), None
+            )
+            for annotation in modifiers.named_children if modifiers is not None else ():
+                if annotation.type not in {"annotation", "marker_annotation"}:
+                    continue
+                annotation_name = self.text(annotation.child_by_field_name("name"))
+                short_name = annotation_name.rsplit(".", 1)[-1]
+                if short_name in {"Nullable", "NotNull", "NonNull"}:
+                    nullable.append("@" + annotation_name)
+                if short_name not in {"JsonProperty", "SerializedName"}:
+                    continue
+                arguments = annotation.child_by_field_name("arguments")
+                for argument in arguments.named_children if arguments is not None else ():
+                    if argument.type == "element_value_pair":
+                        if self.text(argument.child_by_field_name("key")) != "value":
+                            continue
+                        argument = argument.child_by_field_name("value")
+                    literal = re.fullmatch(r'"([^"\\\n]*)"', self.text(argument))
+                    if literal:
+                        serialized = literal[1]
+        facts = {
+            "declaredType": (self.text(declared_type).lstrip(": ") if declared_type else "")
+            + self.text(node.child_by_field_name("dimensions")),
+            "optionalMember": any(child.type == "?" for child in node.children),
+            "hasInitializer": value is not None,
+            "initializer": self.text(value) if value is not None else "",
+            "nullableEvidence": nullable,
+            "serializationName": serialized,
+        }
+        record = {
+            "id": identity,
+            "name": name,
+            "label": name,
+            "scope_id": scope["id"],
+            "body_scope_id": scope["id"],
+            "exported": False,
+            "name_line": name_node.start_point.row + 1,
+            "kind": "enum-member" if enum else "field",
+            "qualified_name": qualified,
+            "owner": ".".join(owners),
+            "signature": self.text(node),
+            "line": anchor["line"],
+            "column": anchor["column"],
+            "source_file": self.relative,
+            "source_location": f"L{anchor['line']}:{anchor['column']}",
+            "source_end_line": anchor["endLine"],
+            "source_ranges": [anchor],
+            "file_type": "code",
+            "language": self.language,
+            "objectFacts": facts,
+        }
+        self.declarations.append(record)
+        self.nodes.append(record)
+        self.edges.append(
+            {
+                "source": scope["owner"],
+                "target": identity,
+                "relation": "contains",
+                "resolution": "exact",
+                "source_file": self.relative,
+                "source_location": record["source_location"],
+            }
+        )
+
     def walk(self, node, scope, owners: tuple[str, ...] = ()) -> None:
         kind = node.type
+        if self.language == "cpp" and kind == "namespace_definition":
+            # 命名空间拥有词法范围，但不是类；其中的函数不能变成类方法。
+            name = self.text(node.child_by_field_name("name"))
+            nested_owners = (*owners, *filter(None, name.split("::")))
+            inner = self.new_scope(
+                occurrence_id(self.relative, node.start_byte, node.end_byte, "namespace"),
+                scope["id"],
+                "module",
+                scope["owner"],
+            )
+            body = node.child_by_field_name("body")
+            if body is not None:
+                for child in body.named_children:
+                    self.walk(child, inner, nested_owners)
+            return
         if kind in {"package_clause", "package_declaration"}:
             self.package = self.text(node).removeprefix("package").strip().rstrip(";")
             return
@@ -699,6 +844,7 @@ class _FileParser:
             return
         if self._walk_declaration(node, scope, owners):
             return
+        self.observe_member(node, scope, owners)
         if kind in {
             "variable_declarator",
             "assignment",

@@ -12,6 +12,7 @@ from typer.main import get_command
 from _support.markdown import assert_local_markdown_links_resolve
 from _support.paths import REPO_ROOT
 from modus.cli import app
+from modus.scaffold import TemplateCatalog
 
 _PUBLIC_READMES = (
     REPO_ROOT / "README.md",
@@ -19,12 +20,15 @@ _PUBLIC_READMES = (
 )
 _DEVELOPER_DOCS = (
     *_PUBLIC_READMES,
+    REPO_ROOT / "AGENTS.md",
     REPO_ROOT / "ARCHITECTURE.md",
     REPO_ROOT / "CONTRIBUTING.md",
     *sorted((REPO_ROOT / "docs").rglob("*.md")),
     *sorted((REPO_ROOT / "src/modus").rglob("README.md")),
+    *sorted((REPO_ROOT / "skills/modus-development").rglob("*.md")),
     REPO_ROOT / "tests/README.md",
     REPO_ROOT / "scripts/README.md",
+    *sorted((REPO_ROOT / "integrations/dsh").glob("*.md")),
 )
 _MARKDOWN_ROOTS = (
     *_DEVELOPER_DOCS,
@@ -50,6 +54,28 @@ def test_developer_documentation_has_valid_files_and_anchors() -> None:
     for readme in _DEVELOPER_DOCS:
         assert readme.is_file()
         assert_local_markdown_links_resolve(readme, root=REPO_ROOT)
+
+
+def test_repository_development_skill_has_valid_bundle_metadata() -> None:
+    """开发入口与产品模板共用格式检查，避免 Agent 路由失效。"""
+
+    skill = TemplateCatalog(REPO_ROOT).load_skills(("modus-development",))[0]
+    assert "references/development.md" in skill.support_files
+
+
+def test_documentation_links_ignore_nested_fenced_examples(tmp_path: Path) -> None:
+    """Skill 样例可用长围栏包含短围栏，示例链接不属于实际导航。"""
+
+    page = tmp_path / "guide.md"
+    target = tmp_path / "target.md"
+    target.write_text("# Section\n", encoding="utf-8")
+    page.write_text(
+        "# Guide\n\n````markdown\n```text\nexample\n```\n"
+        "[example](missing.md)\n````\n\n[actual](target.md#section)\n",
+        encoding="utf-8",
+    )
+
+    assert assert_local_markdown_links_resolve(page, root=tmp_path) == {target.resolve()}
 
 
 # 同时覆盖行内示例和围栏内的命令行，不执行示例中的业务动作。

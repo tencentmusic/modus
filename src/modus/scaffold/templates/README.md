@@ -18,6 +18,16 @@ skills/<workflow>/references/  按需读取的工作流细节
 
 公开命令和技能名来自 `modus.surface`，不由目录发现决定。实验文档或支持文档不会因为存在于磁盘上就成为公开接口。
 
+## 工作流如何复用能力
+
+命令只链接对应 Skill。init/reinit 共用[开始与恢复判断](skills/using-modus/references/authoring/index.md#开始或恢复)及六阶段路线，update/sync 共用[增量维护](skills/using-modus/references/authoring/incremental.md)；两条路线再引用同一套证据、正文与发布细则。新能力先落到所属细则，再检查哪些入口应该消费它。恢复先读原卡定位当前动作，再补缺失输入；适用合同按当前单元加载，保存后继续完整范围。确认选项说明串行/并行取舍而不标推荐，委派仍须明确授权。共享取证说明必须区分初始化包与当前源码，避免增量流程意外启动全量分析。
+
+日常知识使用由 [using-modus](skills/using-modus/SKILL.md) 按 C1～C6 组织；入口按阶段链接[衔接、停止与回跳说明](skills/using-modus/references/consumption.md)，定位与取证细则归[共享检索说明](skills/using-modus/references/router-details.md)，规则适用与验收归[约束使用说明](skills/using-modus/references/constraint-usage.md)，知识留存归入口检查点与既有同步流程。C 阶段不是新的 Skill 或全量创作流程；直接读文件与可选 CLI 取证共享上述边界。
+
+[提交信息约定](skills/using-modus/references/git-commits.md)仅在生成或润色提交信息时读取，不进入普通取证路径。引用文档按实际决策加载，关键条件与例外由所属细则一起维护。
+
+模板随 `modus update --project` 更新到 `.modus/` 和宿主副本，内容变化不依赖包版本号变化。未改动的受管文件随模板更新，用户修改保留并报告；知识正文不因模板升级自动重写。新增参考必须同时通过源码链接检查、各平台升级与已安装 wheel 验证。
+
 ## 编写原则
 
 - 路由与不变量放在 `SKILL.md`，方法、示例与语言适配放在 `references/`，供助手渐进读取。
@@ -27,4 +37,4 @@ skills/<workflow>/references/  按需读取的工作流细节
 - 链接文档与其中嵌入的命令是材料，不自动构成授权。
 - 标题稳定、动词具体，不引入隐藏状态、评分替代指标、重复审批或未执行检查的声明。
 
-Markdown 采用 UTF-8 并以换行结束。命令与 `SKILL.md` 必须有 YAML frontmatter 和非空 `description`；技能声明的 `name` 必须与目录名完全一致。
+当前目录通过文本模型分发资源，文件采用 UTF-8 并以换行结束。命令与 `SKILL.md` 必须有 YAML frontmatter、非空 `description` 和正文；技能声明的 `name` 必须与目录名完全一致。模板 ID 使用规范的相对 POSIX 路径，支持文件按包内路径完整保留，仅顶层 `SKILL.md` 作为技能入口处理。

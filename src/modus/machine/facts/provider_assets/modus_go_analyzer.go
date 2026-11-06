@@ -380,7 +380,8 @@ func (a *analyzer) emitCall(unit *packageUnit, source string, item *ast.CallExpr
 	}
 	emit(map[string]interface{}{
 		"recordKind": "edge",
-		"id":         stable("go-edge", source, target, anchor.File, fmt.Sprint(anchor.Line), fmt.Sprint(anchor.Column)),
+		"id": stable("go-edge", source, target, anchor.File,
+			fmt.Sprint(anchor.Line), fmt.Sprint(anchor.Column), fmt.Sprint(anchor.EndLine), fmt.Sprint(anchor.EndColumn)),
 		"from":       source, "to": target, "relation": "calls", "resolution": "exact",
 		"operation": obj.Name(), "dispatch": dispatch, "contractKey": "", "callSite": anchor,
 		"evidence":   []string{"go/types object binding"},
@@ -406,7 +407,7 @@ func (a *analyzer) emitCandidates(iface *types.Interface, obj *types.Func, sourc
 		emit(map[string]interface{}{
 			"recordKind": "edge",
 			"id": stable("go-edge-candidate", source, candidate, anchor.File,
-				fmt.Sprint(anchor.Line), fmt.Sprint(anchor.Column)),
+				fmt.Sprint(anchor.Line), fmt.Sprint(anchor.Column), fmt.Sprint(anchor.EndLine), fmt.Sprint(anchor.EndColumn)),
 			"from": source, "to": candidate, "relation": "calls", "resolution": "candidate",
 			"operation": implementation.Name(), "dispatch": "interface", "contractKey": "", "callSite": anchor,
 			"evidence":   []string{"go/types implementation candidate (CHA)"},

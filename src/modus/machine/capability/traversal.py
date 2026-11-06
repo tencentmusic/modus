@@ -256,6 +256,7 @@ def compose_seed(
         entry_signature=seed.signature,
         trigger=seed.trigger,
         entry=entry,
+        observed_entries=tuple(_step(identity, entries) for identity in sorted(visited_nodes)),
         evidence_tier=evidence_tier,
         degradation_reasons=(degradation_reason,) if degradation_reason else (),
         orchestrators=orchestrators,

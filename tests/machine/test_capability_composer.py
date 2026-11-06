@@ -24,6 +24,51 @@ def _compose(root: Path):
         return compose(resolve(observe(corpus))).model
 
 
+def test_container_routes_and_client_calls_do_not_become_service_seeds(tmp_path: Path) -> None:
+    (tmp_path / "Controller.java").write_text(
+        """@RequestMapping("/orders")
+class Controller {
+ @PostMapping("/create")
+ void create() { repository.save(order); }
+}
+""",
+        encoding="utf-8",
+    )
+    (tmp_path / "client.ts").write_text(
+        'export async function load() { return fetch("/orders"); }', encoding="utf-8"
+    )
+    model = _compose(tmp_path)
+    assert all(
+        row.entry["kind"] in {"method", "function", "constructor", "handler"}
+        for row in model.slices
+    )
+    clients = [row for row in model.slices if str(row.entry["symbol"]).endswith("load")]
+    assert clients and all(row.trigger["kind"] == "public-export" for row in clients)
+    assert sum(row.trigger["kind"] == "external-http" for row in model.slices) == 1
+
+
+def test_every_seed_has_an_inventory_entry_when_expansion_is_budgeted(tmp_path: Path) -> None:
+    from modus.machine.capability.composer import compose_capabilities
+
+    (tmp_path / "api.ts").write_text(
+        "export function first() { return 1; }\nexport function second() { return 2; }\n",
+        encoding="utf-8",
+    )
+    corpus = freeze(tmp_path, compiler_mode="off")
+    with corpus.activate():
+        model = compose_capabilities(resolve(observe(corpus)), max_slices=1)
+    assert model.seed_count == 2 and len(model.slices) == 1
+    assert len(model.seed_inventory) == model.seed_count
+    assert {
+        row["entryId"] for row in model.seed_inventory if row["expansionStatus"] == "not-expanded"
+    } == set(model.uncovered_seeds)
+    assert all(
+        row["reasonCode"] == "machine.capability.slice-budget"
+        for row in model.seed_inventory
+        if row["expansionStatus"] == "not-expanded"
+    )
+
+
 # 验证从显式 HTTP 入口到写入终点的有界能力切片。
 # 结构证据只能达到启发式精度，关闭编译器的原因必须随结果保留。
 # 同时检查线协议 schema，防止内部正确但交付格式失效。

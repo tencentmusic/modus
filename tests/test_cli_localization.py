@@ -124,7 +124,7 @@ def test_installation_projects_chinese_guidance_without_renaming_assets(tmp_path
     assert result.exit_code == 0, result.output
     assert "项目已接入" in result.stdout and "下一步" in result.stdout
     manifest = json.loads((tmp_path / ".modus/manifest.json").read_text(encoding="utf-8"))
-    assert set(manifest["platforms"]) == {"codex", "cursor", "claude", "codebuddy"}
+    assert set(manifest["platforms"]) == {"codex", "cursor", "claude", "codebuddy", "dsh"}
     for name in ("AGENTS.md", "CLAUDE.md", "CODEBUDDY.md", ".cursor/rules/modus.mdc"):
         content = (tmp_path / name).read_text(encoding="utf-8")
         assert "默认使用简体中文" in content

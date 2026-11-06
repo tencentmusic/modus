@@ -12,8 +12,25 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ...knowledge_identity import is_team_standard_path
 from ...knowledge_reader import BoundKnowledgeReadError, read_bound_regular_text
 from ...knowledge_seeds import is_constraint_seed
+from ...markdown import (
+    body_start as body_start,
+)
+from ...markdown import (
+    markdown_anchors,
+    markdown_item_ids,
+)
+from ...markdown import (
+    markdown_headings as markdown_headings,
+)
+from ...markdown import (
+    markdown_slug as markdown_slug,
+)
+from ...markdown import (
+    strip_fenced_code as strip_fenced_code,
+)
 from ...paths import ModusPaths
 from ...skillmd import split_frontmatter
 
@@ -24,14 +41,8 @@ MAX_DOCUMENT_BYTES = 32 * 1024 * 1024
 MAX_SCAN_BYTES = 64 * 1024 * 1024
 MAX_INDEX_BYTES = 256 * 1024 * 1024
 
-_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 _LABELED_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
-_ITEM_ID_RE = re.compile(r"\{\{item:([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\}\}")
-_ITEM_ANCHOR_RE = re.compile(
-    r'<a\s+id=["\']item-([A-Za-z0-9][A-Za-z0-9._:-]{0,127})["\']\s*></a>',
-    re.IGNORECASE,
-)
 
 
 # 扫描结果同时保存正文、链接、输入摘要与降级原因。
@@ -45,6 +56,7 @@ class DocumentScan:
     input_digests: dict[str, str]
     partial: bool
     issues: list[dict[str, Any]]
+    read_bytes: int = 0
 
     def as_legacy_tuple(
         self,
@@ -113,7 +125,7 @@ def classify_document(relative: str) -> tuple[str, str, dict[str, str | None]]:
     if relative.endswith("/handbook/SKILL.md"):
         return "workspace-router", "routing-authority", scope
     if "/knowledge/constraint/" in f"/{relative}":
-        if relative.endswith("/constraint/team-standard.md"):
+        if is_team_standard_path(relative):
             return "project-constraint", "document-declaration", scope
         return "project-constraint", "human-authority", scope
     if relative.endswith("/knowledge/architecture-overview.md"):
@@ -257,6 +269,8 @@ def classify_section_facet(
     }:
         return declared
     path = Path(relative)
+    if is_team_standard_path(relative):
+        return "rule"
     stem = path.stem
     if stem in _FACET_STEMS:
         return _FACET_STEMS[stem]
@@ -362,68 +376,27 @@ def is_rule_evidence(item: Mapping[str, Any]) -> bool:
     )
 
 
-# 仅跳过有闭合边界的 frontmatter，损坏元数据不能吞掉整篇正文。
-# 前置元数据不作为正文证据，行号偏移仍需保留供定位。
-def body_start(lines: list[str]) -> int:
-    if not lines or lines[0].strip() != "---":
-        return 0
-    for index in range(1, min(len(lines), 4096)):
-        if lines[index].strip() == "---":
-            return index + 1
-    return 0
-
-
-# 代码围栏与缩进代码中的井号不能切分知识章节。
-# 同时支持 ATX 与 Setext 标题，保持常见 Markdown 写法可读。
-def markdown_headings(lines: list[str], start: int = 0) -> list[tuple[int, int, str]]:
-    """Recognize Markdown headings outside backtick/tilde fences and indented code.
-
-    Fence closing requires the same character and at least the opening length;
-    a shorter embedded fence is source text, not a new document section.
-    """
-    headings: list[tuple[int, int, str]] = []
-    fence: tuple[str, int] | None = None
-    for index in range(start, len(lines)):
-        line = lines[index]
-        fence_match = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
-        if fence is not None:
-            if (
-                fence_match
-                and fence_match[1][0] == fence[0]
-                and len(fence_match[1]) >= fence[1]
-                and not fence_match[2].strip()
-            ):
-                fence = None
-            continue
-        if fence_match and not (fence_match[1][0] == "`" and "`" in fence_match[2]):
-            fence = (fence_match[1][0], len(fence_match[1]))
-            continue
-        _append_markdown_heading(lines, index, start, headings)
-    return headings
-
-
-def _append_markdown_heading(
-    lines: list[str], index: int, start: int, headings: list[tuple[int, int, str]]
-) -> None:
-    """调用方排除围栏后，在正文中识别 ATX 与 Setext 标题。"""
-    line = lines[index]
-    match = _HEADING_RE.match(line[0:]) if not line.startswith(("    ", "\t")) else None
-    if match is None and line.startswith(" ") and not line.startswith("    "):
-        match = _HEADING_RE.match(line.lstrip(" "))
-    if match:
-        title = re.sub(r"\s+#+\s*$", "", match[2]).strip()
-        headings.append((index, len(match[1]), title))
-    elif index > start and re.fullmatch(r" {0,3}(?:=+|-+)\s*", line):
-        previous = lines[index - 1]
-        if (
-            previous.strip()
-            and not previous.startswith(("    ", "\t"))
-            and not re.match(r"^\s*(?:#|[-*+]>?|>|```|~~~)", previous)
-        ):
-            if not headings or headings[-1][0] != index - 1:
-                headings.append(
-                    (index - 1, 1 if line.lstrip().startswith("=") else 2, previous.strip())
-                )
+def matches_knowledge_need(need: str, item: Mapping[str, Any]) -> bool:
+    """分开提示业务正文与工程约束到场，保留旧 business-rule 的宽泛兼容语义。"""
+    if need == "business-rule":
+        return is_rule_evidence(item)
+    if item.get("status") != "current" or item.get("loadLevel") == "L1":
+        return False
+    text = str(item.get("text") or item.get("excerpt") or "")
+    if not any(
+        line.strip() and not line.lstrip().startswith(("#", "<a ", "{{item:"))
+        for line in text.splitlines()
+    ):
+        return False
+    if need == "domain-knowledge":
+        return bool((item.get("scope") or {}).get("domain")) and item.get("sourceType") in {
+            "project-generated",
+            "project-module",
+            "project-business",
+        }
+    if need == "engineering-constraint":
+        return item.get("sourceType") == "project-constraint" and is_rule_evidence(item)
+    return False
 
 
 # 文件大小、总读取量和截止时间共同约束扫描。
@@ -527,6 +500,7 @@ def scan_documents(
         # 标题栈保留父级角色、主题与状态，子章节可继承阅读上下文。
         # 子树终点单独计算，用于构造完整条目的继续阅读范围。
         heading_context: list[dict[str, Any]] = []
+        anchors_by_line = markdown_anchors(text)
         subtree_ends = [len(lines)] * len(headings)
         open_headings: list[int] = []
         for ordinal, (line_index, level, _heading) in enumerate(headings):
@@ -554,9 +528,12 @@ def scan_documents(
                 if facet == "rule"
                 else infer_status(section_text, frontmatter, inherited_status)
             )
-            own_items = sorted(
-                set(_ITEM_ID_RE.findall(section_text)) | set(_ITEM_ANCHOR_RE.findall(section_text))
-            )
+            own_items = markdown_item_ids(section_text)
+            section_anchors = [
+                anchor
+                for line in range(line_index, end_index)
+                for anchor in anchors_by_line.get(line, ())
+            ]
             parent = heading_context[-1] if heading_context else None
             normalized_heading = re.sub(
                 r"^\d+[.、．]\s*", "", heading.casefold().replace("_", " ").strip()
@@ -568,14 +545,24 @@ def scan_documents(
             )
             # 显式条目标记、主题条目及状态变化都会开启新交付单元。
             # 普通失败/前置条件子章节应跟随其业务条目，避免只返回成功路径。
+            inherited_item = bool(parent and parent["itemIds"])
             new_entry = (
                 bool(own_items)
-                or level <= 2
-                or (level == 3 and Path(relative).stem in _ENTRY_FACET_FILES)
-                or (level == 3 and Path(relative).parent.name in {"api", "object"})
                 or parent is None
-                or bool(parent["facetHeading"] and level > parent["level"])
                 or bool(parent and status != parent["status"])
+                or (
+                    not inherited_item
+                    and (
+                        level <= 2
+                        or (level == 3 and Path(relative).stem in _ENTRY_FACET_FILES)
+                        or (level == 3 and Path(relative).parent.name in {"api", "object"})
+                        or bool(
+                            parent
+                            and parent["facetHeading"]
+                            and parent["entryOrdinal"] == parent["ordinal"]
+                        )
+                    )
+                )
             )
             entry_ordinal = ordinal if new_entry or parent is None else int(parent["entryOrdinal"])
             item_ids = own_items or (list(parent["itemIds"]) if parent and not new_entry else [])
@@ -583,6 +570,7 @@ def scan_documents(
             heading_context.append(
                 {
                     "level": level,
+                    "ordinal": ordinal,
                     "heading": heading,
                     "facet": facet,
                     "sectionRole": section_role,
@@ -605,6 +593,7 @@ def scan_documents(
                     "path": relative,
                     "heading": heading,
                     "headingPath": heading_path,
+                    "anchors": list(dict.fromkeys(section_anchors)),
                     "entryRange": entry_range,
                     "_entryOrdinal": entry_ordinal,
                     "readTarget": {"path": relative, **entry_range},
@@ -662,6 +651,7 @@ def scan_documents(
         input_digests=inputs,
         partial=limited,
         issues=scan_issues,
+        read_bytes=total_bytes,
     )
 
 

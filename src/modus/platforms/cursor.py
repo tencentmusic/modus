@@ -1,12 +1,10 @@
-"""Cursor adapter: skills under ``.cursor/skills`` + a ``.cursor/rules/modus.mdc``
-rule + a session-start hook in ``.cursor/hooks.json``."""
+"""Cursor 接入：.cursor/skills 技能与 .cursor/rules/modus.mdc 常驻规则。"""
 
 from __future__ import annotations
 
-from ..hooks import bootstrap
-from ..precedence import MODUS_DISPATCHER_FALLBACK, USER_INVOKED_WORKFLOWS_SENTENCE
+from ..precedence import USER_INVOKED_WORKFLOWS_SENTENCE
 from .base import Command, PlatformAdapter, Skill
-from .models import HookFile, InstructionFile, PlatformLayout
+from .models import InstructionFile, PlatformLayout
 from .rendering import render_skill_index
 
 _FRONTMATTER = "---\ndescription: Modus 框架入口\nalwaysApply: true\n---\n\n"
@@ -18,18 +16,13 @@ _LAYOUT = PlatformLayout(
         marker="modus-cursor",
         preamble=_FRONTMATTER,
     ),
-    hook=HookFile(
-        path=".cursor/hooks.json",
-        template="hooks/cursor-hooks.json",
-        render_config=bootstrap.cursor_hook_config,
-    ),
 )
 
 
 # 布局只描述宿主拥有的路径与标记，文件合并和所有权校验由基类负责。
 # 常驻规则只呈现工作流入口，具体技能仍从权威资产投影。
 class CursorAdapter(PlatformAdapter):
-    """Project Modus into Cursor skills, always-on rules, and lifecycle hooks."""
+    """将 Modus 投影到 Cursor 的技能与常驻规则。"""
 
     name = "cursor"
     layout = _LAYOUT
@@ -39,9 +32,5 @@ class CursorAdapter(PlatformAdapter):
         skills: list[Skill],
         _commands: list[Command],
     ) -> str:
-        heading = (
-            "# Modus\n\n"
-            f"{MODUS_DISPATCHER_FALLBACK} {USER_INVOKED_WORKFLOWS_SENTENCE}.\n"
-            "Modus 核心能力："
-        )
+        heading = f"# Modus\n\n{USER_INVOKED_WORKFLOWS_SENTENCE}.\nModus 核心能力："
         return render_skill_index(skills, heading)

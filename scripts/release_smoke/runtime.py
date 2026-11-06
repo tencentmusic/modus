@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import json
 import shlex
@@ -166,6 +167,10 @@ def _exercise_knowledge_paths(project: SmokeProject) -> dict[Path, bytes]:
         {entry.stem for entry in paths.commands_dir.glob("*.md")} == COMMAND_NAMES,
         "首次安装的显式命令范围不符合发布契约",
     )
+    require(
+        {entry.name for entry in (project.root / ".dsh/skills").iterdir()} == WORKFLOW_NAMES,
+        "安装后的 DSH 技能不符合发布契约",
+    )
     project.invoke("context", "resolve", "helper", "--scope", "project-read")
     project.invoke("status", "--json")
 
@@ -177,6 +182,35 @@ def _exercise_knowledge_paths(project: SmokeProject) -> dict[Path, bytes]:
         result.get("status") == "completed",
         f"知识更新未完成：{result!r}",
     )
+    # 安装后的 CLI 先创建专题，再填充入口，核验公开权限与路径身份同时生效。
+    team = paths.team_standard
+    team_relative = team.relative_to(project.root).as_posix()
+    topic = paths.constraint_dir / "team-standard" / "runtime.md"
+    topic_relative = paths.relative(topic)
+    topic_text = "# 运行约束\n\n性质: 通用建议\n\n保持明确的资源所有权。\n"
+    authored_standard = "# 团队规范\n\n[运行约束](team-standard/runtime.md)\n"
+    request = project.root / "initialize-standard.json"
+    request.write_text(
+        json.dumps(
+            {
+                "documents": {topic_relative: topic_text, team_relative: authored_standard},
+                "expectedHashes": {team_relative: hashlib.sha256(team.read_bytes()).hexdigest()},
+                "initializeTeamStandard": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    initialized = _parse_json_object(
+        project.invoke("knowledge", "update", "--input", str(request)),
+        source="knowledge update",
+    )
+    require(
+        initialized.get("writes") == [topic_relative, team_relative],
+        "安装后的 CLI 未创建团队规范专题并填充入口种子",
+    )
+    require(team.read_text(encoding="utf-8") == authored_standard, "团队规范正文未实际落盘")
+    require(topic.read_text(encoding="utf-8") == topic_text, "团队规范专题未实际落盘")
+    request.unlink()
     verification = project.runner.invoke(
         project.app,
         ["-C", str(project.root), "knowledge", "verify", "--json"],
@@ -204,8 +238,31 @@ def _exercise_authoring_contract() -> None:
     catalog = TemplateCatalog()
     required_references = (
         "skills/modus-init/SKILL.md",
+        "skills/modus-init/references/constraint-profiles/index.md",
+        "skills/modus-init/references/constraint-profiles/composition.md",
+        "skills/modus-init/references/constraint-profiles/foundation.md",
+        "skills/modus-init/references/constraint-profiles/engineering-types.md",
+        "skills/modus-init/references/constraint-profiles/typescript.md",
+        "skills/modus-init/references/constraint-profiles/capabilities/database.md",
+        "skills/modus-init/references/constraint-profiles/capabilities/configuration.md",
+        "skills/modus-init/references/constraint-profiles/capabilities/concurrency.md",
+        "skills/modus-init/references/constraint-profiles/adapters/spring.md",
+        "skills/modus-init/references/constraint-profiles/adapters/react.md",
         "skills/modus-reinit/SKILL.md",
+        "skills/modus-update-knowledge/SKILL.md",
+        "skills/modus-sync-knowledge/SKILL.md",
         "skills/using-modus/references/authoring/index.md",
+        "skills/using-modus/references/authoring/incremental.md",
+        "skills/using-modus/references/authoring/stages/k1-scope.md",
+        "skills/using-modus/references/authoring/stages/k2-plan.md",
+        "skills/using-modus/references/authoring/stages/k3-evidence.md",
+        "skills/using-modus/references/authoring/stages/k4-domain.md",
+        "skills/using-modus/references/authoring/stages/k5-constraints.md",
+        "skills/using-modus/references/authoring/stages/k6-publish.md",
+        "skills/using-modus/references/authoring/context-continuity.md",
+        "skills/using-modus/references/authoring/execution-strategy.md",
+        "skills/using-modus/references/authoring/cross-domain.md",
+        "skills/using-modus/references/authoring/domain-worker-prompt.md",
         "skills/using-modus/references/authoring/evidence/index.md",
         "skills/using-modus/references/authoring/evidence/machine-packet.md",
         "skills/using-modus/references/authoring/evidence/scenario-closure.md",
@@ -307,10 +364,57 @@ def _exercise_init_analysis(
     )
     require(selection.get("schemaVersion") == 1, "证据筛选结果模式无效")
     require(isinstance(selection.get("items"), list), "证据筛选没有条目")
+    packet = _parse_json_object(
+        project.invoke(
+            "internal",
+            "init-analysis",
+            "context",
+            "--root",
+            str(project.root),
+            "--bundle-digest",
+            bundle_digest,
+            "--baseline-digest",
+            snapshot_digest,
+            "--intent",
+            "coverage-audit",
+            "--path",
+            "main.py",
+        ),
+        source="internal init-analysis context",
+    )
+    require(packet.get("schemaVersion") == 1, "创作上下文模式无效")
+    require(bool(packet.get("evidence")), "源码范围审计没有交付库存/入口证据")
+    require(isinstance(packet.get("coverageGaps"), list), "创作上下文缺少覆盖缺口")
+    require(bool(packet.get("expansionQueries")), "创作上下文缺少精确展开条件")
     require(
         _snapshot_markdown(project.root / "modus") == retained_knowledge,
         "初始化分析修改了保留的知识正文",
     )
+
+
+def _exercise_mobile_grammars(root: Path) -> None:
+    """已安装产物必须包含语言访问器，且依赖可实际解析，不能静默退回文本。"""
+    from modus.machine.facts.structural import extract
+
+    root.mkdir()
+    sources = {
+        "View.h": "@interface View : NSObject\n- (void)refresh;\n@end",
+        "View.m": "@implementation View\n- (void)refresh {}\n@end",
+        "View.mm": "namespace Shared { void run() {} }\n@implementation View\n@end",
+        "View.swift": "struct View { func refresh() {} }",
+        "View.kt": "class View { fun refresh() {} }",
+        "Model.hpp": "namespace Shared { class Model { public: void run(); }; }",
+    }
+    for name, source in sources.items():
+        (root / name).write_text(source, encoding="utf-8")
+    result = extract([root / name for name in sources], cache_root=root)
+    require(len(result["fileFacts"]) == len(sources), "安装后的移动端源码发现不完整")
+    for facts in result["fileFacts"]:
+        require(bool(facts["declarations"]), f"安装后的语言观察缺少声明：{facts['path']}")
+        require(
+            not any(row.get("kind") == "source-text" for row in facts["nodes"]),
+            f"安装后的语言观察意外回退为通用文本：{facts['path']}",
+        )
 
 
 # 新安装应被识别为最新，验证清单与模板版本的一致性。
@@ -463,23 +567,12 @@ def exercise_installed_wheel(wheel: Path) -> RuntimeVerification:
             _exercise_authoring_contract()
             project_root = workspace / "project"
             project_root.mkdir()
-            from modus.machine.corpus.source_snapshot import SourceSnapshot
-            from modus.machine.facts.structural import _get_extractor
-
-            for name, source in {
-                "View.m": "@implementation View\n- (void)run {}\n@end",
-                "View.mm": "@implementation View\n- (void)run {}\n@end",
-                "View.swift": "class View { func run() {} }",
-                "View.kt": "class View { fun run() {} }",
-            }.items():
-                path = project_root / name
-                facts = _get_extractor(path)(SourceSnapshot(path, source))
-                require(bool(facts.get("declarations")), f"安装后的语言解析不可用：{name}")
             (project_root / "main.py").write_text(SAMPLE_SOURCE, encoding="utf-8")
             project = SmokeProject(project_root, app, CliRunner())
 
             retained_knowledge = _exercise_knowledge_paths(project)
             _exercise_init_analysis(project, retained_knowledge)
+            _exercise_mobile_grammars(workspace / "mobile")
             _exercise_maintenance_paths(project)
             _exercise_workspace_uninstall_boundary(workspace, app, CliRunner())
             platforms = frozenset(available_platforms())

@@ -13,11 +13,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..capability.lifecycle import ComposedCapabilities
-from ..errors import safe_error_summary
+from ..errors import safe_error_summary, validate_code
 from ..resolution.lifecycle import ResolvedProgram
 from ..states import Completeness, ExecutionStatus
 from .community_signal import GraphEngine
 from .contracts import AuthoringProjection
+from .memberships import EntryMembership, entry_memberships
 from .proposals import build_proposals, capability_first_scope, capability_navigation
 from .publication import sanitize_publication
 from .scope_candidates import project_scope_candidates
@@ -64,6 +65,21 @@ def _attach_candidate_memberships(
     return memberships
 
 
+def _reference_reason(value: object) -> str:
+    """上游短原因不是无效存储记录；规范化后仍能解释未解析边界。"""
+    reason = str(value or "unresolved")
+    if len(reason) > 120:
+        return "machine.resolution.reference-unresolved"
+    try:
+        return validate_code(
+            reason
+            if reason.startswith("machine.")
+            else "machine.resolution." + f"reference-{reason}"
+        )
+    except ValueError:
+        return "machine.resolution.reference-unresolved"
+
+
 # 社区划分仅提供结构线索，失败后仍可使用能力与目录证据。
 # 能力提议优先于结构候选，未覆盖声明保留为明确的剩余材料。
 # 未解析引用与规则缺口回写文件证据，使局部查询也能看到降级。
@@ -93,8 +109,26 @@ def project(
             "reasonCode": "machine.projection.community-unavailable",
             "summary": safe_error_summary(exc),
         }
-    evidence_index = resolved.source_evidence.index
-    evidence_packets = resolved.source_evidence.packets
+    # N5 添加归属和预算说明，不能反写 N3 的冻结观察。
+    evidence_index = {
+        **resolved.source_evidence.index,
+        "files": [
+            dict(row)
+            for row in resolved.source_evidence.index.get("files", [])
+            if isinstance(row, Mapping)
+        ],
+    }
+    evidence_packets = {
+        key: {
+            **packet,
+            **{
+                name: [dict(row) for row in packet.get(name, []) if isinstance(row, Mapping)]
+                for name in ("entries", "relations", "authoringRecords", "coverageGaps")
+            },
+        }
+        for key, packet in resolved.source_evidence.packets.items()
+    }
+    seed_inventory = {row["entryId"]: row for row in capabilities.model.seed_inventory}
     evidence_gaps = [dict(item) for item in resolved.source_evidence.coverage_gaps]
     evidence_gaps.extend(
         dict(item)
@@ -153,6 +187,22 @@ def project(
         resolved.source_evidence.source_digests,
     )
     memberships = _attach_candidate_memberships(scope, evidence_index)
+    by_entry = entry_memberships(scope["candidates"], capabilities.model)
+    # 文件库存保留文件级关联；细节使用声明/关系来源的精确身份。
+    # 无归属记录保留文件相关提示，不能挂进某个提案的已绑定信号。
+    for packet in evidence_packets.values():
+        related = sorted(memberships.get(str(packet.get("path") or ""), []))
+        for kind in ("entries", "relations", "authoringRecords"):
+            for row in packet.get(kind, []):
+                identity = str(row.get("source" if kind == "relations" else "entryId") or "")
+                binding = by_entry.get(identity, EntryMembership())
+                if kind == "entries" and identity in seed_inventory:
+                    row["capabilitySeed"] = dict(seed_inventory[identity])
+                row["candidateIds"] = list(binding.candidate_ids)
+                row["capabilityIds"] = list(binding.capability_ids)
+                if not binding.candidate_ids:
+                    row["relatedCandidateIds"] = related
+
     services = project_services(
         resolved.topology,
         baseline_digest=baseline_digest,
@@ -191,7 +241,7 @@ def project(
             continue
         target.setdefault("coverageGaps", []).append(
             {
-                "reasonCode": str(raw.get("reason") or "machine.resolution.reference-unresolved"),
+                "reasonCode": _reference_reason(raw.get("reason")),
                 "symbol": str(raw.get("name") or ""),
                 "location": dict(raw.get("location") or {}),
                 "resolution": "unresolved",

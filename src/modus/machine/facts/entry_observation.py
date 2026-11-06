@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,6 @@ from modus.machine.facts.language_capabilities import (
     structural_extractors,
 )
 
-EVIDENCE_SCHEMA_VERSION = 1
 _DECLARATION_RELATIONS = {"contains", "method", "defines", "declares", "function", "exports"}
 _NON_ENTRY_KINDS = {
     "file",
@@ -59,6 +59,30 @@ def _line(value: Any) -> int | None:
 def entry_identity(node_id: str) -> str:
     """A view identity of the bound node, never another symbol resolver."""
     return "entry:" + hashlib.sha256(node_id.encode()).hexdigest()[:_IDENTITY_HEX_LENGTH]
+
+
+def declaration_aliases(entries: list[dict[str, Any]]) -> dict[str, str]:
+    """消费已确认的声明对应关系；不合并原始观察或跨构建上下文猜测身份。"""
+    by_node = {str(row.get("graphNodeId")): row for row in entries if row.get("graphNodeId")}
+    claims: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for entry in entries:
+        targets = {
+            str(row["syntaxGraphNodeId"])
+            for row in entry.get("correspondences", [])
+            if row.get("role") == "declaration" and row.get("syntaxGraphNodeId") in by_node
+        }
+        if len(targets) == 1:
+            claims[next(iter(targets))].append(entry)
+    aliases: dict[str, str] = {}
+    for target, observations in claims.items():
+        identities = {
+            (row.get("analysisContextId", ""), row.get("symbolId", "")) for row in observations
+        }
+        if len(identities) != 1 or any(row.get("correspondenceCandidates") for row in observations):
+            continue
+        canonical = str(by_node[target]["entryId"])
+        aliases.update((str(row["entryId"]), canonical) for row in observations)
+    return aliases
 
 
 # 优先使用显式调用位置或源码范围，再兼容旧字符串位置。
@@ -349,6 +373,7 @@ def _collect_entries(
                 "graphNodeId": nid,
                 "analysisContextId": node.get("analysis_context_id", node.get("context_id", "")),
                 "correspondences": list(node.get("correspondences") or []),
+                "correspondenceCandidates": list(node.get("correspondence_candidates") or []),
                 "symbol": symbol,
                 "language": capability.language,
                 "symbolId": node.get("symbol_id") or node.get("semantic_id") or symbol,
@@ -356,6 +381,7 @@ def _collect_entries(
                 "declarationName": name.rsplit(".", 1)[-1].rsplit("::", 1)[-1],
                 "sourceRole": capability.role,
                 "signature": signature,
+                "signatureOmittedCharacters": node.get("signatureOmittedCharacters", 0),
                 "displayName": str(api or node.get("display_name") or node.get("api") or label),
                 "route": route
                 or next((item["identity"] for item in contracts if item["kind"] == "http"), ""),
@@ -363,6 +389,9 @@ def _collect_entries(
                 "contracts": contracts,
                 "decorators": node.get("decorators", []),
                 "comment": comment,
+                "objectFacts": dict(node.get("objectFacts") or {}),
+                "owner": owner,
+                "qualifiedName": str(node.get("qualified_name") or ""),
                 "annotations": annotations,
                 "location": {
                     **location,
@@ -546,6 +575,11 @@ def _extend_extraction_gaps(
             {
                 "path": relative,
                 "reasonCode": str(diagnostic.get("code") or "machine.facts.extraction-diagnostic"),
+                **{
+                    key: diagnostic[key]
+                    for key in ("provider", "buildUnitId", "subject", "contextId", "nodeId")
+                    if key in diagnostic
+                },
             }
         )
     if extraction.get("analysisCompleteness") == "partial" or any(

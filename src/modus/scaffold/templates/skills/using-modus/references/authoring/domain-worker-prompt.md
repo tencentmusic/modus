@@ -1,67 +1,52 @@
-<!--
-本模板与并行协议共同定义委托边界，维护时成对核对。
-输入包必须足够独立执行，不能依赖根作者未传递的上下文。
-占位符是待填事实，不是默认推断。
-共享文件与业务人工区不归领域工作者拥有。
-交接摘要用于验收导航，实际正文仍是最终检查对象。
--->
+# Domain worker 固定委托合同
 
-# 领域工作者委托契约
+仅在用户已授权按 Domain 委派、范围已确认且正文所有权不重叠时使用。本文件就是 worker 的公共行为指令，根作者不能为每个域重新概括或删减规则。各域差异只来自下面的事实输入包；本文与 [K2](stages/k2-plan.md)、[K3](stages/k3-evidence.md)、[K4](stages/k4-domain.md)及共享细则一起交付。
 
-只有用户已经授权按 Domain 并行，且根作者确认目标 Domain 与其他正在写入的 Domain 没有正文所有权重叠时，才使用本合同。根作者为每个 worker 生成一份完整、可独立执行的任务；不得只发送“把这个域写详细一点”或让 worker 自行重做 Scope。
+## 根作者填写的事实输入包
 
-## 必填输入包
+每次委派前，在唯一执行卡正文的本域计划中保存下列输入和**实际发送的完整任务文本**，使用户可检查，恢复也可复用。更新时原位保留当前有效版本，不新增 prompt 文件、receipt 或 schema。缺少会影响边界、事实或验收的信息时先补齐，未知项写具体原因，不能让 worker 自行猜测。
 
-委托前填充下列事实，缺一项就留在根线程补齐：
+| 输入 | 必须具体到 |
+| --- | --- |
+| 身份与边界 | 仓库/成员、Domain 稳定 ID、全部 Module ID/目标语言名称、业务范围及排除项 |
+| 表达与运行形态 | 目标语言、Surface、构建单元/语言、用户额外交付要求 |
+| 执行位置 | 原卡实际路径、本域章节、当前 K 阶段、条目进度与最早未完成动作 |
+| 证据会话 | 双摘要或不可用原因、逐 Module 知识 ID → 实际请求对象/selector、packet requestedScope、相关记录/缺口及消费落点 |
+| 文件所有权 | 精确允许写入路径、写前哈希、已验收版本、人工/共享/其他域保护路径 |
+| 来源与依赖 | 已有正文、用户材料、相关约束、实际跨域主定义路径/证据 |
+| 协作基线 | 已接受标识、本域每条输入/输出交接、术语与状态所有者、完成/恢复责任、未决问题 |
+| 内容与验收计划 | 全部目标页、接口/字段/规则/场景清单、案例/visual 决定、已验收/未验收与待预览位置 |
+| 合同位置 | 本文件、K2/K3/K4、上下文、跨域、框架、发布合同的实际可读路径 |
 
-- Domain 稳定 ID、业务边界、目标自然语言、Surface、构建单元与实现语言；
-- canonical 写入根 `modus/knowledge/domain/<slug>/`，以及完整 Module 稳定 ID/中文任务名；
-- 每个 Module 独立的 candidate/capability/path/symbol selector 与预期 `requestedScope`；
-- 固定 `bundleDigest`、`baselineDigest`，或机器层不可用的明确原因；
-- 读时哈希、受保护的 `references/business/**`、共享文件和禁止写入路径；
-- 当前 visual 决定、读者问题、机制触发、目标文件和未闭合证据；
-- 必读的证据、框架、产物、图文、发布合同及本委托合同路径。
+## 固定发送文本
 
-## 委托模板
-
-根作者把方括号占位符替换为当前事实后再发送；不要删除验收与禁止项。
+只替换方括号中的定位信息，不临时改写质量要求；必要的任务差异写入事实输入包。不要仅发送域名，也不要把整段父对话或无关域源码作为输入。
 
 ```text
-你是 Domain `[domain-id]` 的唯一正文作者。完整负责本域六专题、全部 Module、Domain 路由、图表决定、域级回读和 handoff；不要继续委派本域正文。
-
-目标与边界
-- 业务边界：[boundary]
-- 目标语言 / Surface / 构建单元 / 语言：[profile]
-- 唯一允许写入：[domain-root]/SKILL.md 与 [domain-root]/references/** 中的生成正文
-- 禁止写入：references/business/**、其他 Domain、scope-confirmation.md、根概览、Team Standard、源码、Git
-- 读时哈希与保护路径：[hashes-and-protected-paths]
-
-固定证据会话
-- bundleDigest：[bundle-digest-or-unavailable-reason]
-- baselineDigest：[baseline-digest-or-unavailable-reason]
-- Module 与 selector：[complete-module-selector-map]
-
-必须执行
-1. 完整读取：[required-contract-paths]。
-2. 按 Module 逐个请求 module-authoring context，并核对 requestedScope 必须等于 `module:[domain-id]/[module-id]`。独立 Module 不得使用整域宽请求替代；失败、空结果或 partial 时回当前源码、配置、SQL、迁移、测试和运行证据定向补查，并在 handoff 说明 fallback。
-3. 先按真实任务闭合触发、输入、判定、权威写入、返回/异步交接、完成、失败残留、恢复和验证，再把同一事实投影到六专题与 Module；不要为不同文件重复扫描同一链路。
-4. 正文写成可独立阅读的工程手册，不是证据目录。仓库源码路径和行号只写入目标文件 frontmatter 的少量 `anchors.locations`；正文不得出现 `path#L`、完整源码路径或“证据”清单。移除 frontmatter 后，正文仍须让新人复述任务、贡献者安全修改、维护者定位失败与恢复。
-5. 每个非平凡 Module 使用真实场景 H3，解释独有字段、分支、受理/完成、失败残留、恢复和修改验证。六专题逐项定义契约、对象、规则、状态、协作和资源，不得只列接口、类、枚举、表或中间件。
-6. 证据闭合后重新评估 [visual-decisions]。异步交接、持久状态、多条件决策、对象映射和资源生命周期分别登记 readerQuestion、mechanism、kind、target；一张总览图不能豁免独立机制。图表使用业务名称，正文说明方向、责任、完成、失败与恢复。
-7. 用本域源码 selector 执行 coverage-audit；不得用 modus/knowledge/**。no-match、空结果或 partial 只能补证或报告缺口，不能宣称 reviewed。
-8. 运行本域机械校验，回读实际文件。预计无法保持当前深度时停在 Domain 边界并如实 handoff，不得压缩剩余 Module。
-
-handoff 必须返回
-- 实际写入、未写、冲突与保护文件；
-- 每个 Module 的 requestedScope、selector、证据模式、触发/判定/权威写入/完成/失败恢复/验证摘要及缺口；
-- 六专题覆盖与每项 visual 决定；
-- coverage-audit 的源码范围、结果和本域 verify 结果；
-- 三类读者回读、跨域调用、事实所有者、术语和完成信号；
-- 建议根作者写入执行卡的 Module evidence、status、Domain coverage、visual 与 outcome 字段。
-
-不要把 verify clean 当作正文质量证明，不要修改执行卡或共享产物。完成 handoff 后等待根作者验收。
+你是 [domain-id] 的唯一正文作者，不得继续委派。
+先实际读取唯一执行卡 [execution-card-path]，定位 [domain-entry] 的事实输入包与原进度；再完整读取固定委托合同 [this-contract-path] 并执行它。输入包定位为 [input-section]，已接受协作基线为 [shared-baseline-id]，当前阶段与最早未完成动作是 [stage-and-next-action]。
+本文只是定位指令，不能替代读卡、证据、相关正文及共享细则。执行卡、根概览、Team Standard、business、其他域、源码和 Git 不属于你的写入范围。发现卡片/实际文件/共享基线不一致先返回根作者核对，不能猜测、重放写入或缩减范围。
 ```
 
-## 根作者校准
+## worker 必须执行
 
-首波选择一个复杂域和一个普通或证据较薄域，并分别发送完整模板。根作者必须读取实际文件而非只看 handoff，校准正文无源码路径、场景深度、六专题主定义、解释型图表与失败恢复；不合格就定向退回原 worker 并修正后续输入包。首波通过前不批量派发剩余 Domain。
+1. 按[上下文保存与恢复](context-continuity.md)读卡 → 本域证据 → 相关正文/跨域主定义 → 完整适用规范，再从最早未完成动作继续。开始或上下文丢失时实际恢复；同一作者切域、工具中断或取消后仍持有有效内容时，按该合同定向补读，不重复加载。任务消息或摘要不能替代丢失的证据。
+2. 执行 [K2](stages/k2-plan.md)、[K3](stages/k3-evidence.md)、[K4](stages/k4-domain.md)中当前域的全部适用动作与必读细则，遵守[初始化质量要求](framework/index.md#初始化质量要求)。不重跑 build、不重做 Scope，不自行新增/拆并/改名 Domain/Module。
+3. 只写被分配域的生成路由与 `references/**`，保护 `references/business/**`。按 CAS 安全写入，一个事实一个主定义；完整负责本域六专题、所有 Module、案例、图表和逐篇验收，不将域内工作再次拆给其他作者。
+4. 逐 Module 精确取证，逐接口/字段/规则/场景对账；按[并行交接规则](parallel-domain-authoring.md#按依赖分波)报告增量进度并继续下一单元，仅在该规则规定的边界等待。上下文容量不足时切小下一单元，不把剩余模块压成摘要。
+5. 按[跨域合同](cross-domain.md)实际读取相关交接和主定义。新增关系/冲突立即返回根作者；只暂停受影响结论，不修改其他域。收到基线变化后重读受影响事实，更新对应页、图、案例和回读结果。
+6. 按 K4 完成源码 coverage、逐篇事实与阅读检查、实际整页/逐图预览、本域 verify。首个有图页面即验证渲染能力；没有执行的检查、工具不可用的预览不能报通过。独立读者由根作者在授权范围组织，本 worker 不自行委派。
+
+## 每次 handoff
+
+通过任务消息返回本次变化及其定位，根作者合并到原卡；已保存且未变化的输入和事实引用原位置即可，不每次重发完整输入包或验收历史。域级最终交接覆盖全部目标和未完成项。不新建回执，不直接改卡或把自己的完成声明当成 reviewed：
+
+- 实际输入双摘要、逐 Module 知识 ID 与机器请求映射、已读记录/源码和正文落点、反证/缺口/省略处置、使用的协作基线标识；
+- 写入、未写、冲突/保护文件及版本；当前 K/页/条目、最近完成检查和下一动作；
+- 逐接口、对象字段、规则与场景的清单/详情落点，触发、判定、权威写入、完成与恢复证据，以及具名缺口；
+- 本域所有跨域输入/输出交接、事实主定义、消费者、发现的冲突和建议更新范围；
+- visual 决定、案例落点、coverage 的源码范围/结果、verify 结果；
+- 每篇读取范围、验收版本、事实/跨页对账、编辑结果、已预览/未预览章节、逐图事实/渲染/可读性及待修项；
+- 建议根作者更新的现有 evidence/status/coverage/visual/outcome，区分作者自查与真正的独立读者反馈。
+
+handoff 只提供验收导航。根作者必须依[并行协议](parallel-domain-authoring.md)读取实际文件、核对共享基线与全量回读范围，再决定状态和下一波任务。

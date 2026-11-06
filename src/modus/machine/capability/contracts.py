@@ -144,7 +144,11 @@ class CapabilitySlice:
     omitted_counts: dict[str, int] = field(default_factory=dict)
     resolution: Resolution = Resolution.UNRESOLVED
     receipts: tuple[CoverageReceipt, ...] = ()
+
     expansion_handles: tuple[dict[str, Any], ...] = ()
+    # N4 到 N5 的内部关联见证，保留代表路径采样前实际访问的声明。
+    # 不作为穷举覆盖证明，也不增加公开能力切片的线协议字段。
+    observed_entries: tuple[PathStep, ...] = ()
 
     def resolution_is_consistent(self) -> bool:
         """Check the monotone-degradation invariant for this slice."""
@@ -186,6 +190,7 @@ class CapabilityModel:
     seed_count: int = 0
     uncovered_seeds: tuple[str, ...] = ()
     receipts: tuple[CoverageReceipt, ...] = ()
+    seed_inventory: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -193,6 +198,7 @@ class CapabilityModel:
             "slices": [item.to_dict() for item in self.slices],
             "seedCount": self.seed_count,
             "uncoveredSeeds": list(self.uncovered_seeds),
+            "seedInventory": [dict(item) for item in self.seed_inventory],
             "receipts": [receipt.to_dict() for receipt in self.receipts],
         }
 

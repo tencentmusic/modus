@@ -11,14 +11,17 @@ compare-and-swap knowledge update.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import cast
 
+from ..knowledge_identity import KnowledgePathIdentity
 from ..knowledge_reader import BoundKnowledgeReadError, read_bound_regular_text
 from ..paths import ModusPaths
-from ..scope_models import ModuleMeta
+from ..retrieval.stages.discovery import discover_markdown_files
+from ..scope_models import SourceLocation
+from ..skillmd import split_frontmatter
+from ..source_anchors import check_location, document_locations, source_declarations
 from .models import JsonObject
 from .path_scope import relative_paths
 
@@ -31,8 +34,8 @@ __all__ = ["inspect_knowledge_impact", "sync_knowledge"]
 
 
 @dataclass(frozen=True, slots=True)
-class _ModuleImpact:
-    """One module candidate plus any anchor losses requiring a decision."""
+class _DocumentImpact:
+    """一份知识文档及需要回读的源码关联。"""
 
     candidate: JsonObject | None
     anchor_reviews: tuple[JsonObject, ...] = ()
@@ -65,7 +68,7 @@ def inspect_knowledge_impact(
             return workspace_result
 
     diagnostics: list[JsonObject] = []
-    candidates, anchor_reviews = _candidate_modules(
+    candidates, anchor_reviews = _candidate_documents(
         paths,
         changed,
         selected_targets,
@@ -159,132 +162,153 @@ def _delegate_workspace_if_needed(
     )
 
 
-# 候选按文档路径去重，显式非模块目标仍保留而不捏造模块归属。
-def _candidate_modules(
+# 使用现有知识发现与身份规则；专题与模块共享锚点语义，不新增持久索引。
+def _candidate_documents(
     paths: ModusPaths,
     changed: Sequence[str],
     targets: Sequence[str],
     *,
-    diagnostics: list[JsonObject] | None = None,
+    diagnostics: list[JsonObject],
 ) -> tuple[list[JsonObject], list[JsonObject]]:
-    from .module_meta import list_modules
+    from .module_meta import load_module
 
     explicit_targets = set(targets)
     changed_paths = set(changed)
-    modules = list_modules(paths, diagnostics=diagnostics)
     source_cache: dict[str, list[str] | None] = {}
-
+    declaration_cache: dict[str, list[JsonObject] | None] = {}
     candidates: dict[str, JsonObject] = {}
     anchor_reviews: list[JsonObject] = []
-    for metadata in modules:
-        impact = _module_impact(
+    for path in discover_markdown_files(paths, "project", scan_issues=diagnostics):
+        document = paths.relative(path)
+        identity = KnowledgePathIdentity.classify(paths, document)
+        if identity is None:
+            continue
+        try:
+            if identity.module is not None and identity.domain is not None:
+                # 保留模块的物理身份检查，文件头不能改写业务归属。
+                load_module(paths, identity.domain, identity.module, diagnostics=diagnostics)
+            text = read_bound_regular_text(paths.root, path, max_bytes=_MAX_KNOWLEDGE_BYTES)
+        except (BoundKnowledgeReadError, OSError, ValueError) as exc:
+            diagnostics.append(
+                {"path": document, "kind": "knowledge-unavailable", "reason": str(exc)}
+            )
+            continue
+        locations, issues = document_locations(paths, path, text)
+        diagnostics.extend(issues)
+        frontmatter, _ = split_frontmatter(text)
+        anchors = frontmatter.get("anchors")
+        support_paths = anchors.get("paths", []) if isinstance(anchors, dict) else []
+        if not isinstance(support_paths, list) or any(
+            not isinstance(item, str) for item in support_paths
+        ):
+            diagnostics.append(
+                {
+                    "path": document,
+                    "kind": "anchor_metadata_invalid",
+                    "reason": "anchors.paths 必须为路径列表",
+                }
+            )
+            support_paths = []
+        impact = _document_impact(
             paths,
-            metadata,
+            document,
+            str(identity.scope_ref.value) if identity.module and identity.scope_ref else None,
+            locations,
+            support_paths,
             changed_paths=changed_paths,
             explicit_targets=explicit_targets,
             source_cache=source_cache,
+            declaration_cache=declaration_cache,
         )
-        if impact.candidate is None:
-            continue
-        module_path = cast(str, impact.candidate["path"])
-        candidates[module_path] = impact.candidate
-        anchor_reviews.extend(impact.anchor_reviews)
+        if impact.candidate is not None:
+            candidates[document] = impact.candidate
+            anchor_reviews.extend(impact.anchor_reviews)
 
-    # An explicit non-Module document remains visible without inventing
-    # business ownership for it.
     for target in targets:
         candidates.setdefault(target, _explicit_candidate(target))
     return [candidates[key] for key in sorted(candidates)], anchor_reviews
 
 
-# 路径命中、符号缺失和显式选择分别保留原因，置信度可追溯。
-def _module_impact(
+def _document_impact(
     paths: ModusPaths,
-    metadata: ModuleMeta,
+    document: str,
+    module_id: str | None,
+    locations: Sequence[SourceLocation],
+    support_paths: Sequence[str],
     *,
     changed_paths: set[str],
     explicit_targets: set[str],
     source_cache: dict[str, list[str] | None],
-) -> _ModuleImpact:
-    module_path = _module_path(paths, metadata)
-    matched_paths = sorted(
-        {location.path for location in metadata.anchor_locations if location.path in changed_paths}
-    )
-    matched_symbols: list[JsonObject] = []
-    lost_anchors: list[JsonObject] = []
-    for location in metadata.anchor_locations:
-        if location.path not in changed_paths and module_path not in explicit_targets:
-            continue
-        loss = _anchor_loss(paths, location.path, location.symbol, source_cache)
-        if loss is None:
-            continue
-        record: JsonObject = {"path": location.path, "anchorSymbol": location.symbol, **loss}
-        matched_symbols.append(record)
-        lost_anchors.append(record)
+    declaration_cache: dict[str, list[JsonObject] | None],
+) -> _DocumentImpact:
+    location_paths = {location.path for location in locations} & changed_paths
+    file_paths = set(support_paths) & changed_paths
+    explicitly_selected = document in explicit_targets
+    if not explicitly_selected and not location_paths and not file_paths:
+        return _DocumentImpact(candidate=None)
 
-    explicitly_selected = module_path in explicit_targets
-    if not explicitly_selected and not matched_paths and not matched_symbols:
-        return _ModuleImpact(candidate=None)
+    reviews: list[JsonObject] = []
+    for location in locations:
+        if location.path not in changed_paths and not explicitly_selected:
+            continue
+        if location.path not in source_cache:
+            source_cache[location.path] = _read_source_lines(paths, location.path)
+        lines = source_cache[location.path]
+        if lines is None:
+            review: JsonObject = {
+                "disposition": "anchor-symbol-missing",
+                "detail": "源码缺失或不可读，需核对当前路径",
+            }
+        else:
+            if location.path not in declaration_cache:
+                declaration_cache[location.path] = source_declarations(location.path, lines)
+            check = check_location(location, declaration_cache[location.path])
+            if check.finding == "current":
+                continue
+            review = {
+                "disposition": check.finding.replace("_", "-")
+                if check.finding.startswith("anchor_")
+                else "anchor-" + check.finding.replace("_", "-"),
+                "detail": check.detail,
+            }
+            if check.start_line is not None:
+                review["actualLine"] = check.start_line
+            if check.candidate_lines:
+                review["candidateLines"] = list(check.candidate_lines[:10])
+        reviews.append({"path": location.path, "anchorSymbol": location.symbol, **review})
 
     reasons: list[str] = []
-    confidence = "path-only"
-    if matched_paths:
+    if location_paths:
         reasons.append("source-location-path")
-    if matched_symbols:
+    if file_paths:
+        reasons.append("source-path")
+    if reviews:
         reasons.append("source-location-symbol")
-        confidence = "symbol"
     if explicitly_selected:
         reasons.append("explicit-target")
-        confidence = "explicit"
-
-    candidate: JsonObject = {
-        "path": module_path,
-        "moduleId": str(metadata.module_id),
-        "confidence": confidence,
-        "reasons": reasons,
-        "matchedSourcePaths": matched_paths,
-        "matchedSymbols": matched_symbols,
-    }
-    reviews = tuple(
-        {
-            "moduleId": str(metadata.module_id),
-            "document": module_path,
-            **record,
-            "reason": (
-                "直接读取当前源码时已找不到锚定符号；请先核查文件，再修订文档或记录证据缺口"
-            ),
-        }
-        for record in lost_anchors
+    return _DocumentImpact(
+        candidate={
+            "path": document,
+            "moduleId": module_id,
+            "confidence": "explicit"
+            if explicitly_selected
+            else "symbol"
+            if reviews
+            else "path-only",
+            "reasons": reasons,
+            "matchedSourcePaths": sorted(location_paths | file_paths),
+            "matchedSymbols": reviews,
+        },
+        anchor_reviews=tuple(
+            {
+                "moduleId": module_id,
+                "document": document,
+                **review,
+                "reason": "源码关联需要回读；核对当前声明、正文及文件头后再判断同步完成",
+            }
+            for review in reviews
+        ),
     )
-    return _ModuleImpact(candidate=candidate, anchor_reviews=reviews)
-
-
-# 直接检查当前源码；行号移动但符号仍存在时不判为丢失。
-def _anchor_loss(
-    paths: ModusPaths,
-    relative_path: str,
-    symbol: str,
-    source_cache: dict[str, list[str] | None],
-) -> JsonObject | None:
-    """Report an anchor as lost only on direct evidence from current source.
-
-    This mirrors the mechanical, script-first check in
-    ``modus knowledge verify-anchors``: no persisted analysis diff is consulted, so
-    the verdict is exactly as current as the checked-out working tree. A
-    missing file or an identifier stem absent from every line is reported as
-    ``anchor-symbol-missing``; the anchor's own claimed line is irrelevant
-    here, because moved-but-still-present symbols are drift, not loss, and are
-    already handled by ``verify-anchors --fix``.
-    """
-    if relative_path not in source_cache:
-        source_cache[relative_path] = _read_source_lines(paths, relative_path)
-    source_lines = source_cache[relative_path]
-    if source_lines is None:
-        return {"disposition": "anchor-symbol-missing", "detail": "文件缺失"}
-    stem = _identifier_stem(symbol)
-    if stem and _stem_present(source_lines, stem):
-        return None
-    return {"disposition": "anchor-symbol-missing", "detail": "文件中未找到符号"}
 
 
 # 统一读取边界和大小上限，单次检查共享源码缓存。
@@ -295,19 +319,6 @@ def _read_source_lines(paths: ModusPaths, relative_path: str) -> list[str] | Non
         ).splitlines()
     except (BoundKnowledgeReadError, OSError, ValueError):
         return None
-
-
-def _identifier_stem(symbol: str) -> str:
-    """The searchable identifier inside an authored anchor symbol."""
-    cleaned = symbol.strip().strip("()").lstrip(".")
-    cleaned = cleaned.split("(", 1)[0]
-    return cleaned.rsplit(".", 1)[-1].rsplit("#", 1)[-1].strip()
-
-
-# 按标识符边界匹配，避免短名称误命中更长的无关符号。
-def _stem_present(source_lines: list[str], stem: str) -> bool:
-    pattern = re.compile(rf"(?<![\w]){re.escape(stem)}(?![\w])")
-    return any(pattern.search(line) for line in source_lines)
 
 
 # 候选目标不可读或缺失时报告冲突，不能悄悄创建替代文档。
@@ -337,10 +348,6 @@ def _read(paths: ModusPaths, relative: str) -> str | None:
         if exc.kind == "missing":
             return None
         raise
-
-
-def _module_path(paths: ModusPaths, metadata: ModuleMeta) -> str:
-    return paths.relative(paths.module(metadata.module_id.domain, metadata.module_id.module))
 
 
 # 显式目标代表用户选择，不推断额外的源码匹配证据。

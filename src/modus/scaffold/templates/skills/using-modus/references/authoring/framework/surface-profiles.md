@@ -18,4 +18,6 @@ Surface 描述真实运行入口，是正文适配轴，不是目录模板。Mod
 | `plugin` | 宿主发现、注册、能力协商、隔离、错误传播和卸载 | 宿主时序、插件生命周期、协商流程 |
 | `generic` | 只表达已核实的中性入口、状态、协作和资源 | 由事实决定 |
 
+规范选择可复用这些候选，但有自己的适用条件；mobile/android/ios、desktop、SSR 等更细运行边界按[工程类型](../../../../modus-init/references/constraint-profiles/engineering-types.md)记录在原卡和规则范围，不因缺少机器 Surface 值强套 backend。
+
 Surface 不能改变稳定目录或完成定义。语言适配只改变取证方法；正文自然语言只改变表达。三者始终正交。

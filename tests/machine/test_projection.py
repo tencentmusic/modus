@@ -117,6 +117,7 @@ def test_structural_signal_totals_are_not_smeared_onto_one_capability() -> None:
                     "kind": "entry",
                     "evidenceKind": "external-http",
                     "symbol": "OrdersController.create",
+                    "entryId": "entry-orders",
                 }
             ],
             "src/support.py": [
@@ -124,6 +125,7 @@ def test_structural_signal_totals_are_not_smeared_onto_one_capability() -> None:
                     "kind": "effect",
                     "evidenceKind": "authoritative-write",
                     "symbol": "Support.run",
+                    "entryId": "entry-support",
                 }
             ],
         },
@@ -160,3 +162,78 @@ def test_proposals_prioritize_explicit_triggers_over_public_exports() -> None:
     )
 
     assert projection.proposals[0].capability_ids == ("cap-endpoint",)
+
+
+def test_shared_declaration_keeps_both_capability_owners() -> None:
+    from modus.machine.capability.contracts import PathStep
+    from modus.machine.projection.memberships import entry_memberships
+
+    shared = PathStep("shared", "Shared.run", {"path": "shared.py"})
+    slices = tuple(
+        CapabilitySlice(f"cap-{name}", name, {}, {"entryId": name}, observed_entries=(shared,))
+        for name in ("orders", "payments")
+    )
+    model = CapabilityModel(slices)
+    projection = build_proposals(model, baseline_digest="a" * 64)
+    scope = capability_first_scope({"candidates": []}, model, projection)
+    memberships = entry_memberships(scope["candidates"], model)
+    assert memberships["shared"].capability_ids == ("cap-orders", "cap-payments")
+    assert len(memberships["shared"].candidate_ids) == 2
+
+
+def test_signal_outside_or_between_ambiguous_declarations_stays_unbound() -> None:
+    from modus.config import AuthoringRule, RuleEmit, RuleMatch
+    from modus.machine.facts.rule_signals import project_authoring_records
+
+    entries = [
+        {"entryId": name, "symbol": name, "location": {"startLine": 2, "endLine": 2}}
+        for name in ("first", "second")
+    ]
+    rows = project_authoring_records(
+        "sample.py",
+        "save()\nsave()\nsave()\n",
+        (
+            AuthoringRule(
+                "test.write", RuleMatch(r"save"), RuleEmit("effect", "authoritative-write")
+            ),
+        ),
+        entries=entries,
+    )
+    assert len(rows) == 3
+    assert all("entryId" not in row and "symbol" not in row for row in rows)
+
+
+def test_signals_bind_corresponding_declarations_but_preserve_context_ambiguity() -> None:
+    from modus.config import AuthoringRule, RuleEmit, RuleMatch
+    from modus.machine.facts.rule_signals import project_authoring_records
+
+    syntax = {
+        "entryId": "syntax-entry",
+        "graphNodeId": "syntax",
+        "symbol": "Service.save",
+        "location": {"startLine": 1, "endLine": 1},
+    }
+    semantic = {
+        **syntax,
+        "entryId": "compiler-entry",
+        "graphNodeId": "compiler",
+        "analysisContextId": "main",
+        "symbolId": "Service#save()",
+        "correspondences": [{"role": "declaration", "syntaxGraphNodeId": "syntax"}],
+    }
+    rules = (
+        AuthoringRule("test.write", RuleMatch("save"), RuleEmit("effect", "authoritative-write")),
+    )
+
+    def signals(entries):
+        return project_authoring_records("Service.java", "save()", rules, entries=entries)
+
+    assert signals([syntax, semantic])[0]["entryId"] == "syntax-entry"
+    assert signals([semantic, syntax])[0]["entryId"] == "syntax-entry"
+    # 同声明的不同构建上下文、重载冲突、未确认对应不能随意挑一项。
+    for extra in (
+        {**semantic, "entryId": "other", "analysisContextId": "test"},
+        {**semantic, "entryId": "other", "symbolId": "Service#save(int)"},
+        {**semantic, "entryId": "other", "correspondences": []},
+    ):
+        assert "entryId" not in signals([syntax, semantic, extra])[0]

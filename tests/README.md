@@ -12,11 +12,15 @@
 | --- | --- |
 | `test_cli_boundaries.py` | 终端隔离、分析依赖延迟加载、输入上限与运行错误 |
 | `test_cli_localization.py` | 中文帮助、参数错误、交互、输出流及协议稳定性 |
-| `test_project_lifecycle.py`、`test_install_safety.py`、`test_workspace_lifecycle.py` | 安装、所有权、回滚、并发与工作区成员只读 |
+| `test_project_lifecycle.py`、`test_install_safety.py`、`test_workspace_lifecycle.py` | 安装、五平台工作流升级、所有权、回滚、并发与工作区成员只读 |
 | `test_analysis_pipeline.py`、`test_evidence_selection.py`、`machine/` | 公开分析生命周期、分层、模式、降级与存储 |
-| `test_knowledge_retrieval.py`、`test_knowledge_update.py`、`test_verify_knowledge.py` | 检索边界、哈希条件写入与客观知识完整性 |
-| `test_platforms.py`、`test_hooks.py`、`test_sensitive_literals.py` | 宿主扩展与安全输出 |
-| `test_scaffold.py` | 随包模板目录 |
+| `machine/test_mobile_adapters.py`、`machine/test_mobile_integration.py` | Kotlin/Swift/Objective-C/C++ 结构、混编坐标、保守绑定、发现与缺工具降级 |
+| `test_knowledge_identity.py`、`test_knowledge_retrieval.py`、`test_knowledge_update.py`、`test_verify_knowledge.py` | 路径所有权、检索边界、哈希条件写入与客观知识完整性 |
+| `test_platforms.py`、`test_legacy_hook_cleanup.py`、`test_sensitive_literals.py` | 宿主扩展、旧安装迁移与安全输出 |
+| `test_dsh.py`、[DSH 插件测试](../integrations/dsh/architecture.md#贡献与验证) | 项目投影与用户资产保护、宿主执行边界、CLI 报告与隔离分发 |
+| `test_scaffold.py` | 模板路径、元数据、支持文件可达性与写入前预检 |
+| `test_documented_cli.py` | 仓库指引、开发 Skill、维护文档与模板中的链接、锚点和真实 CLI 示例 |
+| `test_team_standard_examples.py`、[编码演练](fixtures/team_standard/README.md) | Java/TS 真实编译与编码行为；Kotlin、混合/未知技术、规则冲突的人工回读边界 |
 | `test_filesystem_portability.py` | 无 openat 时的读取与退役、软链/重解析点拒绝、替换冲突、Windows 编码与换行摘要 |
 | `test_release_smoke.py`、`scripts/wheel-smoke.sh` | 拒绝损坏归档及真实产物验收 |
 
@@ -31,12 +35,4 @@
 5. 夹具先保持局部，只有多模块共享时才抽取；不要用通用辅助函数隐藏产品工作流。
 6. 语言回归检查用户看见的中文语义，同时验证原命令、JSON 键与状态码未被翻译。
 
-完整验证：
-
-```text
-uv run --locked --extra test ruff check src tests scripts
-uv run --locked --extra test ruff format --check src tests scripts
-uv run --locked --extra test mypy
-uv run --locked --extra test pytest -q
-./scripts/wheel-smoke.sh
-```
+完整验证命令见 [贡献指南](../CONTRIBUTING.md#本地开发)。Skill 的结构检查与行为验收按 [Skill 编写规范](../docs/skill-authoring.md#修改与验证)分别报告；模型评测不进入普通确定性测试，也不能由格式检查替代。

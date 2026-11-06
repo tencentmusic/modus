@@ -8,11 +8,9 @@ installation lifecycle.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
-
-HookConfigFactory = Callable[[], dict[str, object]]
 
 
 class ProjectionConfigurationError(ValueError):
@@ -110,33 +108,17 @@ class InstructionFile:
 
 
 @dataclass(frozen=True, slots=True)
-class HookFile:
-    """A shared JSON hook container and the renderer for Modus' entry."""
-
-    path: str
-    template: str
-    render_config: HookConfigFactory
-
-    def __post_init__(self) -> None:
-        validate_relative_path(self.path, label="钩子文件路径")
-        validate_relative_path(self.template, label="钩子模板 ID")
-        if not callable(self.render_config):
-            raise TypeError("钩子配置渲染器必须可调用")
-
-
-@dataclass(frozen=True, slots=True)
 class PlatformLayout:
     """Declarative filesystem contract for one platform adapter.
 
     ``owned_file_prefixes`` only covers files Modus can delete outright.
-    Shared instruction and hook files have their own section/signature-based
-    ownership and are therefore intentionally modeled separately.
+    Shared instruction files have section-based ownership and are therefore
+    intentionally modeled separately.
     """
 
     skills_root: str
     owned_file_prefixes: tuple[str, ...]
     instructions: InstructionFile
-    hook: HookFile | None = None
     commands_root: str | None = None
 
     def __post_init__(self) -> None:

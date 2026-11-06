@@ -152,7 +152,9 @@ def _maybe_lift_rpc_invocation(
             or target_text,
             build_unit_id=caller_node.build_unit_id,
             language=target_node.language,
+            source_anchors=(call.call_site.to_dict(),) if call.call_site else (),
             attributes={
+                "sourceBasis": "relation",
                 "contractKey": contract_key,
                 "external": not bool(target_node.source_anchors),
             },
@@ -215,7 +217,9 @@ def _emit_resource_occurrences(
                 kind=kind,
                 qualified_name=resource_name,
                 build_unit_id=caller_node.build_unit_id,
+                source_anchors=(call.call_site.to_dict(),) if call.call_site else (),
                 attributes={
+                    "sourceBasis": "relation",
                     "framework": framework,
                     "dynamic": resource_name.startswith("dynamic-"),
                     "namespaceId": namespace,

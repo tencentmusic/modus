@@ -2,12 +2,48 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from typing import Any
 
-from .documents import canonical_json
+from .documents import canonical_json, matches_knowledge_need
 from .lexical import BM25Query, tokenize
-from .sections import is_rule_evidence
+
+
+def rank_source_locations(
+    records: list[dict[str, Any]], query: str
+) -> list[tuple[dict[str, Any], Any]]:
+    """优先问题匹配及命中正文提及的声明，文件头顺序不代表相关性。"""
+    query_terms = tokenize(query)
+    ranked: list[tuple[tuple[int, int, int, int], dict[str, Any], Any]] = []
+    for record in records:
+        heading = str(record.get("heading") or "")
+        text = str(record.get("text") or "")
+        heading_relevance = sum(term in heading.casefold() for term in query_terms)
+        locations = record.get("sourceLocations") or []
+        for raw in locations if isinstance(locations, list) else [locations]:
+            score = (0, 0, 0, 0)
+            if isinstance(raw, dict):
+                symbol = str(raw.get("symbol") or "")
+                identity = (symbol + " " + str(raw.get("path") or "")).casefold()
+                # 小节可能只写类名（如任务入口），不一定重复 execute 等方法名。
+                names = [
+                    name for name in re.split(r"[.#]|::", symbol.split("(", 1)[0])[-2:] if name
+                ]
+                pattern = rf"(?<![\w$])(?:{'|'.join(re.escape(name) for name in names)})(?![\w$])"
+                in_heading = int(bool(names and re.search(pattern, heading)))
+                in_text = int(bool(names and re.search(pattern, text)))
+                score = (
+                    sum(term in identity for term in query_terms),
+                    heading_relevance if in_heading or in_text else 0,
+                    in_heading,
+                    in_text,
+                )
+            ranked.append((score, record, raw))
+    # 同分保留文档检索顺序；这里只给读取优先级，不声称小节与锚点精确绑定。
+    return [
+        (record, raw) for _, record, raw in sorted(ranked, key=lambda row: row[0], reverse=True)
+    ]
 
 
 # 显式范围是过滤边界，推断领域和模块只影响排序。
@@ -80,6 +116,19 @@ def search_index(
         route_scope = record.get("scope") or {}
         route_bonus = 0
         if route:
+            locations = record.get("sourceLocations") or []
+            if isinstance(locations, list) and any(
+                isinstance(location, dict)
+                and isinstance(location.get("path"), str)
+                and any(
+                    location["path"] == prefix
+                    or location["path"].startswith(prefix.rstrip("/") + "/")
+                    for prefix in route.get("paths") or []
+                    if not prefix.startswith(("modus/", ".modus/"))
+                )
+                for location in locations
+            ):
+                route_bonus += 5
             if route_scope.get("memberId") in set(route.get("members") or []):
                 route_bonus += 3
             if route_scope.get("domain") in set(route.get("domains") or []):
@@ -110,6 +159,13 @@ def search_index(
             rrf[evidence_id] += contribution
             signals[evidence_id][channel] = round(contribution, 8)
     by_id = {item["id"]: item for item in records}
+    # 场景链接可连接不同词汇；片段精确命中保留独立信号，不升级规则权威。
+    for record in records:
+        if record.get("navigationScore"):
+            # 整篇文件链接只给弱提示，不能让无关小节压过精确正文命中。
+            contribution = 1.0 / 61 if record.get("navigationTargeted") else 0.002
+            rrf[record["id"]] += contribution
+            signals[record["id"]]["navigationLink"] = contribution
     need_types = {
         "relationship": {"workspace-generated", "project-generated", "project-module"},
         "contract": {"workspace-generated", "project-generated", "project-module"},
@@ -121,9 +177,8 @@ def search_index(
             1
             for need in evidence_needs or []
             if (
-                is_rule_evidence(record)
-                if need == "business-rule"
-                else record.get("sourceType") in need_types.get(need, set())
+                matches_knowledge_need(need, record)
+                or record.get("sourceType") in need_types.get(need, set())
             )
         )
         if matched_needs:

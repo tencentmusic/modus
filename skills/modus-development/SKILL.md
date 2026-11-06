@@ -1,11 +1,13 @@
 ---
 name: modus-development
-description: 用于开发、评审、排障和解释 Modus 框架自身，以及基于其源码写文章、技术方案或分享材料。按项目概览、模块所有权、实现契约和验证入口渐进加载；以 modus-open 的 Python 版本为知识基线。普通业务项目使用 Modus 的任务应读取该项目的 using-modus。
+description: 开发、评审、排障或解释 Modus 框架自身，包括代码、Skill 工作流和维护文档，以及基于源码的技术写作。普通业务项目使用 Modus 时读取该项目的 using-modus。
 ---
 
 # Modus 开发与写作
 
 这是一套服务于 **Modus 框架自身** 的复合技能。一个入口连接全局认知、模块开发、测试发布和文章写作；模块指南按任务加载，不把整个参考目录一次性塞进上下文。
+
+在源码仓库中，先遵循 [仓库指引](../../AGENTS.md) 与 [贡献指南](../../CONTRIBUTING.md)。本技能负责定位和执行方法，不另存一套代码风格或质量规范。
 
 ## 先确定当前项目
 
@@ -17,7 +19,7 @@ python3.11 "$SKILL_DIR/scripts/inspect_repository.py" --root .
 
 它检查分支、HEAD、上游、本地修改、包版本与知识基线漂移，不联网、不写仓库、不调用已安装的 Modus。使用任一 Python 3.11+ 解释器，可按实际环境替换示例中的 `python3.11`。
 
-知识快照来自 `modus-open` / `49c51621f378a58d6724eedde4657d9505346d45`，分发包 `openmodus 0.0.4`。不同分支、版本或文件变化意味着相关指南需要回到当前实现核对；不要自动切分支、升级个人 CLI 或生成项目知识。
+诊断使用随技能携带的文件哈希基线提示源码变化；指南用于定位，当前实现与测试决定结论。保持用户选择的分支和工作区，不为匹配基线自动切分支、升级 CLI 或生成项目知识。
 
 先读 [全局概览](references/global-overview.md)，再按下表选择指南。已熟悉项目且任务明确时，可直接进入相关模块。
 
@@ -26,9 +28,10 @@ python3.11 "$SKILL_DIR/scripts/inspect_repository.py" --root .
 | 当前任务 | 读取 |
 | --- | --- |
 | 功能开发、修复、重构、源码评审 | [开发流程](references/development.md) + 对应模块 + [验证与发布](references/modules/quality-release.md) |
+| Skill 划分、description、指令与引用维护 | [Skill 编写规范](../../docs/skill-authoring.md) + [知识创作工作流](references/modules/authoring-templates.md) |
 | 帮助、参数、退出码、中文体验、个人包维护 | [CLI 与维护入口](references/modules/cli-maintenance.md) |
 | 接入、升级、卸载、清单、资产冲突、Git 保护 | [项目安装与所有权](references/modules/installation.md) |
-| CodeBuddy / Claude / Cursor / Codex 接入、启动钩子 | [平台与钩子](references/modules/platforms-hooks.md) |
+| CodeBuddy / Claude / Cursor / Codex / DSH 接入与运行时 | [平台与常驻指引](references/modules/platforms-hooks.md) |
 | 源码发现、冻结、解析、编译器、语言扩展、缓存命中 | [N1–N2：源码与观察](references/modules/machine-corpus-facts.md) |
 | 身份解析、调用关系、拓扑、入口到效果、能力遍历 | [N3–N4：解析与能力](references/modules/machine-resolution-capability.md) |
 | 范围候选、聚类建议、证据包、上下文、游标、摘要 | [N5–N6：投影与交付](references/modules/machine-projection-packet.md) |
@@ -38,7 +41,7 @@ python3.11 "$SKILL_DIR/scripts/inspect_repository.py" --root .
 | 多仓工作区、成员寻址、外层导航、隔离 | [工作区](references/modules/workspace.md) |
 | wheel、源码包、依赖、CI、测试选择 | [验证与发布](references/modules/quality-release.md) |
 | 文章、汇报、技术介绍、分享大纲、架构图 | [源码依据与写作](references/writing.md)；涉及的机制联读对应模块 |
-| 核对 iwiki、旧材料或本技能依据 | [来源与差异](references/sources.md) |
+| 核对实现依据、源码版本与验证范围 | [源码依据与版本核对](references/sources.md) |
 
 ## 最容易改错的边界
 

@@ -1,33 +1,20 @@
-"""Codex adapter: Agent Skills plus lifecycle hooks in ``.codex/hooks.json``.
-
-The official hook contract provides a stable session id to hook processes but
-no persistent environment-file channel for later CLI invocations. Consequently
-session continuation cannot auto-bind on Codex: an explicit existing binding or
-the deliberately narrow clear-session singleton recovery is required.
-"""
+"""Codex 接入：Agent Skills 与 AGENTS.md 常驻指引。"""
 
 from __future__ import annotations
 
-from ..hooks import bootstrap
-from ..precedence import MODUS_DISPATCHER_FALLBACK, USER_INVOKED_WORKFLOWS_SENTENCE
 from .base import Command, PlatformAdapter, Skill
-from .models import HookFile, InstructionFile, PlatformLayout
-from .rendering import render_skill_index
+from .models import InstructionFile, PlatformLayout
+from .rendering import render_agents_instructions
 
 _LAYOUT = PlatformLayout(
     skills_root=".agents/skills",
     owned_file_prefixes=(".agents/skills/",),
-    instructions=InstructionFile(path="AGENTS.md", marker="modus-codex"),
-    hook=HookFile(
-        path=".codex/hooks.json",
-        template="hooks/codex-hooks.json",
-        render_config=bootstrap.codex_hook_config,
-    ),
+    instructions=InstructionFile(path="AGENTS.md", marker="modus"),
 )
 
 
 class CodexAdapter(PlatformAdapter):
-    """Project Modus into Codex' standard Agent Skills and hook surfaces."""
+    """将 Modus 投影到 Codex 的技能与常驻指引。"""
 
     name = "codex"
     layout = _LAYOUT
@@ -37,5 +24,4 @@ class CodexAdapter(PlatformAdapter):
         skills: list[Skill],
         _commands: list[Command],
     ) -> str:
-        heading = f"## Modus\n\n{MODUS_DISPATCHER_FALLBACK} {USER_INVOKED_WORKFLOWS_SENTENCE}:"
-        return render_skill_index(skills, heading)
+        return render_agents_instructions(skills)

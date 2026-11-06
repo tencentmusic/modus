@@ -1,23 +1,33 @@
 ---
 name: modus-reinit
-description: 全面评审并重建知识快照，保留稳定业务身份及人工材料；只有明确选中的内容才允许修改。
+description: 用户请求全量复核或重建已有项目知识时使用，保留稳定 Domain/Module 身份及人工材料；局部事实更新使用 modus-update-knowledge。
 ---
 
 # modus-reinit
 
-全量复核已有正文时使用。共享[证据指南](../using-modus/references/authoring/evidence/index.md)、[生成框架](../using-modus/references/authoring/framework/index.md)与[发布合同](../using-modus/references/authoring/publication.md)；本文件只描述 reinit 差异。
+全量复核已有正文时使用，与 init 共用[六阶段入口](../using-modus/references/authoring/index.md)及全部质量细则；本文件只规定重建差异。
 
-## 先盘点，再证明变化
+## 先恢复，再判断变化
 
-完整读取现有正文与哈希，将目标归为 `unchanged`、`anchor-only`、`implementation-change`、`scope-change`、`content-repair`、疑似退役或人工正文。稳定身份和主定义默认复用；源码路径/符号移动只修锚点，正文布局变化不是 Scope 变化。
+盘点、构建或调查前，先读取并执行[开始或恢复](../using-modus/references/authoring/index.md#开始或恢复)。续作从原任务最早未完成动作继续；新一轮普通项目且身份可恢复时使用下述重建流程。没有可恢复的稳定 Domain/Module 身份时转 [modus-init](../modus-init/SKILL.md)，复用本轮盘点。
 
-`content-repair` 包括：通用模板段落替代真实场景、代表锚点替代事实、跨 Module 复制、完成/失败语义不清、复杂关系缺少能显著帮助理解的图表。真正满足读者任务且事实未变的正文保持 `unchanged` 并跳写。
+新一轮重建完整读取已确认范围的正文与哈希，以稳定身份 → 入口/对象责任 → 语义变化 → 结构变化 → 文件变化判断。目标归为 `unchanged`、`anchor-only`、`implementation-change`、`scope-change`、`content-repair`、疑似退役或人工正文。
 
-## 执行
+`content-repair` 包括简略条目、接口/字段缺漏、模板套话、复制内容、完成/失败不清、已核验的目标语言业务名称未应用、缺失[初始化质量要求](../using-modus/references/authoring/framework/index.md#初始化质量要求)规定的案例/图形，以及已观察到的阅读缺陷。文件存在不能证明 unchanged；准确且已满足质量要求的正文、图表保持原位并跳写。
 
-1. 单仓同步构建一次本轮证据并取得 `reinit-diff` context；失败立即回当前源码。按[机器证据合同](../using-modus/references/authoring/evidence/machine-packet.md)定向展开，不直接读取 bundle 内部文件，也不追求 cursor 耗尽。
-2. 按[Scope 建模](../using-modus/references/authoring/evidence/scope-modeling.md)以“稳定身份 → 入口/对象责任 → 语义变化 → 结构变化 → 文件变化”的顺序判断，把范围、句柄、读时哈希、精确 Domain/Module evidence/status、Domain coverage、outcome 与图表候选写入唯一 `schemaVersion: 2` 执行卡。只把新增、拆分、合并、移动、改名或已证明退役合并确认一次。默认串行；用户明确授权且存在多个互不重叠的受影响 Domain 时，加载[按 Domain 并行撰写](../using-modus/references/authoring/parallel-domain-authoring.md)并使用 [Domain worker 委托合同](../using-modus/references/authoring/domain-worker-prompt.md)，根作者继续独占执行卡和共享产物。
-3. 对每个变化或 `content-repair` Module 分别使用精确 selector 请求 `module-authoring` context，核对双摘要与 `requestedScope`；覆盖整域多个独立 Module 的宽请求无效。互不依赖的精确请求可以并发，随后汇总并去重当前 Domain 的源码路径/符号，再分批回读。请求失败、空结果或 partial 时回到当前方法体、配置、SQL 与测试补证，不得把类名、接口签名或文件首行锚点当作内容已经恢复。禁止为不同专题重复扫描同一链路，也不得并发写同一正文。按[场景闭合](../using-modus/references/authoring/evidence/scenario-closure.md)重新证明；在原主定义修订，不追加 changelog，不因模板变化批量重写或重画。
-4. 按完整 Domain 批次以“六专题主定义 → Module 场景 → Domain 路由”回读受影响范围。源码路径和行号迁移到各生成文档 frontmatter 的少量 `anchors.locations`，正文删除完整源码路径、`path#L` 和证据清单；修复目标是恢复完整任务、字段语义、关键分支、状态与错误恢复，而不是让文件重新拥有标题、锚点或相似篇幅。证据闭合后按[图文表达](../using-modus/references/authoring/framework/visual-expression.md)重新评估候选并更新唯一主图，导航表不替代解释性图。域级 `coverage-audit` 必须复用本域 candidate/capability/source path/symbol 范围，不能使用 `modus/knowledge/**`；no-match、空结果或 partial 只触发补证或明确缺口。把有效结果记录为 Domain coverage，完成三类读者回读后，由根作者读取实际文件并标记 `reviewed`。只有跨域方向、所有权、状态、条件、完成或恢复变化时才更新根概览；Team Standard 和已有 business 默认原字节保护，新增 Domain 使用 `modus knowledge seed-business --domain <slug> --json` 创建缺失索引。
-5. 结构变化先写新落点并通过语义回读，修复生成正文入链和导航，再按读时哈希删除旧生成文件。不得从符号消失、partial 或覆盖缺口直接推导退役。
-6. 全局语义回读后运行 `modus knowledge verify --publication --json`，CAS 发布并回读。publication 必须核对 `schemaVersion: 2` 执行卡、正文无源码路径、结构化锚点、逐 Module evidence、Domain coverage 和 visual 决定；`clean` 仍不是正文质量证明。大量同长度短文、没有真实场景、只有导航表、状态专题无转换或证据只落在文件首行时继续修订。不得提前删除执行卡，也不得在丢失后根据输出重建一张更小的“全部 reviewed”卡。只有全部确认目标达到终态且语义回读、实际 publication 与发布后回读都通过才清理执行卡；普通机械核验不能替代 publication。真实报告 unchanged、修订、删除、冲突与缺口。
+## 六个阶段入口与差异
+
+| 阶段 | 必须读取的入口 | reinit 差异 |
+| --- | --- | --- |
+| K1 | [范围建模](../using-modus/references/authoring/stages/k1-scope.md) | 构建本轮证据一次，使用 reinit-diff；复用身份，只合并确认真实结构变化 |
+| K2 | [创作计划](../using-modus/references/authoring/stages/k2-plan.md) | 全面盘点目标与保护内容，记录分类、写前哈希和跨域影响 |
+| K3 | [证据闭环](../using-modus/references/authoring/stages/k3-evidence.md) | 对变化/content-repair 模块精确取证；未变结论也须核对当前依据，不能沿用失效证据 |
+| K4 | [领域成稿](../using-modus/references/authoring/stages/k4-domain.md) | 原主定义修订，逐篇核对；不追加 changelog，不因模板措辞重排全库 |
+| K5 | [项目约束](../using-modus/references/authoring/stages/k5-constraints.md) | 复核规范适用性与偏差，默认保护 Team Standard；明确委托时才维护，缺失不自动补建 |
+| K6 | [系统概览与发布](../using-modus/references/authoring/stages/k6-publish.md) | 核对全部交接，按 K4/K5 的真实影响修订概览，新增域补 business 索引；全局验收及发布 |
+
+先做全局 K2，再逐域 K2 → K3 ↔ K4，最后 K5/K6。进入阶段确保已完整读取适用细则，仍完整有效的内容按上下文合同复用，逐域保留相同深度；未授权委派时由同一作者持续执行；仅明确授权后按[并行协议](../using-modus/references/authoring/parallel-domain-authoring.md)和固定委托合同执行。
+
+图表在参与者、方向、所有权、状态、条件、完成/恢复变化或阅读缺陷时更新；准确且满足要求的原图复用。结构迁移先写新落点、回读并修入链，再按原哈希删除旧生成文件；符号消失、partial 或锚点移动都不能单独证明退役。每次写入遵守 CAS，冲突只处理受影响目标。
+
+最后分别报告 unchanged、修订、删除、冲突、内容覆盖、机械核验、整页/逐图结果及缺口；语义 reviewed 或 clean 不代表未执行的预览通过。

@@ -1,7 +1,3 @@
-<!--
-本页只适配取证方法，领域身份、稳定路径与正文职责由共享框架维护。
--->
-
 # IaC 与声明式配置证据适配
 
 以 Terraform module、Kubernetes/Kustomize/Helm、Ansible role 或部署栈识别单元；从声明、plan、apply、发布和运维入口调查。核对 variable/output、resource dependency、state backend、Provider、secret 注入、环境隔离、漂移、回滚、销毁和验证。

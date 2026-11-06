@@ -53,6 +53,7 @@ class InputSnapshot:
     root: Path
     files: dict[str, FrozenSource]
     digest: str
+    dispositions: tuple[dict[str, str], ...] = ()
     _mirror: Any = field(default=None, init=False, repr=False)
     _observations: dict[str, dict[str, Any]] = field(default_factory=dict, init=False, repr=False)
     _extra_blobs: dict[str, FrozenSource] = field(default_factory=dict, init=False, repr=False)
@@ -95,12 +96,13 @@ class InputSnapshot:
                 atomic_write_text(target, raw.decode("utf-8"))
             files[path.relative_to(root).as_posix()] = FrozenSource(path, target, content_digest)
 
-        scan.source_files(root, on_read=accept)
+        dispositions: list[dict[str, str]] = []
+        scan.source_files(root, on_read=accept, on_disposition=dispositions.append)
         hashes = {path: value.digest for path, value in sorted(files.items())}
         value = hashlib.sha256(
             json.dumps(hashes, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
-        return cls(root, files, value)
+        return cls(root, files, value, tuple(dispositions))
 
     # 仓库内使用相对身份，显式外部依赖保留独立命名空间供后续可移植化。
     def _key(self, path: Path) -> tuple[str, str, str]:

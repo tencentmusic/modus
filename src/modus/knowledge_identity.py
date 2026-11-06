@@ -86,6 +86,21 @@ def _target_parts(paths: ModusPaths, target: str | Path) -> tuple[str, ...] | No
     return parts if _existing_path_chain_is_safe(root, parts) else None
 
 
+def _is_team_standard_tail(tail: tuple[str, ...]) -> bool:
+    # 新内容推荐一级专题；已有嵌套专题仍属于同一人工命名空间。
+    return tail == ("constraint", "team-standard.md") or (
+        len(tail) >= 3 and tail[:2] == ("constraint", "team-standard") and tail[-1].endswith(".md")
+    )
+
+
+def is_team_standard_path(target: str | Path) -> bool:
+    """识别入口及任意深度的 Markdown 专题，不检查磁盘或授予写入权限。"""
+    parts = _canonical_relative_parts(target)
+    return (
+        parts is not None and parts[:2] == _KNOWLEDGE_PREFIX and _is_team_standard_tail(parts[2:])
+    )
+
+
 def _scope(domain: str, module: str | None) -> ScopeRef | None:
     try:
         return (
@@ -138,10 +153,7 @@ class KnowledgePathIdentity:
     def _root_identity(cls, tail: tuple[str, ...]) -> KnowledgePathIdentity | None:
         if tail == ("architecture-overview.md",):
             return cls("architecture-overview", None, None, None, "machine")
-        if tail in {
-            ("constraint", "global-standard.md"),
-            ("constraint", "team-standard.md"),
-        }:
+        if tail == ("constraint", "global-standard.md") or _is_team_standard_tail(tail):
             return cls("constraint", None, None, None, "human")
         return None
 
@@ -215,4 +227,4 @@ class KnowledgePathIdentity:
         return workspace or cls._root_identity(tail) or cls._domain_identity(tail)
 
 
-__all__ = ["KnowledgePathIdentity", "OwnershipPlane", "PathKind"]
+__all__ = ["KnowledgePathIdentity", "OwnershipPlane", "PathKind", "is_team_standard_path"]

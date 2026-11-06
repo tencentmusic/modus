@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from pathlib import Path
+from threading import Event
 
 import pytest
 import yaml
+from typer.testing import CliRunner
 
 from modus import knowledge_write_session as session
+from modus.cli import app
 from modus.commands.seed_business import seed_domain_business
 from modus.knowledge_update import update_knowledge
 from modus.orchestrator import knowledge_sync
@@ -192,12 +197,55 @@ def test_write_conflict_defers_retirement_without_rolling_back_other_writes(tmp_
         {"deletions": [OLD, OLD], "expected_hashes": {OLD: _digest("old")}},
         {"deletions": [MODULE], "expected_hashes": {MODULE: _digest("old")}},
         {"allow_team_standard": "true"},
+        {"initialize_team_standard": "true"},
+        {"initialize_team_standard": True, "allow_team_standard": True},
     ],
 )
 def test_invalid_batch_is_rejected_before_any_write(tmp_path: Path, extra: dict) -> None:
     with pytest.raises(ValueError):
         update_knowledge(str(tmp_path), {MODULE: "# New\n"}, **extra)
     assert not (tmp_path / "modus").exists()
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"initialize_team_standard": True, "allow_team_standard": True},
+        {"initialize_team_standard": "true"},
+        {"allow_team_standard": 1},
+    ],
+)
+def test_direct_writer_rejects_invalid_permissions_before_side_effects(
+    tmp_path: Path, options: dict
+) -> None:
+    """直接调用与批量调用同样拒绝矛盾权限，不能依赖上层预检。"""
+    with pytest.raises(ValueError):
+        session.write_document(
+            ModusPaths.for_root(tmp_path),
+            TEAM,
+            "# 项目规范\n",
+            expected_hash=None,
+            allow_human=True,
+            **options,
+        )
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_empty_write_distinguishes_a_missing_document_from_existing_empty_bytes(
+    tmp_path: Path,
+) -> None:
+    """写入回执必须对应实际文件，空正文不能绕过新建或所有权判断。"""
+    first = update_knowledge(str(tmp_path), {MODULE: ""})
+    assert first["writes"] == [MODULE]
+    assert (tmp_path / MODULE).read_bytes() == b""
+    retry = update_knowledge(str(tmp_path), {MODULE: ""})
+    assert retry["status"] == "noop"
+    assert retry["unchanged"] == [MODULE]
+
+    denied = update_knowledge(str(tmp_path), {TEAM: ""})
+    assert denied["status"] == "partial"
+    assert denied["writes"] == []
+    assert not (tmp_path / TEAM).exists()
 
 
 # 摘要匹配只证明内容未变，不赋予删除人工文档的权限。
@@ -331,22 +379,371 @@ def test_team_standard_initialization_preserves_authored_content(
 
 # 团队规范需要类别授权与当前摘要两道独立条件。
 # 显式授权不取消并发保护，过时摘要仍然必须拒绝。
+@pytest.mark.parametrize(
+    "target_name",
+    [
+        TEAM,
+        "modus/knowledge/constraint/team-standard/tasks.md",
+        "modus/knowledge/constraint/team-standard/legacy/tasks.md",
+    ],
+)
 def test_explicit_team_standard_maintenance_requires_opt_in_and_current_digest(
     tmp_path: Path,
+    target_name: str,
 ) -> None:
-    target = _put(tmp_path, TEAM, "# Team's existing standard\n")
-    hashes = {TEAM: _digest(target.read_text(encoding="utf-8"))}
-    denied = update_knowledge(str(tmp_path), {TEAM: "# Revised standard\n"}, expected_hashes=hashes)
+    target = _put(tmp_path, target_name, "# Team's existing standard\n")
+    hashes = {target_name: _digest(target.read_text(encoding="utf-8"))}
+    denied = update_knowledge(
+        str(tmp_path), {target_name: "# Revised standard\n"}, expected_hashes=hashes
+    )
     assert denied["status"] == "partial"
     accepted = update_knowledge(
         str(tmp_path),
-        {TEAM: "# Revised standard\n"},
+        {target_name: "# Revised standard\n"},
         expected_hashes=hashes,
         allow_team_standard=True,
     )
-    assert accepted["writes"] == [TEAM]
+    assert accepted["writes"] == [target_name]
     stale = update_knowledge(
-        str(tmp_path), {TEAM: "# Overwrite\n"}, expected_hashes=hashes, allow_team_standard=True
+        str(tmp_path),
+        {target_name: "# Overwrite\n"},
+        expected_hashes=hashes,
+        allow_team_standard=True,
     )
     assert stale["status"] == "partial"
     assert target.read_text(encoding="utf-8") == "# Revised standard\n"
+
+
+@pytest.mark.parametrize("nested", [False, True])
+def test_team_topic_initialization_is_missing_only_and_not_machine_owned(
+    tmp_path: Path, nested: bool
+) -> None:
+    """拆成专题不解除人工保护；入口种子也不能充当专题的覆盖凭据。"""
+    from modus.knowledge_identity import KnowledgePathIdentity
+
+    topic = "modus/knowledge/constraint/team-standard/" + (
+        "legacy/concurrency.md" if nested else "concurrency.md"
+    )
+    body = "# 并发\n\n性质: 通用建议\n"
+    denied = update_knowledge(str(tmp_path), {topic: body})
+    assert denied["status"] == "partial"
+    assert not (tmp_path / topic).exists()
+    created = update_knowledge(str(tmp_path), {topic: body}, initialize_team_standard=True)
+    assert created["writes"] == [topic]
+    assert update_knowledge(str(tmp_path), {topic: body})["status"] == "noop"
+    identity = KnowledgePathIdentity.classify(ModusPaths.for_root(tmp_path), topic)
+    assert identity is not None and identity.ownership_plane == "human"
+
+    for existing in (body, TemplateCatalog().read("knowledge/constraint/team-standard.md")):
+        _put(tmp_path, topic, existing)
+        result = update_knowledge(
+            str(tmp_path),
+            {topic: "# Replacement\n"},
+            expected_hashes={topic: _digest(existing)},
+            initialize_team_standard=True,
+        )
+        assert result["status"] == "partial"
+        retired = update_knowledge(
+            str(tmp_path),
+            {},
+            deletions=[topic],
+            expected_hashes={topic: _digest(existing)},
+        )
+        assert retired["status"] == "partial"
+        assert (tmp_path / topic).read_text(encoding="utf-8") == existing
+
+
+def test_initialization_cannot_add_topics_after_entry_is_human_owned(tmp_path: Path) -> None:
+    """不能把新增文件当作绕过既有团队规范维护授权的入口。"""
+    _put(tmp_path, TEAM, "# 人工规范\n")
+    topic = "modus/knowledge/constraint/team-standard/database.md"
+    result = update_knowledge(str(tmp_path), {topic: "# 数据库\n"}, initialize_team_standard=True)
+    assert result["status"] == "partial"
+    assert not (tmp_path / topic).exists()
+    maintained = update_knowledge(str(tmp_path), {topic: "# 数据库\n"}, allow_team_standard=True)
+    assert maintained["writes"] == [topic]
+    assert (tmp_path / TEAM).read_text(encoding="utf-8") == "# 人工规范\n"
+
+
+@pytest.mark.parametrize("seed_exists", [False, True])
+def test_team_topics_publish_before_entry_and_retry_without_maintenance(
+    tmp_path: Path, seed_exists: bool
+) -> None:
+    """专题先发布，入口最后成稿；原请求重试不需要升级人工维护授权。"""
+    seed = TemplateCatalog().read("knowledge/constraint/team-standard.md")
+    if seed_exists:
+        _put(tmp_path, TEAM, seed)
+    topic = "modus/knowledge/constraint/team-standard/database.md"
+    documents = {topic: "# 数据库\n", TEAM: "# 团队规范\n\n[数据库](team-standard/database.md)\n"}
+    hashes = {topic: None, TEAM: _digest(seed) if seed_exists else None}
+
+    published = update_knowledge(
+        str(tmp_path), documents, expected_hashes=hashes, initialize_team_standard=True
+    )
+    assert published["status"] == "completed"
+    assert published["writes"] == [topic, TEAM]
+    retried = update_knowledge(
+        str(tmp_path), documents, expected_hashes=hashes, initialize_team_standard=True
+    )
+    assert retried["status"] == "noop"
+    assert retried["unchanged"] == [topic, TEAM]
+
+
+def test_failed_entry_publication_preserves_completed_topic(tmp_path: Path) -> None:
+    """CAS 冲突只影响入口；调用者可回读后继续发布，不回滚已完成专题。"""
+    seed = TemplateCatalog().read("knowledge/constraint/team-standard.md")
+    _put(tmp_path, TEAM, seed)
+    topic = "modus/knowledge/constraint/team-standard/database.md"
+    documents = {topic: "# 数据库\n", TEAM: "# 团队规范\n"}
+    partial = update_knowledge(
+        str(tmp_path),
+        documents,
+        expected_hashes={TEAM: _digest("# 过时种子\n")},
+        initialize_team_standard=True,
+    )
+    assert partial["status"] == "partial"
+    assert partial["writes"] == [topic]
+    assert partial["conflicts"][0]["path"] == TEAM
+    assert (tmp_path / topic).read_text(encoding="utf-8") == documents[topic]
+    assert (tmp_path / TEAM).read_text(encoding="utf-8") == seed
+
+    retried = update_knowledge(
+        str(tmp_path),
+        documents,
+        expected_hashes={TEAM: _digest(seed)},
+        initialize_team_standard=True,
+    )
+    assert retried["status"] == "completed"
+    assert retried["unchanged"] == [topic]
+    assert retried["writes"] == [TEAM]
+
+
+def test_topic_initialization_observes_entry_published_while_waiting_for_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """入口锁串行化交接：专题等待期间入口成稿，唤醒后必须重新判定权限。"""
+    paths = ModusPaths.for_root(tmp_path)
+    seed = TemplateCatalog().read("knowledge/constraint/team-standard.md")
+    _put(tmp_path, TEAM, seed)
+    topic = "modus/knowledge/constraint/team-standard/database.md"
+    entry_lock = paths.knowledge_document_lock(paths.team_standard)
+    original_lock = session.required_reentrant_file_lock
+    waiting = Event()
+
+    @contextmanager
+    def observed_lock(path: Path):
+        if path == entry_lock:
+            waiting.set()
+        with original_lock(path):
+            yield
+
+    monkeypatch.setattr(session, "required_reentrant_file_lock", observed_lock)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with original_lock(entry_lock):
+            pending = pool.submit(
+                update_knowledge,
+                str(tmp_path),
+                {topic: "# 数据库\n"},
+                initialize_team_standard=True,
+            )
+            assert waiting.wait(timeout=5), "专题初始化必须先取得入口锁"
+            session.write_document(
+                paths,
+                TEAM,
+                "# 已发布规范\n",
+                expected_hash=_digest(seed),
+                allow_human=True,
+                initialize_team_standard=True,
+            )
+        result = pending.result(timeout=5)
+
+    assert result["status"] == "partial"
+    assert "入口已包含保留内容" in result["conflicts"][0]["reason"]
+    assert not (tmp_path / topic).exists()
+
+
+@pytest.mark.parametrize("seed_exists", [False, True])
+def test_cli_initializes_team_standard_once_and_preserves_it_on_retry(
+    tmp_path: Path, seed_exists: bool
+) -> None:
+    """真实 CLI 必须连接窄权限；初始化重试不能获得人工正文维护权限。"""
+    seed = TemplateCatalog().read("knowledge/constraint/team-standard.md")
+    if seed_exists:
+        _put(tmp_path, TEAM, seed)
+    replacement = "# 团队规范\n\n当前项目约束。\n"
+    payload = {
+        "documents": {TEAM: replacement},
+        "expectedHashes": {TEAM: _digest(seed) if seed_exists else None},
+    }
+    request = tmp_path / "initialize.json"
+    runner = CliRunner()
+
+    def invoke() -> tuple[int, dict]:
+        request.write_text(json.dumps(payload), encoding="utf-8")
+        result = runner.invoke(
+            app, ["-C", str(tmp_path), "knowledge", "update", "--input", str(request)]
+        )
+        return result.exit_code, json.loads(result.output)
+
+    code, result = invoke()
+    assert code == 1, result
+    assert result["writes"] == []
+    if seed_exists:
+        assert (tmp_path / TEAM).read_text(encoding="utf-8") == seed
+    else:
+        assert not (tmp_path / TEAM).exists()
+
+    payload["initializeTeamStandard"] = True
+    code, result = invoke()
+    assert code == 0, result
+    assert result["writes"] == [TEAM]
+    assert (tmp_path / TEAM).read_text(encoding="utf-8") == replacement
+
+    code, result = invoke()
+    assert code == 0, result
+    assert result["status"] == "noop"
+    assert result["unchanged"] == [TEAM]
+
+    payload["documents"] = {TEAM: "# 不能通过首次填充重写\n"}
+    payload["expectedHashes"] = {TEAM: _digest(replacement)}
+    code, result = invoke()
+    assert code == 1, result
+    assert result["writes"] == []
+    assert (tmp_path / TEAM).read_text(encoding="utf-8") == replacement
+
+
+@pytest.mark.parametrize("content", ["", "# 旧版种子\n", "# 人工规范\n"])
+def test_initialization_rejects_non_seed_even_with_current_digest(
+    tmp_path: Path, content: str
+) -> None:
+    target = _put(tmp_path, TEAM, content)
+    result = update_knowledge(
+        str(tmp_path),
+        {TEAM: "# 首次规范\n"},
+        expected_hashes={TEAM: _digest(content)},
+        initialize_team_standard=True,
+    )
+    assert result["status"] == "partial"
+    assert result["conflicts"][0]["path"] == TEAM
+    assert target.read_text(encoding="utf-8") == content
+
+
+def test_initialization_rechecks_seed_after_preflight(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """调查和预读之后发生人工修改，最终锁内检查仍须阻止覆盖。"""
+    from modus import knowledge_update
+
+    seed = TemplateCatalog().read("knowledge/constraint/team-standard.md")
+    target = _put(tmp_path, TEAM, seed)
+    human = seed + "\n人工补充。\n"
+    original_write = knowledge_update.write_document
+
+    def concurrent_edit(*args, **kwargs):
+        target.write_text(human, encoding="utf-8")
+        return original_write(*args, **kwargs)
+
+    monkeypatch.setattr(knowledge_update, "write_document", concurrent_edit)
+    result = update_knowledge(
+        str(tmp_path),
+        {TEAM: "# 首次规范\n"},
+        expected_hashes={TEAM: _digest(seed)},
+        initialize_team_standard=True,
+    )
+    assert result["status"] == "partial"
+    assert result["writes"] == []
+    assert target.read_text(encoding="utf-8") == human
+
+
+def test_sync_discovers_topic_file_links_and_protected_candidates_without_writing(
+    tmp_path: Path,
+) -> None:
+    from modus.skillmd import render
+
+    _put(tmp_path, "refund.py", "# run is no longer declared\nmessage = 'run'\n")
+    _put(tmp_path, "settings.yaml", "limit: 3\n")
+    _module(tmp_path, "refund", "refund.py", "run")
+    _put(
+        tmp_path,
+        API_SHARD,
+        render(
+            {"anchors": {"locations": [{"path": "refund.py", "symbol": "run", "startLine": 1}]}},
+            "# 接口\n",
+        ),
+    )
+    rule = "modus/knowledge/domain/order/references/rule.md"
+    _put(tmp_path, rule, render({"anchors": {"paths": ["settings.yaml"]}}, "# 规则\n"))
+    _put(tmp_path, TEAM, render({"anchors": {"paths": ["settings.yaml"]}}, "# 人工规范\n"))
+    originals = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    result = knowledge_sync.inspect_knowledge_impact(str(tmp_path), ["refund.py", "settings.yaml"])
+    candidates = {row["path"]: row for row in result["candidates"]}
+    assert set(candidates) == {MODULE, API_SHARD, rule, TEAM}
+    assert candidates[MODULE]["moduleId"] == "order/refund"
+    assert candidates[API_SHARD]["moduleId"] is None
+    assert candidates[rule]["confidence"] == "path-only"
+    assert candidates[rule]["matchedSourcePaths"] == ["settings.yaml"]
+    assert {row["document"] for row in result["anchorReviewCandidates"]} == {MODULE, API_SHARD}
+    assert all(
+        row["disposition"] == "anchor-symbol-missing" for row in result["anchorReviewCandidates"]
+    )
+    assert result["writes"] == [] and not result["conflicts"]
+    assert {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == originals
+    protected = update_knowledge(
+        str(tmp_path),
+        {TEAM: "# Changed\n"},
+        expected_hashes={TEAM: _digest((tmp_path / TEAM).read_text())},
+    )
+    assert protected["conflicts"] and (tmp_path / TEAM).read_bytes() == originals[tmp_path / TEAM]
+
+
+@pytest.mark.parametrize(
+    ("source", "symbol", "line", "disposition"),
+    [
+        ("\n\ndef run():\n    pass\n", "run", 1, "anchor-line-drift"),
+        (
+            "# run\nclass A:\n    def run(self): pass\nclass B:\n    def run(self): pass\n",
+            "run",
+            1,
+            "anchor-ambiguous",
+        ),
+        ("def run(:\n", "run", 1, "anchor-verification-unavailable"),
+    ],
+)
+def test_sync_reports_declaration_review_reasons(
+    tmp_path: Path, source: str, symbol: str, line: int, disposition: str
+) -> None:
+    _put(tmp_path, "source.py", source)
+    _module(tmp_path, "refund", "source.py", symbol)
+    result = knowledge_sync.inspect_knowledge_impact(str(tmp_path), ["source.py"])
+    assert result["anchorReviewCandidates"][0]["disposition"] == disposition
+    assert not result["writes"]
+
+
+def test_moved_source_is_routable_after_existing_cas_maintenance(tmp_path: Path) -> None:
+    from modus.commands.verify_anchors import run_verify_anchors
+    from modus.orchestrator.context_resolver import resolve_context
+    from modus.skillmd import render
+
+    old = {"path": "old.py", "symbol": "refund", "startLine": 1}
+    original = render({"anchors": {"locations": [old]}}, "# 退款\n退款由 `refund` 执行。\n")
+    _put(tmp_path, API_SHARD, original)
+    _put(tmp_path, "new.py", "def refund():\n    return 'settled'\n")
+    unmatched = knowledge_sync.inspect_knowledge_impact(str(tmp_path), ["new.py"])
+    assert not unmatched["candidates"] and unmatched["skipped"]
+    impact = knowledge_sync.inspect_knowledge_impact(str(tmp_path), ["old.py", "new.py"])
+    assert [row["path"] for row in impact["candidates"]] == [API_SHARD]
+    assert impact["anchorReviewCandidates"][0]["disposition"] == "anchor-symbol-missing"
+    revised = render(
+        {"anchors": {"locations": [{**old, "path": "new.py", "endLine": 2}]}},
+        "# 退款\n退款由 `refund` 执行，返回已结算结果。\n",
+    )
+    updated = update_knowledge(
+        str(tmp_path), {API_SHARD: revised}, expected_hashes={API_SHARD: _digest(original)}
+    )
+    assert updated["writes"] == [API_SHARD]
+    assert run_verify_anchors(str(tmp_path))["status"] == "clean"
+    context = resolve_context(str(tmp_path), "退款 refund", scope="project-read")
+    assert any(
+        row["path"] == "new.py" and row.get("symbol") == "refund" for row in context["evidence"]
+    )
+    assert not context["groundingGaps"]

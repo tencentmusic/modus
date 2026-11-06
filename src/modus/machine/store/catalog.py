@@ -134,7 +134,7 @@ def _branch_payload(
     return payload
 
 
-# 全局键排序保证页面与树结构可重复，重复键直接拒绝。
+# 全局键排序保证页面与树结构可重复；相同观察幂等，不同内容拒绝。
 # 打包记录和单条文件共享引用协议，读取端无需猜测布局。
 # 数据页与索引页都经过统一的字节预算检查。
 def write_catalog(
@@ -154,9 +154,19 @@ def write_catalog(
     ``relative_path`` remains part of the input contract for unpacked catalogs.
     """
 
-    normalized = sorted(records, key=lambda item: item.key)
-    if len({item.key for item in normalized}) != len(normalized):
-        raise IntegrityError("machine.store.catalog-duplicate-key")
+    unique: dict[str, CatalogRecord] = {}
+    for item in records:
+        previous = unique.get(item.key)
+        if previous is not None and (
+            previous.relative_path != item.relative_path
+            or canonical_bytes(previous.value) != canonical_bytes(item.value)
+        ):
+            raise IntegrityError(
+                "machine.store.catalog-duplicate-key",
+                details={"catalog": catalog, "keyDigest": content_digest(item.key.encode())},
+            )
+        unique[item.key] = item
+    normalized = sorted(unique.values(), key=lambda item: item.key)
     references: list[CatalogReference] = []
     if pack_records:
         page: list[CatalogRecord] = []

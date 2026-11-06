@@ -8,20 +8,19 @@ the verifier.
 from __future__ import annotations
 
 import re
-import unicodedata
 from pathlib import Path
 from urllib.parse import unquote
 
 from ..commands.verify_anchors import _REF_RE
 from ..knowledge_reader import BoundKnowledgeReadError, read_bound_regular_text
+from ..markdown import body_start, markdown_anchors, markdown_headings
+from ..markdown import markdown_slug as markdown_slug
+from ..markdown import strip_fenced_code as _strip_fenced_code
 from ..paths import ModusPaths
-from ..retrieval.stages.documents import body_start, markdown_headings
 from .models import VerificationFinding, finding
 
 MAX_DOCUMENT_BYTES = 4 * 1024 * 1024
 LINK_RE = re.compile(r"!?\[([^\]]+)\]\(([^)]+)\)")
-_HTML_ANCHOR_RE = re.compile(r'<a\s+(?:name|id)=["\']([^"\']+)["\']', re.IGNORECASE)
-_ITEM_RE = re.compile(r"\{\{item:([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\}\}")
 _ABSOLUTE_LOCAL_RE = re.compile(
     r"(?:file://)?(?:/Users/[^\s)`]+|/home/[^\s)`]+|/root/[^\s)`]+|"
     r"/private/(?:tmp|var)/[^\s)`]+|/tmp/[^\s)`]+|/workspace/[^\s)`]+|"
@@ -69,18 +68,6 @@ def document_headings(text: str, level: int | None = None) -> list[tuple[int, in
     return [item for item in headings if item[1] == level]
 
 
-# 按 Unicode 类别保留文字、数字与组合标记，支持中文标题。
-# 统一大小写和空格连接符，使链接片段与标题使用同一比较规则。
-def markdown_slug(value: str) -> str:
-    value = value.strip().casefold()
-    result: list[str] = []
-    for character in value:
-        category = unicodedata.category(character)
-        if character in {"-", "_", " "} or category[0] in {"L", "N", "M"}:
-            result.append(character)
-    return re.sub(r"[ -]+", "-", "".join(result)).strip("-")
-
-
 # 逐级检查路径，不能只检查最终文件而遗漏中间目录链接。
 def _path_uses_symlink(root: Path, relative: str) -> bool:
     current = root
@@ -89,27 +76,6 @@ def _path_uses_symlink(root: Path, relative: str) -> bool:
         if current.is_symlink():
             return True
     return False
-
-
-# 代码示例中的链接不是正文导航，核验时跳过围栏内容。
-# 以空行替换而非删除，保留原文的行位置关系。
-# 闭合围栏需使用相同字符且长度不短于开头。
-def _strip_fenced_code(text: str) -> str:
-    output: list[str] = []
-    fence: tuple[str, int] | None = None
-    for line in text.splitlines():
-        match = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
-        if fence is None and match:
-            fence = (match[1][0], len(match[1]))
-            output.append("")
-            continue
-        if fence is not None:
-            if match and match[1][0] == fence[0] and len(match[1]) >= fence[1]:
-                fence = None
-            output.append("")
-            continue
-        output.append(line)
-    return "\n".join(output)
 
 
 # 返回未闭合围栏的起始行，定位真正需要修复的位置。
@@ -162,11 +128,7 @@ def verify_markdown_basics(
 # 标题、显式 HTML 锚点与条目标记共同构成可链接目标。
 # 三类锚点统一大小写后匹配，不从普通正文推测锚点。
 def _anchors_for(text: str) -> set[str]:
-    return {
-        *(markdown_slug(heading) for _line, _level, heading in document_headings(text)),
-        *(match.casefold() for match in _HTML_ANCHOR_RE.findall(text)),
-        *(f"item-{item}".casefold() for item in _ITEM_RE.findall(text)),
-    }
+    return {anchor for anchors in markdown_anchors(text).values() for anchor in anchors}
 
 
 # 只核验仓库内的相对链接，不发起网络请求检查外部 URL。

@@ -10,7 +10,7 @@ uv run --locked --extra test python -m modus --version
 uv run --locked --extra test python -m modus --help
 ```
 
-这样调用当前 checkout，不拿用户 PATH 上旧 `modus-ai` 代表本仓库。需要隔离项目环境时，可显式给 `UV_PROJECT_ENVIRONMENT` 一个任务临时目录，不替换用户 HOME/CODEX_HOME。
+这些命令使用当前 checkout，避免误用 PATH 中其他安装版本。需要隔离项目环境时，可显式给 `UV_PROJECT_ENVIRONMENT` 一个任务临时目录，不替换用户 HOME/CODEX_HOME。
 
 ## 按契约选最小测试
 
@@ -18,7 +18,7 @@ uv run --locked --extra test python -m modus --help
 | --- | --- |
 | CLI 隔离/中文/真实命令 | `test_cli_boundaries.py`、`test_cli_localization.py`、`test_documented_cli.py` |
 | 项目生命周期/用户文件保护 | `test_project_lifecycle.py`、`test_install_safety.py`、`test_scaffold.py` |
-| 平台/Hook | `test_platforms.py`、`test_hooks.py`、安装安全测试 |
+| 平台/旧安装迁移 | `test_platforms.py`、`test_legacy_hook_cleanup.py`、安装安全测试 |
 | 分析生命周期/包确定性/漂移 | `test_analysis_pipeline.py`、`test_evidence_selection.py` |
 | 语义分层/状态/语言缓存 | `machine/test_architecture.py`、`test_states.py`、`test_contracts.py`、`test_language_fixtures.py`、`test_extraction_cache_identity.py`、`test_corpus.py` |
 | 能力/投影/局部降级 | `machine/test_capability_composer.py`、`test_projection.py`、`test_lifecycle_degradation.py` |
@@ -34,15 +34,7 @@ uv run --locked --extra test python -m modus --help
 
 ## 完整检查
 
-提交前遵循当前 CONTRIBUTING：
-
-```bash
-uv run --locked --extra test pytest -q
-uv run --locked --extra test ruff check src tests scripts
-uv run --locked --extra test ruff format --check src tests scripts
-uv run --locked --extra test mypy
-git diff --check
-```
+提交前运行 [贡献指南中的完整检查](../../../../CONTRIBUTING.md#本地开发)。此处只维护按契约选测试的方法，避免多处命令清单逐渐分叉。
 
 依赖改动同步 `pyproject.toml`/`uv.lock` 并审查约束。mypy strict frontier、fixtures 排除、pytest markers 等以 pyproject 为主，不维护第二套工具版本。
 
@@ -50,8 +42,10 @@ git diff --check
 
 发布前 `./scripts/wheel-smoke.sh` 在临时目录重新构建一个 wheel 和源码包，再调用 package_smoke；已有产物可用 `python scripts/package_smoke.py ARTIFACT...`。该脚本验证，不发布。
 
-`release_smoke/contracts.py` 声明架构见证、五个技能、四个平台、元数据和排除项；archive 拒绝危险成员与路径穿越；verification 执行静态策略；runtime 在脱离源码路径的独立 wheel 环境验证知识、分析、更新、卸载。源码单测通过不能替代安装产物验收。
+`release_smoke/contracts.py` 声明架构见证、工作流与平台集合、元数据和排除项；archive 拒绝危险成员与路径穿越；verification 执行静态策略；runtime 在脱离源码路径的独立 wheel 环境验证知识、分析、更新、卸载。源码单测通过不能替代安装产物验收。
 
 wheel 将 schemas 打包到 `modus/_bundled/schemas`；source 包保留源码、文档、模板、模式、测试、脚本和锁文件。`schema_resources.py` 统一读源码/安装资源；新增资源需检查两种分发形态。
 
 CI 定义 Linux 3.11–3.14，以及 macOS/Windows 最低与最高版本；Linux 3.14 执行静态/类型/分发检查。本地结果只代表实际 OS、Python、可用工具链与运行命令，不等于矩阵已通过。
+
+DSH 原生插件独立运行 Node.js 检查；源码入口、真实 CLI 测试与隔离安装要求见 [DSH 贡献与验证](../../../../integrations/dsh/architecture.md#贡献与验证)。Python 测试不能替代该插件的运行时验证。

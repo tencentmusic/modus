@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from modus.machine.corpus.source_snapshot import SourceSnapshot
 from modus.machine.facts.native_binding import bind_files
 from modus.machine.facts.native_parser import parse_file
@@ -185,6 +187,31 @@ void Run();
     assert facts["analysisCompleteness"] == "partial"
     assert not any(row["name"] == "REGISTER_MODEL" for row in facts["declarations"])
     assert any(row["name"] == "Run" for row in facts["declarations"])
+
+
+@pytest.mark.parametrize(
+    ("filename", "source"),
+    [
+        ("View.kt", "fun run(" + ", ".join(f"arg{i}: Int" for i in range(150)) + ") {}"),
+        ("View.swift", "func run(" + ", ".join(f"arg{i}: Int" for i in range(150)) + ") {}"),
+        ("View.cpp", "void run(" + ", ".join(f"int arg{i}" for i in range(150)) + ") {}"),
+        (
+            "View.m",
+            "@implementation View\n- (void)run: (int)arg0 "
+            + " ".join(f"arg{i}:(int)arg{i}" for i in range(1, 150))
+            + " {}\n@end",
+        ),
+    ],
+)
+def test_specialized_signatures_preserve_truncation_evidence(
+    tmp_path: Path, filename: str, source: str
+) -> None:
+    facts = _parse(tmp_path, filename, source)
+    declaration = next(row for row in facts["declarations"] if row["name"].startswith("run"))
+    assert len(declaration["signature"]) == 1000
+    assert declaration["signatureOmittedCharacters"] > 0
+    assert "{}" not in declaration["signature"]
+    assert declaration["endLine"] >= declaration["line"]
 
 
 def test_kotlin_import_and_source_sets_remain_candidates(tmp_path: Path) -> None:

@@ -198,7 +198,7 @@ def _node_points(
 
 
 # 对应前检查语言、种类、名称及已知签名，排除明显不兼容的声明。
-# 函数与方法允许种类兼容，但不放宽所有者和签名约束。
+# Java CST 的所有者不含包名；允许编译器补全包名前缀，仍须匹配精确源码位置。
 def _compatible(data: Mapping[str, Any], semantic: SemanticNode) -> bool:
     kind = str(data.get("kind") or data.get("node_type") or "")
     if kind and kind != semantic.kind and {kind, semantic.kind} != {"function", "method"}:
@@ -211,6 +211,12 @@ def _compatible(data: Mapping[str, Any], semantic: SemanticNode) -> bool:
         structural = data.get(key)
         compiled = semantic.attributes.get(key)
         if structural and compiled and structural != compiled:
+            if (
+                key == "owner"
+                and semantic.language == "java"
+                and str(compiled).endswith("." + str(structural))
+            ):
+                continue
             return False
     return True
 

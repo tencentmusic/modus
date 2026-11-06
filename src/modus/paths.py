@@ -8,22 +8,23 @@ from pathlib import Path
 from typing import Final
 
 # Platform projection trees. These hold Modus-projected skill bundles, command
-# surfaces, and hook configs (NOT user source code), so every code-scanning or
+# surfaces, and host configuration (NOT user source code), so every code-scanning or
 # evidence-searching surface must exclude them the same way it excludes the
 # ``modus/`` / ``.modus/`` output trees. Centralised here so initialization
 # analysis, the ripgrep fallback (``orchestrator/fallback.py``), and
 # any future scanner share one authoritative list and never drift apart.
 # Roots that contain projected Agent Skill bundles.  Keep this separate from
-# ``PLATFORM_OUTPUT_DIRS``: Codex stores Skills under ``.agents`` but its current
-# project Hook contract lives under ``.codex``.
+# ``PLATFORM_OUTPUT_DIRS`` also excludes host configuration and legacy assets
+# under ``.codex``; those are never project implementation evidence.
 PLATFORM_SKILL_DIRS: Final[tuple[str, ...]] = (
     ".claude",
     ".agents",
     ".cursor",
     ".codebuddy",
+    ".dsh",
 )
 
-# Every project-root directory generated for a host platform. Source and
+# Project-root directories reserved for host configuration and projections. Source and
 # knowledge scanners must ignore all of them so Modus
 # never learns from its own projections.
 PLATFORM_OUTPUT_DIRS: Final[tuple[str, ...]] = (*PLATFORM_SKILL_DIRS, ".codex")
@@ -113,11 +114,6 @@ class ModusPaths:
     @property
     def skills_dir(self) -> Path:
         return self.modus_dir / "skills"
-
-    @property
-    def hooks_dir(self) -> Path:
-        """Neutral session-start bootstrap scripts (run-hook.cmd + session-start)."""
-        return self.modus_dir / "hooks"
 
     @property
     def manifest_path(self) -> Path:

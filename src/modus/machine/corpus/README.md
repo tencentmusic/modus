@@ -11,3 +11,5 @@
 | 一次捕获字节，分类来源与选择范围，记录仓库、配置、工具链身份，输出 corpus/context/baseline 摘要 | 解析声明、绑定符号、推断调用或描述行为 |
 
 公开生命周期动词：`freeze`。
+
+纳入文件的角色与摘要保存在 snapshot；排除、编码/二进制不支持和不可访问保存为 `sourceDispositions`，噪声目录仅记录一次目录剪枝。公开 evidence 查询用 `machine.corpus.input-not-admitted` 暴露这些边界。扫描接入不代表语义提取或材料已充分消费；测试、示例和生成文件保持独立角色。

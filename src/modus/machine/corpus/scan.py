@@ -37,6 +37,7 @@ def source_files(
     *,
     extra_excludes: Sequence[str] = (),
     on_read: Callable[[Path, bytes], None] | None = None,
+    on_disposition: Callable[[dict[str, str]], None] | None = None,
 ) -> list[Path]:
     """Walk *root* and return every analyzable source file, sorted.
 
@@ -47,9 +48,25 @@ def source_files(
     """
     root = root.resolve()
     root_rules = [(root, value) for value in extra_excludes]
+
+    def disposition(path: Path, reason: str, *, directory: bool = False) -> None:
+        if on_disposition is not None:
+            on_disposition(
+                {
+                    "path": path.relative_to(root).as_posix(),
+                    "scope": "directory" if directory else "file",
+                    "reason": reason,
+                }
+            )
+
     rules_by_directory: dict[Path, list[tuple[Path, str]]] = {}
     result = []
-    for directory, dirs, names in os.walk(root, followlinks=False):
+
+    def unavailable(error: OSError) -> None:
+        if error.filename:
+            disposition(Path(error.filename), "unavailable", directory=True)
+
+    for directory, dirs, names in os.walk(root, followlinks=False, onerror=unavailable):
         base = Path(directory)
         rules = list(rules_by_directory.get(base.parent, ()))
         for name in (".gitignore", ".modusignore"):
@@ -63,37 +80,60 @@ def source_files(
             rules.extend(root_rules)
         rules_by_directory[base] = rules
         ignored: dict[Path, bool] = {}
-        dirs[:] = sorted(
-            name
-            for name in dirs
-            if not (
-                (base / name).is_symlink()
-                or is_noise_directory(name, base)
-                or (base == root and name in _ROOT_OUTPUTS)
-                or is_sensitive(base / name / "_")
-                or is_ignored(base / name, root, rules, _cache=ignored)
+        kept = []
+        for name in sorted(dirs):
+            path = base / name
+            reason = (
+                "symlink"
+                if path.is_symlink()
+                else "noise-directory"
+                if is_noise_directory(name, base)
+                else "managed-output"
+                if base == root and name in _ROOT_OUTPUTS
+                else "sensitive"
+                if is_sensitive(path / "_")
+                else "ignored"
+                if is_ignored(path, root, rules, _cache=ignored)
+                else ""
             )
-        )
+            if reason:
+                disposition(path, reason, directory=True)
+            else:
+                kept.append(name)
+        dirs[:] = kept
         for name in sorted(names):
             path = base / name
             relative = path.relative_to(root)
-            if (
-                path.is_symlink()
-                or name in _SKIP_FILES
-                or name.endswith((".lock", ".min.js", ".map"))
-                or relative.as_posix() in MANAGED_ROOT_FILES
-                or is_sensitive(relative)
-                or is_ignored(path, root, rules, _cache=ignored)
-            ):
+            reason = (
+                "symlink"
+                if path.is_symlink()
+                else "generated-or-lockfile"
+                if name in _SKIP_FILES or name.endswith((".lock", ".min.js", ".map"))
+                else "managed-output"
+                if relative.as_posix() in MANAGED_ROOT_FILES
+                else "sensitive"
+                if is_sensitive(relative)
+                else "ignored"
+                if is_ignored(path, root, rules, _cache=ignored)
+                else ""
+            )
+            if reason:
+                disposition(path, reason)
                 continue
             try:
                 if not path.is_file() or path.stat().st_size > MAX_SOURCE_BYTES:
+                    disposition(path, "size-or-file-type")
                     continue
                 head = read_bound_regular_bytes(root, path, max_bytes=MAX_SOURCE_BYTES)
                 if b"\0" in head:
+                    disposition(path, "unsupported-binary")
                     continue
                 head.decode("utf-8")
-            except (OSError, UnicodeError, BoundKnowledgeReadError):
+            except UnicodeError:
+                disposition(path, "unsupported-encoding")
+                continue
+            except (OSError, BoundKnowledgeReadError):
+                disposition(path, "unavailable")
                 continue
             if on_read is not None:
                 on_read(path, head)

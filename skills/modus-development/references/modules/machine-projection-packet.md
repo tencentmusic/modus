@@ -19,11 +19,13 @@ N6：`machine/packet/lifecycle.py` 核验/打包；`context_builder.py` 按意�
 | `authoring-context-packet.schema.json` | `packet/contracts.py: AuthoringContextPacket` |
 | `capability-slice.schema.json` | `capability/contracts.py: CapabilitySlice` |
 
-当前 machine wire schemaVersion 为 1；创作执行卡 version 2 是另一个协议。baselineDigest 是分析身份，sourceDigest 是单个见证内容，不能互换。
+分析包、select 页和 Authoring Context Packet 的 schemaVersion 均为 1；上下文契约随 CLI 与正文模板同步更新，包含 evidence/coverageGaps/expansionQueries；创作执行卡 version 2 是另一个协议。baselineDigest 是分析身份，sourceDigest 是单个见证内容，不能互换。
 
 Context intent 包含 scope-discovery、module-authoring、constraint-extraction、service-boundary、reinit-diff、coverage-audit。module-authoring 至少需要 candidate/capability/path/symbol 之一；boundary 单独不够。回显 requestedScope，不能对 no-match 悄悄扩大到全仓。
 
 查询同时限制正向条目和完整序列化字节；覆盖缺口不占正向条目配额，但仍占字节。页要有实际正向证据或真耗尽，不能让缺口前缀形成不可推进的空页。游标绑定包和规范过滤条件；是否可改变页大小依当前 codec/测试，不把“改页大小”误认为续页。非空游标不是写作完成门槛。
+
+Scope/Module/constraint/coverage 的 path/symbol 和无匹配范围必须保持真实筛选，服务边界需同时返回入边/出边；不同 selector 轴取交集，域并集通过独立请求合并。回包保存来源、缺口、完整代表路径与裁剪后计数。
 
 查询会再次核对当前 sourceDigest，漂移/不可读转为相应缺口或拒绝语义。N5/N6 不能重新解析源码、从快照制造新事实；当前源码摘要安全检查与语义观察是不同职责。
 

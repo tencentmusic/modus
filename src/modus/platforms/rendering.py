@@ -4,9 +4,42 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from ..precedence import MODUS_PRECEDENCE_NOTICE
+import yaml
+
+from ..precedence import (
+    MODUS_PRECEDENCE_NOTICE,
+    USER_INVOKED_WORKFLOWS_SENTENCE,
+)
+from ..skillmd import split_frontmatter
 from ..surface import EXPLICIT_SKILLS, INTENT_ROUTED_SKILLS
 from .models import Skill
+
+
+def render_agents_instructions(skills: Sequence[Skill]) -> str:
+    """Render the AGENTS.md section shared by Codex and DSH."""
+
+    heading = f"## Modus\n\n{USER_INVOKED_WORKFLOWS_SENTENCE}:"
+    return render_skill_index(skills, heading)
+
+
+def render_invocation_metadata(content: str, *, model_invocable: bool, user_invocable: bool) -> str:
+    """补齐 Claude 与 DSH 的顶层调用权限，保留正文、已有配置和换行。
+
+    使用有界 frontmatter 解析，避免把正文示例或嵌套键误认为权限。
+    模板合法性由 catalog 校验；无法解析时保留原文，不在投影层猜测修复。
+    """
+    metadata, body = split_frontmatter(content)
+    defaults = {
+        "user-invocable": user_invocable,
+        "disable-model-invocation": not model_invocable,
+    }
+    if not metadata or defaults.keys() <= metadata.keys():
+        return content
+    for key, value in defaults.items():
+        metadata.setdefault(key, value)
+    newline = "\r\n" if content.startswith("---\r\n") else "\n"
+    header = yaml.safe_dump(metadata, sort_keys=False, allow_unicode=True, line_break=newline)
+    return f"---{newline}{header}---{newline}{body}"
 
 
 def _skill_line(skill: Skill) -> str:
@@ -29,7 +62,7 @@ def render_skill_index(skills: Sequence[Skill], heading: str) -> str:
     if dispatcher is not None:
         lines.extend(
             [
-                "**项目证据与生命周期协调（按需读取；启动时仅提示入口）：**",
+                "**项目证据与生命周期协调（按需读取）：**",
                 _skill_line(dispatcher),
                 "",
             ]
@@ -60,7 +93,7 @@ def render_skill_index(skills: Sequence[Skill], heading: str) -> str:
     if maintenance is not None:
         lines.extend(
             [
-                "**确认影响后的知识维护（自动执行）：**",
+                "**知识影响调查与维护（自动执行）：**",
                 _skill_line(maintenance),
                 "",
             ]

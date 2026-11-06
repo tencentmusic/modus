@@ -54,6 +54,43 @@ def test_constraint_templates_enter_retrieval_only_after_authoring(
     assert any(row["path"] == relative for row in index["sections"])
 
 
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "team-standard.md",
+        "team-standard/concurrency.md",
+        "team-standard/legacy/concurrency.md",
+        "team-standard/api.md",
+    ],
+)
+def test_team_example_retrieval_preserves_scope_and_declaration_authority(
+    tmp_path: Path,
+    filename: str,
+) -> None:
+    """示例续读带回平台、规则性质与例外，专题不能升级成人工强制政策。"""
+    paths = ModusPaths.for_root(tmp_path)
+    relative = f"modus/knowledge/constraint/{filename}"
+    target = tmp_path / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        "# 团队规范\n## 批量查询\n### 有界执行\n"
+        '<a id="item-bounded"></a>\n性质: 通用建议\n状态: current\n'
+        "适用: server/，Java 8，共享 executor；不适用于 UI。\n"
+        "#### 示例\n使用已注入 Executor；get 接收剩余预算。\n"
+        "#### 例外\ncancel 不保证中断任务；不能关闭共享池。\n"
+        '### 页面请求\n<a id="item-ui"></a>\n只适用于浏览器。\n',
+        encoding="utf-8",
+    )
+    index = scan_index(paths, kind="project")
+    example = next(row for row in index["sections"] if row["heading"] == "示例")
+    assert example["authority"] == "document-declaration"
+    assert example["facet"] == "rule"
+    entry = runtime._entry_refs(index, [example])[0]
+    assert "Java 8" in entry["excerpt"] and "通用建议" in entry["excerpt"]
+    assert "cancel 不保证中断" in entry["excerpt"]
+    assert "只适用于浏览器" not in entry["excerpt"]
+
+
 # 不同长度与字符的代码围栏都不应产生知识标题。
 # 子条目交付需带回前提、失败和恢复说明，同时排除相邻独立操作。
 def test_fences_are_not_headings_and_children_keep_entry_context(tmp_path: Path) -> None:
@@ -306,3 +343,101 @@ def test_evidence_delivery_is_fair_bounded_and_unique() -> None:
     )
 
     assert [item["id"] for item in collector.items] == ["router", "source", "rule", "source-2"]
+
+
+def test_topic_routes_to_relevant_implementation_before_other_module_anchors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """自然语言命中专题后，应优先返回该条目提及的方法而非 YAML 中的前几个。"""
+    from modus.skillmd import render
+
+    locations = [
+        {"path": "refund.py", "symbol": f"helper_{i}", "startLine": i * 3 + 1} for i in range(8)
+    ]
+    source = "".join(f"def helper_{i}():\n    return {i}\n\n" for i in range(8))
+    source += "class ExpiryJob:\n    def execute(self):\n        return 'restored'\n"
+    (tmp_path / "refund.py").write_text(source, encoding="utf-8")
+    paths, module = _knowledge(
+        tmp_path, render({"anchors": {"locations": locations}}, "# 退款\n退款公共操作。\n")
+    )
+    api = paths.domain("payments") / "references/api.md"
+    api.write_text(
+        render(
+            {
+                "anchors": {
+                    "locations": [
+                        *locations,
+                        {"path": "refund.py", "symbol": "ExpiryJob.execute", "startLine": 26},
+                    ]
+                }
+            },
+            "# 退款接口\n## helper_0：查询额度\n查询当前额度。\n## ExpiryJob：到期恢复\n任务解除冻结并返回恢复结果。\n",
+        ),
+        encoding="utf-8",
+    )
+    (paths.domain("payments") / "SKILL.md").write_text(
+        "# 退款\n[退款操作](references/modules/refund.md)\n[到期恢复](references/api.md#expiryjob到期恢复)\n",
+        encoding="utf-8",
+    )
+    original = {p: p.read_bytes() for p in (api, module)}
+
+    def no_scan(*args, **kwargs):
+        raise AssertionError("相关文档已有有效锚点，不应全仓搜索")
+
+    monkeypatch.setattr(fallback, "search", no_scan)
+    result = context_resolver.resolve_context(str(tmp_path), "到期恢复", scope="project-read")
+    sources = [row for row in result["evidence"] if row.get("layer") == "source"]
+    assert sources[0]["symbol"] == "ExpiryJob.execute"
+    assert "return 'restored'" in sources[0]["excerpt"]
+    assert sources[0]["readTarget"] == {"path": "refund.py", "lineStart": 26, "lineEnd": 27}
+    assert not result["groundingGaps"]
+    assert all(p.read_bytes() == content for p, content in original.items())
+
+
+@pytest.mark.parametrize(
+    ("source", "symbol", "finding"),
+    [
+        ("# run is obsolete\nmessage = 'run'\n", "run", "symbol_missing"),
+        ("class Other:\n    def run(self):\n        pass\n", "Expected.run", "symbol_missing"),
+        (
+            "# run\nclass A:\n    def run(self):\n        pass\nclass B:\n    def run(self):\n        pass\n",
+            "run",
+            "ambiguous",
+        ),
+        ("def run(:\n", "run", "anchor_verification_unavailable"),
+    ],
+)
+def test_unverified_anchor_is_only_a_search_hint(
+    tmp_path: Path, source: str, symbol: str, finding: str
+) -> None:
+    (tmp_path / "source.py").write_text(source, encoding="utf-8")
+    evidence, gaps = runtime._anchored_source_refs(
+        ModusPaths.for_root(tmp_path),
+        [{"sourceLocations": [{"path": "source.py", "symbol": symbol, "startLine": 1}]}],
+        "run",
+        limit=4,
+    )
+    assert any(finding in gap.get("reason", "") for gap in gaps)
+    assert all("sourceLocation" not in row["scoreSignals"] for row in evidence)
+
+
+def test_unique_drift_reads_current_range_without_full_scan_or_header_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "source.py").write_text(
+        "# run moved\n\nclass A:\n    def run(self):\n        return 7\n", encoding="utf-8"
+    )
+
+    def no_scan(*args, **kwargs):
+        raise AssertionError("唯一声明可在原文件重定位")
+
+    monkeypatch.setattr(fallback, "search", no_scan)
+    evidence, gaps = runtime._anchored_source_refs(
+        ModusPaths.for_root(tmp_path),
+        [{"sourceLocations": [{"path": "source.py", "symbol": "A.run", "startLine": 1}]}],
+        "run",
+        limit=1,
+    )
+    assert evidence[0]["lineStart"] == 4 and evidence[0]["lineEnd"] == 5
+    assert "return 7" in evidence[0]["excerpt"]
+    assert gaps[0]["reason"] == "line_drift" and gaps[0]["actualLine"] == 4

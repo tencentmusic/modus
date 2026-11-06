@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
-from modus.hooks import SUPPORTED_HOSTS
 from modus.manifest import hash_file
 from modus.platforms import (
     BUILTIN_REGISTRY,
@@ -20,27 +18,23 @@ from modus.platforms import (
 )
 from modus.platforms.claude import ClaudeAdapter
 from modus.platforms.codex import CodexAdapter
-from modus.platforms.hooks import HookConfigurationError, merge_hook
 from modus.platforms.sections import SectionIntegrityError, inject_section, remove_section
 from modus.scaffold import TemplateCatalog, scaffold_project
 from modus.skillmd import split_frontmatter
 from modus.surface import CORE_SKILLS
 
 
-# 名称集合一致只能证明发现能力；顺序和独立路径还保护安装行为。
-# 标记与 hook 路径必须互不冲突，否则卸载一个宿主会影响另一个。
-def test_builtin_registry_and_host_contracts_share_one_complete_vocabulary() -> None:
-    assert set(BUILTIN_REGISTRY.names) == set(SUPPORTED_HOSTS)
-    assert available_platforms() == sorted(SUPPORTED_HOSTS)
-
-    adapters = get_adapters(list(SUPPORTED_HOSTS))
-    assert [adapter.name for adapter in adapters] == list(SUPPORTED_HOSTS)
-    assert len({adapter.layout.instructions.marker for adapter in adapters}) == len(adapters)
-    hook_paths: set[str] = set()
-    for adapter in adapters:
-        assert adapter.layout.hook is not None
-        hook_paths.add(adapter.layout.hook.path)
-    assert len(hook_paths) == len(adapters)
+# 注册表统一安装平台词汇；Codex 与 DSH 共用指令区块，技能目录独立。
+def test_builtin_registry_covers_platforms_and_separates_skill_roots() -> None:
+    expected = ["claude", "codebuddy", "codex", "cursor", "dsh"]
+    assert sorted(BUILTIN_REGISTRY.names) == available_platforms() == expected
+    adapters = get_adapters(expected)
+    assert [adapter.name for adapter in adapters] == expected
+    assert len({adapter.layout.skills_root for adapter in adapters}) == len(adapters)
+    assert (
+        get_adapters(["codex"])[0].layout.instructions
+        == get_adapters(["dsh"])[0].layout.instructions
+    )
 
 
 # 自定义注册表应拥有独立目录，不向内置全局状态追加类型。
@@ -91,33 +85,6 @@ def test_section_editor_preserves_foreign_text_and_fails_closed_on_bad_markers(
     assert target.read_text(encoding="utf-8") == "<!-- MODUS:BEGIN example-section -->\n"
 
 
-# 外部 hook 与非 hook 配置都属于用户，合并必须同时保留。
-# 生成内容也接受形状检查，内部调用不等同于可信结构。
-# 检查命令列表顺序，防止集合式合并改变宿主执行次序。
-def test_hook_merge_preserves_foreign_entries_and_validates_generated_shape(
-    tmp_path: Path,
-) -> None:
-    target = tmp_path / "hooks.json"
-    target.write_text(
-        json.dumps({"theme": "dark", "hooks": {"SessionStart": [{"command": "team"}]}}),
-        encoding="utf-8",
-    )
-    generated = {
-        "hooks": {"SessionStart": [{"command": ".modus/hooks/run-hook.cmd session-start codex"}]}
-    }
-
-    merge_hook(target, generated)
-    merged = json.loads(target.read_text(encoding="utf-8"))
-    assert merged["theme"] == "dark"
-    assert [entry["command"] for entry in merged["hooks"]["SessionStart"]] == [
-        "team",
-        ".modus/hooks/run-hook.cmd session-start codex",
-    ]
-
-    with pytest.raises(HookConfigurationError, match="必须为对象"):
-        merge_hook(target, {"hooks": []})
-
-
 def test_installed_skills_keep_host_invocation_policy_and_manifest_hashes(tmp_path: Path) -> None:
     expected = {
         "using-modus": (False, False),
@@ -126,7 +93,7 @@ def test_installed_skills_keep_host_invocation_policy_and_manifest_hashes(tmp_pa
         "modus-update-knowledge": (True, False),
         "modus-sync-knowledge": (False, False),
     }
-    manifest = scaffold_project(tmp_path, list(SUPPORTED_HOSTS))
+    manifest = scaffold_project(tmp_path, available_platforms())
     projected: dict[str, bytes] = {}
     for skill in TemplateCatalog().load_skills(CORE_SKILLS):
         relative = f".claude/skills/{skill.name}/SKILL.md"
@@ -142,7 +109,7 @@ def test_installed_skills_keep_host_invocation_policy_and_manifest_hashes(tmp_pa
             neutral = tmp_path / root / "skills" / skill.name / "SKILL.md"
             assert neutral.read_text(encoding="utf-8") == skill.body
 
-    second = scaffold_project(tmp_path, list(SUPPORTED_HOSTS))
+    second = scaffold_project(tmp_path, available_platforms())
     assert second.to_dict() == manifest.to_dict()
     assert {path: (tmp_path / path).read_bytes() for path in projected} == projected
 

@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
-from modus.machine.errors import validate_code
+from modus.machine.errors import IntegrityError, validate_code
 from modus.machine.progress import ProgressReporter
 from modus.machine.store.catalog import (
     CatalogRecord,
@@ -45,6 +45,16 @@ def snapshot_catalog(
     progress: ProgressReporter | None = None,
 ) -> CatalogReference:
     records: list[CatalogRecord] = []
+    for row in _as_objects(snapshot.get("sourceDispositions")):
+        path = str(row.get("path") or "")
+        value = gap_record("machine.corpus.input-not-admitted", details=dict(row)).to_dict()
+        records.append(
+            CatalogRecord(
+                f"selection:{path}",
+                value,
+                f"snapshot/selection/{_digest_path(path)}.json",
+            )
+        )
     for row in _as_objects(snapshot.get("sources")):
         path = str(row.get("path") or "")
         if not path:
@@ -131,37 +141,71 @@ def service_catalog(
     progress: ProgressReporter | None = None,
 ) -> CatalogReference:
     digests = _source_digests(snapshot)
+    source_roles = {
+        str(row.get("path") or ""): row.get("role") for row in _as_objects(snapshot.get("sources"))
+    }
     records: list[CatalogRecord] = []
     nodes = _as_objects(services.get("nodes"))
     boundary_ids: set[str] = set()
-    default_path = next(iter(digests), "")
     for row in nodes:
         boundary_id = str(row.get("boundaryId") or row.get("id") or row.get("name") or "")
-        if not boundary_id or not default_path:
+        if not boundary_id:
             continue
         boundary_ids.add(boundary_id)
         anchors = _as_objects(row.get("sourceAnchors") or row.get("anchors"))
         anchor = anchors[0] if anchors else {}
-        path = str(anchor.get("path") or anchor.get("file") or default_path)
-        value = _positive_record(
-            "resource",
-            identity=("service-boundary", boundary_id),
-            candidate_ids=_as_strings(row.get("candidateIds")),
-            resolution=str(row.get("resolution") or "heuristic"),
-            source_layer=str(row.get("sourceLayer") or "cst"),
-            witness=_witness(
-                path=path,
-                source_digest=str(anchor.get("sourceDigest") or digests.get(path, "0" * 64)),
-                symbol=str(row.get("symbol") or row.get("name") or ""),
-                start_line=_line(anchor.get("startLine") or anchor.get("line")),
-                end_line=_line(anchor.get("endLine") or anchor.get("line")),
+        path = str(anchor.get("path") or anchor.get("file") or "")
+        raw_attributes = row.get("attributes")
+        attributes = raw_attributes if isinstance(raw_attributes, dict) else {}
+        details: JsonObject = {
+            "recordType": "serviceBoundary",
+            "boundaryId": boundary_id,
+            "boundaryKind": str(row.get("kind") or ""),
+            "name": str(row.get("name") or row.get("qualifiedName") or row.get("label") or ""),
+            "qualifiedName": str(row.get("qualifiedName") or ""),
+            "displayName": str(row.get("displayName") or ""),
+            "sourceBasis": str(
+                attributes.get("sourceBasis")
+                or (
+                    "configuration"
+                    if source_roles.get(path) == "configuration"
+                    else "declaration"
+                    if path
+                    else "unknown"
+                )
             ),
-            details={
-                "recordType": "serviceBoundary",
-                "boundaryId": boundary_id,
-                "boundaryKind": str(row.get("kind") or ""),
-                "name": str(row.get("name") or row.get("label") or ""),
-            },
+            "resourceNature": "dynamic-reference"
+            if attributes.get("dynamic")
+            else "reference"
+            if attributes.get("sourceBasis") == "relation"
+            else "declaration"
+            if path
+            else "unknown",
+        }
+        value = (
+            _positive_record(
+                "resource",
+                identity=("service-boundary", boundary_id),
+                candidate_ids=_as_strings(row.get("candidateIds")),
+                resolution=str(row.get("resolution") or "heuristic"),
+                source_layer=str(row.get("sourceLayer") or "cst"),
+                witness=_witness(
+                    path=path,
+                    source_digest=str(anchor.get("sourceDigest") or digests.get(path, "0" * 64)),
+                    symbol=str(
+                        row.get("symbol") or row.get("qualifiedName") or row.get("name") or ""
+                    ),
+                    start_line=_line(anchor.get("startLine") or anchor.get("line")),
+                    end_line=_line(anchor.get("endLine") or anchor.get("line")),
+                ),
+                details=details,
+            )
+            if path in digests
+            else gap_record(
+                "machine.projection.service-source-unavailable",
+                candidate_ids=_as_strings(row.get("candidateIds")),
+                details={**details, "path": path},
+            ).to_dict()
         )
         records.append(
             CatalogRecord(
@@ -177,33 +221,43 @@ def service_catalog(
         target = str(row.get("target") or row.get("to") or "")
         boundary_id = source if source in boundary_ids else target
         witness: Mapping[str, Any] = (
-            cast(Mapping[str, Any], row["witness"])
-            if isinstance(row.get("witness"), Mapping)
+            cast(Mapping[str, Any], row.get("witness") or row.get("callSite"))
+            if isinstance(row.get("witness") or row.get("callSite"), Mapping)
             else {}
         )
-        path = str(witness.get("path") or default_path)
-        if not boundary_id or not path:
+        path = str(witness.get("path") or witness.get("file") or "")
+        if not boundary_id:
             continue
-        value = _positive_record(
-            "relation",
-            identity=("service-relation", row.get("id"), source, target, row.get("relation")),
-            candidate_ids=_as_strings(row.get("candidateIds")),
-            resolution=str(row.get("resolution") or "unresolved"),
-            source_layer=str(row.get("sourceLayer") or "cst"),
-            witness=_witness(
-                path=path,
-                source_digest=str(witness.get("sourceDigest") or digests.get(path, "0" * 64)),
-                symbol=str(witness.get("symbol") or ""),
-                start_line=_line(witness.get("startLine")),
-                end_line=_line(witness.get("endLine")),
-            ),
-            details={
-                "recordType": "serviceRelation",
-                "boundaryId": boundary_id,
-                "source": source,
-                "target": target,
-                "relation": str(row.get("relation") or ""),
-            },
+        details = {
+            "recordType": "serviceRelation",
+            "boundaryId": boundary_id,
+            "source": source,
+            "target": target,
+            "relation": str(row.get("relation") or ""),
+            "relationId": str(row.get("id") or ""),
+        }
+        value = (
+            _positive_record(
+                "relation",
+                identity=("service-relation", row.get("id"), source, target, row.get("relation")),
+                candidate_ids=_as_strings(row.get("candidateIds")),
+                resolution=str(row.get("resolution") or "unresolved"),
+                source_layer=str(row.get("sourceLayer") or "cst"),
+                witness=_witness(
+                    path=path,
+                    source_digest=str(witness.get("sourceDigest") or digests.get(path, "0" * 64)),
+                    symbol=str(witness.get("symbol") or ""),
+                    start_line=_line(witness.get("startLine") or witness.get("line")),
+                    end_line=_line(witness.get("endLine")),
+                ),
+                details=details,
+            )
+            if path in digests
+            else gap_record(
+                "machine.projection.service-source-unavailable",
+                candidate_ids=_as_strings(row.get("candidateIds")),
+                details={**details, "path": path},
+            ).to_dict()
         )
         record_id = str(value["recordId"])
         records.append(
@@ -211,6 +265,44 @@ def service_catalog(
                 f"boundary:{boundary_id}:relation:{record_id}",
                 value,
                 f"services/boundaries/{_digest_path(boundary_id)}/records/{_digest_path(record_id)}.json",
+            )
+        )
+    # 没有可发布关系也可能是投影缺口，不能把诊断丢成“没有依赖”。
+    for row in _as_objects(services.get("coverageGaps")):
+        reason = str(row.get("reasonCode") or row.get("code") or "machine.projection.service-gap")
+        try:
+            validate_code(reason)
+        except ValueError:
+            reason = "machine.projection.service-gap"
+        value = gap_record(
+            reason,
+            details={
+                key: cast(Any, row[key])
+                for key in (
+                    "path",
+                    "symbol",
+                    "source",
+                    "target",
+                    "boundaryId",
+                    "relationId",
+                    "code",
+                    "provider",
+                    "buildUnitId",
+                    "subject",
+                    "contextId",
+                    "analysisContextId",
+                    "nodeId",
+                    "recordId",
+                    "severity",
+                    "line",
+                )
+                if key in row
+            },
+        ).to_dict()
+        record_id = str(value["recordId"])
+        records.append(
+            CatalogRecord(
+                f"!gap:{record_id}", value, f"services/gaps/{_digest_path(record_id)}.json"
             )
         )
     return write_catalog(
@@ -255,8 +347,21 @@ def _evidence_record(
         or ""
     )
     detail_names: tuple[str, ...]
-    if raw.get("ruleId") or raw.get("evidenceKind"):
+    if raw.get("materialType"):
         detail_names = (
+            "materialType",
+            "heading",
+            "content",
+            "links",
+            "mentions",
+            "continued",
+            "associations",
+            "blockIndex",
+        )
+        record_type = "materialBlock"
+    elif raw.get("ruleId") or raw.get("evidenceKind"):
+        detail_names = (
+            "entryId",
             "evidenceKind",
             "ruleId",
             "value",
@@ -265,6 +370,7 @@ def _evidence_record(
             "displayName",
             "symbol",
             "signature",
+            "signatureOmittedCharacters",
         )
         record_type = "authoringSignal"
     elif kind == "entry":
@@ -274,16 +380,25 @@ def _evidence_record(
             "language",
             "symbol",
             "signature",
+            "signatureOmittedCharacters",
             "displayName",
             "route",
             "contracts",
             "annotations",
+            "capabilitySeed",
+            "sourceRole",
+            "comment",
+            "objectFacts",
+            "owner",
+            "qualifiedName",
             "analysisCompleteness",
         )
         record_type = "sourceEntry"
     else:
         detail_names = (
             "relation",
+            "location",
+            "callSite",
             "source",
             "target",
             "targetSymbol",
@@ -300,22 +415,75 @@ def _evidence_record(
     # 空值不进入细节；读取者以记录种类解释字段缺省。
     # 列表裁剪只影响公开细节，不改变原始证据包。
     keep: JsonObject = {"recordType": record_type}
+    # 关联身份不能按展示列表上限裁剪，否则合法范围查询会丢失共享消费者。
+    for name in ("capabilityIds", "relatedCandidateIds"):
+        if name in raw:
+            keep[name] = list(_as_strings(raw[name]))
     for name in detail_names:
         value = raw.get(name)
         if value in (None, "", [], {}):
             continue
+        if name == "signatureOmittedCharacters" and not value:
+            continue
         if isinstance(value, list):
+            if len(value) > 32:
+                keep[name + "OmittedCount"] = len(value) - 32
             value = value[:32]
+        if name == "associations" and isinstance(value, list):
+            value = [
+                {
+                    **association,
+                    "entryIds": association["entryIds"][:32],
+                    "entryIdsOmittedCount": len(association["entryIds"]) - 32,
+                }
+                if isinstance(association, dict)
+                and isinstance(association.get("entryIds"), list)
+                and len(association["entryIds"]) > 32
+                else association
+                for association in value
+            ]
+        if name == "objectFacts" and isinstance(value, dict):
+            value = dict(value)
+            initializer = value.get("initializer")
+            if isinstance(initializer, str) and len(initializer) > 2048:
+                value["initializer"] = initializer[:2048]
+                value["initializerOmittedCharacters"] = len(initializer) - 2048
         keep[name] = cast(Any, value)
+    signature = keep.get("signature")
+    if isinstance(signature, str) and len(signature) > 4096:
+        keep["signatureOmittedCharacters"] = int(raw.get("signatureOmittedCharacters") or 0) + (
+            len(signature) - 4096
+        )
+        keep["signature"] = signature[:4096]
+    identity: tuple[object, ...] = (
+        path,
+        # 声明身份用于归属，加入它不能改变已有规则信号的稳定记录身份。
+        (raw.get("entryId") if record_type != "authoringSignal" else None)
+        or raw.get("id")
+        or raw.get("source"),
+        raw.get("target"),
+        raw.get("kind") or raw.get("relation"),
+        location.get("startLine") or witness_raw.get("startLine"),
+    )
+    if record_type == "authoringSignal":
+        # 同一行可同时加锁、保存数据和发送消息。规则及命中值也是信号身份，
+        # 不能让文件级去重静默覆盖这些不同事实；普通入口/关系身份保持不变。
+        identity += (
+            symbol,
+            raw.get("ruleId"),
+            raw.get("evidenceKind"),
+            raw.get("contract"),
+            raw.get("value"),
+            raw.get("observation"),
+            dict(location),
+        )
+    elif record_type == "sourceRelation":
+        identity += (dict(location), raw.get("contextId"), raw.get("sourceLayer"))
+    elif record_type == "materialBlock":
+        identity += (raw.get("materialType"), raw.get("blockIndex"))
     return _positive_record(
         kind,
-        identity=(
-            path,
-            raw.get("entryId") or raw.get("id") or raw.get("source"),
-            raw.get("target"),
-            raw.get("kind") or raw.get("relation"),
-            location.get("startLine") or witness_raw.get("startLine"),
-        ),
+        identity=identity,
         candidate_ids=candidate_ids,
         resolution=str(raw.get("resolution") or ("exact" if kind == "entry" else "unresolved")),
         source_layer=str(raw.get("sourceLayer") or "cst"),
@@ -354,7 +522,23 @@ def _coverage_gap(
         cast(Mapping[str, Any], raw["location"]) if isinstance(raw.get("location"), Mapping) else {}
     )
     details: JsonObject = {"path": path}
-    for name in ("summary", "disposition", "nodeId", "symbol", "resolution"):
+    if location:
+        details["location"] = dict(location)
+    for name in (
+        "summary",
+        "disposition",
+        "nodeId",
+        "symbol",
+        "resolution",
+        "code",
+        "provider",
+        "buildUnitId",
+        "subject",
+        "contextId",
+        "analysisContextId",
+        "recordId",
+        "severity",
+    ):
         value = raw.get(name)
         if value not in (None, ""):
             details[name] = cast(Any, value)
@@ -434,7 +618,7 @@ def evidence_catalog(
                 raw=row,
                 path=path,
                 source_digest=source_digest,
-                candidate_ids=candidate_ids,
+                candidate_ids=_as_strings(row.get("candidateIds")),
                 kind="entry",
             )
             for row in _as_objects(packet.get("entries"))
@@ -444,7 +628,7 @@ def evidence_catalog(
                 raw=row,
                 path=path,
                 source_digest=source_digest,
-                candidate_ids=candidate_ids,
+                candidate_ids=_as_strings(row.get("candidateIds")),
                 kind="relation",
             )
             for row in _as_objects(packet.get("relations"))
@@ -454,7 +638,7 @@ def evidence_catalog(
                 raw=row,
                 path=path,
                 source_digest=source_digest,
-                candidate_ids=candidate_ids,
+                candidate_ids=_as_strings(row.get("candidateIds")),
                 kind=str(row.get("kind") or "effect"),
             )
             for row in _as_objects(packet.get("authoringRecords"))
@@ -473,7 +657,24 @@ def evidence_catalog(
             )
         # 去重后再计数，摘要反映实际可读取记录而非原始重复观察。
         # 逐条验证让无效提供者输出在发布边界失败。
-        projected = list({str(value["recordId"]): value for value in projected}.values())
+        unique: dict[str, JsonObject] = {}
+        for value in projected:
+            record_id = str(value["recordId"])
+            if record_id in unique and canonical_bytes(unique[record_id]) != canonical_bytes(value):
+                raise IntegrityError(
+                    "machine.store.catalog-duplicate-key",
+                    details={
+                        "catalog": "evidence",
+                        "keyDigest": _digest_path(record_id),
+                        "path": path,
+                        "recordType": cast(JsonObject, value.get("details", {})).get("recordType"),
+                        "differingFields": sorted(
+                            key for key in value if value.get(key) != unique[record_id].get(key)
+                        ),
+                    },
+                )
+            unique[record_id] = value
+        projected = list(unique.values())
         for value in projected:
             parse_record(value)
             record_id = str(value["recordId"])

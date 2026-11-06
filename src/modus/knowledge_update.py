@@ -1,4 +1,4 @@
-"""Direct, source-attributed material updates without an intake state machine."""
+"""显式知识更新：整批预检、逐文件 CAS 与可恢复的部分成功报告。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, TypeAlias
 
 from .knowledge_reader import BoundKnowledgeReadError, read_bound_regular_text
-from .knowledge_write_session import delete_document, write_document
+from .knowledge_write_session import TeamStandardWriteMode, delete_document, write_document
 from .paths import ModusPaths
 
 _DigestMap: TypeAlias = Mapping[str, str | None]
@@ -49,7 +49,7 @@ def _validated_hashes(expected_hashes: object) -> _DigestMap:
 # 批量报告不宣称事务性回滚，已完成写入会明确保留。
 @dataclass(slots=True)
 class _UpdateLedger:
-    """Collect independent per-document outcomes without obscuring control flow."""
+    """按文档保存独立结果，保留部分成功与冲突的边界。"""
 
     written: list[str] = field(default_factory=list)
     unchanged: list[str] = field(default_factory=list)
@@ -84,6 +84,7 @@ def _write_one(
     hashes: _DigestMap,
     *,
     allow_team_standard: bool,
+    initialize_team_standard: bool,
 ) -> tuple[_Outcome, dict[str, str] | None]:
     try:
         try:
@@ -110,6 +111,7 @@ def _write_one(
             expected_hash=hashes.get(target),
             allow_human=True,
             allow_team_standard=allow_team_standard,
+            initialize_team_standard=initialize_team_standard,
         )
         return "written", None
     except (OSError, ValueError, RuntimeError) as exc:
@@ -139,8 +141,9 @@ def validate_update_input(
     expected_hashes: object,
     deletions: object,
     allow_team_standard: object,
+    initialize_team_standard: object = False,
 ) -> None:
-    """Validate the entire request's shape before any document can be changed."""
+    """在首个写入前检查整批形状；执行期冲突仍按文档报告。"""
     if not isinstance(documents, Mapping) or not all(
         isinstance(key, str) and isinstance(value, str) for key, value in documents.items()
     ):
@@ -152,8 +155,9 @@ def validate_update_input(
         or not all(isinstance(target, str) for target in deletions)
     ):
         raise ValueError("deletions 必须为单个 Markdown 路径组成的列表")
-    if not isinstance(allow_team_standard, bool):
-        raise ValueError("allowTeamStandard 必须为布尔值")
+    TeamStandardWriteMode.from_flags(
+        initialize=initialize_team_standard, maintain=allow_team_standard
+    )
     if len(set(deletions)) != len(deletions):
         raise ValueError("deletions 不能包含重复路径")
     if set(documents) & set(deletions):
@@ -176,16 +180,22 @@ def update_knowledge(
     expected_hashes: Mapping[str, str | None] | None = None,
     deletions: Sequence[str] = (),
     allow_team_standard: bool = False,
+    initialize_team_standard: bool = False,
 ) -> dict[str, Any]:
-    """Apply explicitly requested material documents, preserving unrelated files.
+    """写入调用方已完成的 Markdown，仅改变本次明确选中的文档。
 
-    Callers supply already-authored Markdown with its evidence references. Existing
-    documents require the digest observed when that text was authored, protecting
-    edits made in between. New files use a None digest. Explicit retirements
-    require an observed digest and run only after this batch's writes succeed.
-    Keep batches scoped: failures do not roll back independent completed work.
+    已有正文使用创作时观察的摘要，新文件以 None 表达预期不存在。
+    退役必须提供原摘要，且只在本批写入全部成功后执行。独立文件已完成的
+    写入不回滚；调用方根据逐项结果回读冲突，不能把 partial 当作整批失败。
+
+    首次填充与人工维护分别授权：initialize_team_standard 仅填缺失入口或
+    精确入口种子，并可在入口尚未成稿时创建缺失专题。先提交专题并确认成功，
+    再发布入口导航。allow_team_standard 允许明确委托的正文维护。两者互斥，
+    均不跳过文档锁内的所有权和内容摘要检查。
     """
-    validate_update_input(documents, expected_hashes, deletions, allow_team_standard)
+    validate_update_input(
+        documents, expected_hashes, deletions, allow_team_standard, initialize_team_standard
+    )
     paths = ModusPaths.for_root(root)
     hashes = expected_hashes or {}
     ledger = _UpdateLedger()
@@ -196,6 +206,7 @@ def update_knowledge(
             content,
             hashes,
             allow_team_standard=allow_team_standard,
+            initialize_team_standard=initialize_team_standard,
         )
         ledger.record(outcome, target, conflict)
     deferred = list(deletions) if ledger.conflicts else []

@@ -6,9 +6,9 @@ The package follows a small ports-and-adapters design:
     Immutable projection data and declarative host layouts.
 ``base``
     The shared install/uninstall lifecycle and manifest ownership rules.
-``rendering`` / ``sections`` / ``hooks``
+``rendering`` / ``sections``
     Pure content rendering plus non-destructive shared-file editors.
-``claude`` / ``codex`` / ``cursor`` / ``codebuddy``
+``claude`` / ``codex`` / ``cursor`` / ``codebuddy`` / ``dsh``
     Thin adapters that state only host paths, metadata, and presentation quirks.
 
 Downstream code normally needs only the stable facade exported here.
@@ -16,7 +16,6 @@ Downstream code normally needs only the stable facade exported here.
 
 from .base import Command, PlatformAdapter, Skill
 from .models import (
-    HookFile,
     InstructionFile,
     PlatformLayout,
     ProjectionConfigurationError,
@@ -32,7 +31,6 @@ from .registry import (
 __all__ = [
     "BUILTIN_REGISTRY",
     "Command",
-    "HookFile",
     "InstructionFile",
     "PlatformAdapter",
     "PlatformLayout",

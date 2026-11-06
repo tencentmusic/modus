@@ -31,29 +31,14 @@ from typing import Any
 
 from ..knowledge_reader import BoundKnowledgeReadError, read_bound_regular_text
 from ..paths import ModusPaths
-from ..scope_models import SourceLocation
 from ..skillmd import render, split_frontmatter
+from ..source_anchors import check_location, document_locations, source_declarations
 
 __all__ = ["run_verify_anchors"]
 
 _REF_RE = re.compile(r"(?P<path>[\w][\w./-]*\.[A-Za-z0-9_]+)#L(?P<line>\d+)")
 
 _MAX_SOURCE_BYTES = 8 * 1024 * 1024
-
-
-def _identifier_stem(symbol: str) -> str:
-    """The searchable identifier inside an authored anchor symbol."""
-    cleaned = symbol.strip().strip("()").lstrip(".")
-    cleaned = cleaned.split("(", 1)[0]
-    return cleaned.rsplit(".", 1)[-1].rsplit("#", 1)[-1].strip()
-
-
-# 按标识符边界收集全部命中，多个结果必须交给作者判断而非任选。
-def _symbol_lines(source_lines: list[str], stem: str) -> list[int]:
-    if not stem:
-        return []
-    pattern = re.compile(rf"(?<![\w]){re.escape(stem)}(?![\w])")
-    return [index for index, line in enumerate(source_lines, start=1) if pattern.search(line)]
 
 
 # 读取当前工作树并限制文件大小，验证结果不依赖历史分析缓存。
@@ -78,57 +63,6 @@ def _in_domain(paths: ModusPaths, path: Path, domain: str | None) -> bool:
     return True
 
 
-# 锚点是可选元数据；结构非法时逐项记录，避免一个坏条目遮蔽全部结果。
-def _document_locations(
-    paths: ModusPaths, path: Path
-) -> tuple[list[SourceLocation], list[dict[str, Any]]]:
-    """Read optional ``anchors.locations`` without assuming a document type."""
-
-    document = paths.relative(path)
-    try:
-        text = read_bound_regular_text(paths.root, path, max_bytes=2 * 1024 * 1024)
-    except (BoundKnowledgeReadError, OSError, ValueError):
-        return [], []
-    frontmatter, _body = split_frontmatter(text)
-    anchors = frontmatter.get("anchors")
-    if anchors is None:
-        return [], []
-    if not isinstance(anchors, dict):
-        return [], [
-            {
-                "document": document,
-                "finding": "anchor_metadata_invalid",
-                "detail": "anchors 必须为映射",
-            }
-        ]
-    raw_locations = anchors.get("locations")
-    if raw_locations is None:
-        return [], []
-    if not isinstance(raw_locations, list):
-        return [], [
-            {
-                "document": document,
-                "finding": "anchor_metadata_invalid",
-                "detail": "anchors.locations 必须为列表",
-            }
-        ]
-
-    locations: list[SourceLocation] = []
-    findings: list[dict[str, Any]] = []
-    for index, raw in enumerate(raw_locations):
-        try:
-            locations.append(SourceLocation.from_dict(raw))
-        except (TypeError, ValueError) as exc:
-            findings.append(
-                {
-                    "document": document,
-                    "finding": "anchor_metadata_invalid",
-                    "detail": f"anchors.locations[{index}]: {exc}",
-                }
-            )
-    return locations, findings
-
-
 def _verify_structured_anchors(
     paths: ModusPaths,
     *,
@@ -140,11 +74,16 @@ def _verify_structured_anchors(
 
     findings: list[dict[str, Any]] = []
     fixed_documents: list[str] = []
+    declaration_cache: dict[str, list[dict[str, Any]] | None] = {}
     for path in markdown_files(paths, "project"):
         if not _in_domain(paths, path, domain):
             continue
         document = paths.relative(path)
-        locations, metadata_findings = _document_locations(paths, path)
+        try:
+            original_text = read_bound_regular_text(paths.root, path, max_bytes=2 * 1024 * 1024)
+        except (BoundKnowledgeReadError, OSError, ValueError):
+            continue
+        locations, metadata_findings = document_locations(paths, path, original_text)
         findings.extend(metadata_findings)
         repairs: dict[tuple[str, str, int], int] = {}
         for location in locations:
@@ -160,34 +99,24 @@ def _verify_structured_anchors(
             if source_lines is None:
                 findings.append({**base, "finding": "symbol_missing", "detail": "文件缺失"})
                 continue
-            stem = _identifier_stem(location.symbol)
-            matches = _symbol_lines(source_lines, stem)
-            if not matches:
-                findings.append({**base, "finding": "symbol_missing", "detail": "文件中未找到符号"})
+            if location.path not in declaration_cache:
+                declaration_cache[location.path] = source_declarations(location.path, source_lines)
+            check = check_location(location, declaration_cache[location.path])
+            if check.finding == "current":
                 continue
-            if location.start_line in matches:
-                continue
-            if len(matches) == 1:
-                findings.append(
-                    {
-                        **base,
-                        "finding": "line_drift",
-                        "actualLine": matches[0],
-                        "fixable": True,
-                    }
-                )
-                repairs[(location.path, location.symbol, location.start_line)] = matches[0]
-            else:
-                findings.append(
-                    {
-                        **base,
-                        "finding": "ambiguous",
-                        "candidateLines": matches[:10],
-                        "detail": "匹配到多个行，无法自动修复",
-                    }
-                )
+            finding: dict[str, Any] = {**base, "finding": check.finding}
+            if check.detail:
+                finding["detail"] = check.detail
+            if check.start_line is not None and check.start_line != location.start_line:
+                finding["actualLine"] = check.start_line
+            if check.candidate_lines:
+                finding["candidateLines"] = list(check.candidate_lines[:10])
+            if check.finding == "line_drift" and check.start_line is not None:
+                finding["fixable"] = True
+                repairs[(location.path, location.symbol, location.start_line)] = check.start_line
+            findings.append(finding)
         if fix and repairs:
-            if _repair_document(paths, document, repairs):
+            if _repair_document(paths, document, repairs, original_text):
                 fixed_documents.append(document)
                 for finding in findings:
                     key = (
@@ -197,20 +126,24 @@ def _verify_structured_anchors(
                     )
                     if finding.get("document") == document and key in repairs:
                         finding["fixed"] = True
+            else:
+                findings.append(
+                    {
+                        "document": document,
+                        "finding": "anchor_write_conflict",
+                        "detail": "未写入修复；保留原读时版本，核对并发变化或写入失败",
+                    }
+                )
     return findings, fixed_documents
 
 
 # 机械修复仅更新可唯一定位的行号，写入依赖原始内容摘要检测并发编辑。
 def _repair_document(
-    paths: ModusPaths, document: str, repairs: dict[tuple[str, str, int], int]
+    paths: ModusPaths, document: str, repairs: dict[tuple[str, str, int], int], text: str
 ) -> bool:
     """Rewrite only the drifted startLine values, under the shared CAS writer."""
     from ..knowledge_write_session import write_document
 
-    try:
-        text = read_bound_regular_text(paths.root, paths.root / document)
-    except (BoundKnowledgeReadError, OSError, ValueError):
-        return False
     frontmatter, body = split_frontmatter(text)
     anchors = frontmatter.get("anchors")
     if not isinstance(anchors, dict):

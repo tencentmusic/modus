@@ -106,7 +106,7 @@ WORKFLOW_NAMES = frozenset(
     }
 )
 COMMAND_NAMES = frozenset({"init", "reinit", "update-knowledge"})
-PLATFORM_NAMES = frozenset({"claude", "codebuddy", "codex", "cursor"})
+PLATFORM_NAMES = frozenset({"claude", "codebuddy", "codex", "cursor", "dsh"})
 WHEEL_METADATA_HEADERS = (
     ("Description-Content-Type", "text/markdown"),
     ("License-Expression", "MIT"),
@@ -138,10 +138,10 @@ PACKAGE_BOUNDARIES = (
         "modus/display_labels.py",
         "modus/platforms/display.py",
         "modus/commands/install_state.py",
+        "modus/legacy_hooks.py",
     ),
     _boundary(
         "knowledge orchestration",
-        "modus/hooks/bootstrap.py",
         "modus/knowledge_update.py",
         "modus/orchestrator/context_resolver.py",
         "modus/paths.py",
@@ -183,10 +183,10 @@ PACKAGE_BOUNDARIES = (
         "modus/machine/facts/build_resolvers/python_resolver.py",
         "modus/machine/facts/build_resolvers/typescript_resolver.py",
         "modus/machine/facts/extension_registry.py",
-        "modus/machine/facts/native_objc.py",
-        "modus/machine/facts/native_swift.py",
         "modus/machine/facts/native_cpp.py",
         "modus/machine/facts/native_kotlin.py",
+        "modus/machine/facts/native_objc.py",
+        "modus/machine/facts/native_swift.py",
         "modus/machine/facts/frontend.py",
         "modus/machine/facts/frontend_frameworks.py",
         "modus/machine/facts/frontend_routes.py",
@@ -226,12 +226,16 @@ SDIST_ROOT_BOUNDARY = _boundary(
     "LICENSE",
     "README.md",
     "ARCHITECTURE.md",
+    "AGENTS.md",
     "CONTRIBUTING.md",
+    "skills/modus-development/SKILL.md",
+    "skills/modus-development/scripts/inspect_repository.py",
     "tests/test_documented_cli.py",
     "scripts/package_smoke.py",
     "READMEs/README.en.md",
     "docs/knowledge-lifecycle-boundary.md",
     "docs/authoring-contract.md",
+    "docs/skill-authoring.md",
     "pyproject.toml",
     "schemas/module-meta.schema.yaml",
     "uv.lock",
@@ -247,7 +251,15 @@ SDIST_EXCLUSIONS = ExclusionPolicy(
 # 退役接口不能因构建目录残留重新进入公开产物。
 # 公共排除策略同时应用于两种发行格式。
 PUBLIC_ARCHIVE_EXCLUSIONS = ExclusionPolicy(
-    prefixes=("third_party/", "modus/licenses/", "src/modus/licenses/"),
+    prefixes=(
+        "third_party/",
+        "modus/licenses/",
+        "src/modus/licenses/",
+        "modus/hooks/",
+        "src/modus/hooks/",
+        "modus/platforms/hooks.py",
+        "src/modus/platforms/hooks.py",
+    ),
     fragments=(
         "dashboard",
         "/planflow/",

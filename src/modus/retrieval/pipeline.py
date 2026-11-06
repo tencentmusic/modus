@@ -15,6 +15,8 @@ from ..knowledge_reader import BoundKnowledgeReadError, read_bound_regular_text
 from ..orchestrator import fallback
 from ..orchestrator.search_policy import redact_secrets
 from ..paths import ModusPaths
+from ..scope_models import SourceLocation
+from ..source_anchors import check_location, source_declarations
 from .budget import RetrievalBudget
 from .delivery import EvidenceCollector, limit_result
 from .delivery import evidence_matches_need as _need_matches
@@ -25,6 +27,7 @@ from .query import analyze_query
 from .routing import infer_knowledge_route as _infer_knowledge_route
 from .routing import route_records as _route_records
 from .settings import RetrievalSettings, retrieval_settings
+from .stages.ranking import rank_source_locations
 
 _NON_SOURCE_PREFIXES = ("modus/knowledge/", "modus/.cache/", ".modus/")
 
@@ -156,6 +159,13 @@ def _entry_refs(index: dict, candidates: list[dict]) -> list[dict]:
             key=lambda section: section["lineStart"],
         )
         record = dict(candidate)
+        # 不同池或命中小节共享条目首段身份，避免残缺片段抢先去重或同条目重复占额。
+        if parts:
+            record.update(
+                id=parts[0]["id"],
+                heading=parts[0]["heading"],
+                headingPath=parts[0]["headingPath"],
+            )
         record.update(
             lineStart=key[1],
             lineEnd=key[2],
@@ -219,7 +229,7 @@ def _source_ref(paths: ModusPaths, relative: str, query: str, hits: list[dict]) 
         )
         start = max(1, match_index + 1 - 2)
     end = min(len(lines), start + 19)
-    excerpt = redact_secrets("\n".join(lines[start - 1 : end]))[:1200]
+    excerpt = redact_secrets("\n".join(lines[start - 1 : end]))
     identity = f"{relative}:{start}:{end}:{hashlib.sha256(raw.encode('utf-8')).hexdigest()}"
     return {
         "id": "ev-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:20],
@@ -236,7 +246,9 @@ def _source_ref(paths: ModusPaths, relative: str, query: str, hits: list[dict]) 
         "symbol": None,
         "digest": hashlib.sha256(raw.encode("utf-8")).hexdigest(),
         "scoreSignals": {"liveSource": 1.0},
-        "excerpt": excerpt,
+        "excerpt": excerpt[:1200],
+        "truncated": len(excerpt) > 1200,
+        "readTarget": {"path": relative, "lineStart": start, "lineEnd": end},
     }
 
 
@@ -289,14 +301,12 @@ def _applicable_constraints(
         else:
             continue
         overlap = len(query_terms & set(tokenize(f"{item['heading']}\n{item['text']}")))
+        overlap += int(item.get("navigationScore") or 0)
         explicit = any(
             item["path"] == p or item["path"].startswith(p.rstrip("/") + "/")
             for p in route.get("paths") or []
         )
-        uncertain = source_type == "project-constraint" and not (overlap or explicit)
-        if uncertain != candidates:
-            continue
-        tiers[tier].append((float(overlap) + float(item.get("score") or 0.0), item))
+        tiers[tier].append((float(overlap) + float(explicit), item))
 
     selected: list[dict] = []
     tier_limits = {"project": 2}
@@ -306,7 +316,24 @@ def _applicable_constraints(
             tiers[tier],
             key=lambda value: (-value[0], value[1]["path"], value[1]["lineStart"]),
         )
-        selected.extend(_knowledge_ref(item) for _score, item in ranked[:limit])
+
+        def entry_key(item: dict) -> tuple:
+            entry = item.get("entryRange") or item
+            return item["path"], entry["lineStart"], entry["lineEnd"]
+
+        # 在截断元数据前判断整个条目，长条目的末尾命中也不能丢失。
+        matched_entries = {entry_key(item) for score, item in ranked if score > 0}
+        chosen: list[dict] = []
+        seen: set[tuple] = set()
+        for _score, item in ranked:
+            key = entry_key(item)
+            uncertain = tier == "project" and key not in matched_entries
+            if uncertain == candidates and key not in seen:
+                chosen.append(item)
+                seen.add(key)
+                if len(chosen) == limit:
+                    break
+        selected.extend(_entry_refs(index, chosen))
     return selected
 
 
@@ -324,110 +351,124 @@ def _anchored_source_refs(
     explicit_paths: list[str] | None = None,
     budget: RetrievalBudget | None = None,
 ) -> tuple[list[dict], list[dict]]:
-    """Verify routed Module source locations and fall back to lexical source search."""
+    """核验相关文档的当前声明；漂移定向重定位，缺口显式交付。"""
     result: list[dict] = []
     gaps: list[dict] = []
     seen: set[tuple[str, str, int, int]] = set()
     searched_symbols: set[str] = set()
-    for record in records:
-        locations = record.get("sourceLocations") or []
-        if not isinstance(locations, list):
-            gaps.append(
-                {
-                    "type": "source-anchor",
-                    "path": str(record.get("path") or ""),
-                    "reason": "sourceLocations 必须为列表",
-                }
+    source_cache: dict[str, tuple[str, list[str], list[dict] | None]] = {}
+    for record, raw in rank_source_locations(records, query):
+        if budget is not None and budget.exhausted:
+            gaps.append({"type": "source-budget", "reason": "anchor-deadline"})
+            return result, gaps
+        try:
+            if not isinstance(raw, dict):
+                raise ValueError("源码位置必须为映射")
+            relative = str(raw["path"])
+            if relative.startswith(_NON_SOURCE_PREFIXES):
+                raise ValueError("锚点未指向当前项目源码")
+            if explicit_paths and not _source_in_scope(relative, explicit_paths):
+                continue
+            location = SourceLocation.from_dict(raw)
+            symbol = location.symbol
+            identity = (
+                relative,
+                symbol,
+                location.start_line,
+                location.end_line or location.start_line,
             )
-            continue
-        for raw in locations:
-            if budget is not None and budget.exhausted:
-                gaps.append({"type": "source-budget", "reason": "anchor-deadline"})
-                return result, gaps
-            try:
-                if not isinstance(raw, dict):
-                    raise ValueError("源码位置必须为映射")
-                relative = str(raw["path"])
-                if relative.startswith(_NON_SOURCE_PREFIXES):
-                    raise ValueError("锚点未指向当前项目源码")
-                if explicit_paths and not _source_in_scope(relative, explicit_paths):
-                    continue
-                symbol = str(raw["symbol"])
-                start = int(raw["startLine"])
-                end = int(raw.get("endLine") or start)
-                identity = (relative, symbol, start, end)
-                if identity in seen:
-                    continue
-                seen.add(identity)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            if relative not in source_cache:
                 text = read_bound_regular_text(
                     paths.root, paths.root / relative, max_bytes=8 * 1024 * 1024
                 )
                 lines = text.splitlines()
-                if start < 1 or end < start or end > len(lines):
-                    raise ValueError("源码行号超出当前文件范围")
-                name = re.split(r"[.#]|::", symbol.split("(", 1)[0])[-1]
-                excerpt_text = "\n".join(lines[start - 1 : end])
-                if not re.search(rf"(?<![\w$]){re.escape(name)}(?![\w$])", excerpt_text):
-                    raise ValueError("声明的源码范围内缺少该符号")
-                digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-                result.append(
-                    {
-                        "id": "ev-"
-                        + hashlib.sha256(
-                            f"anchor:{relative}:{symbol}:{start}:{end}:{digest}".encode()
-                        ).hexdigest()[:20],
-                        "sourceType": _source_type(relative),
-                        "layer": "source",
-                        "authority": "current-implementation",
-                        "status": "current",
-                        "scope": dict(record.get("scope") or {}),
-                        "path": relative,
-                        "heading": None,
-                        "lineStart": start,
-                        "lineEnd": end,
-                        "symbol": symbol,
-                        "digest": digest,
-                        "scoreSignals": {"sourceLocation": 1.0},
-                        "excerpt": redact_secrets(excerpt_text)[:1200],
-                    }
-                )
-                if len(result) >= limit:
-                    return result, gaps
-            except (KeyError, TypeError, BoundKnowledgeReadError, OSError, ValueError) as exc:
-                relative = str(raw.get("path") or "") if isinstance(raw, dict) else ""
-                symbol = str(raw.get("symbol") or "") if isinstance(raw, dict) else ""
+                source_cache[relative] = (text, lines, source_declarations(relative, lines))
+            text, lines, declarations = source_cache[relative]
+            check = check_location(location, declarations)
+            if budget is not None and budget.exhausted:
+                gaps.append({"type": "source-budget", "reason": "anchor-deadline"})
+                return result, gaps
+            if check.finding not in {"current", "line_drift"}:
+                raise ValueError(f"{check.finding}: {check.detail}")
+            assert check.start_line is not None and check.end_line is not None
+            start, end = check.start_line, check.end_line
+            if check.finding == "line_drift":
                 gaps.append(
                     {
                         "type": "source-anchor",
                         "path": relative,
                         "symbol": symbol,
-                        "reason": str(exc),
+                        "reason": "line_drift",
+                        "claimedLine": location.start_line,
+                        "actualLine": start,
                     }
                 )
-                if symbol and symbol not in searched_symbols:
-                    searched_symbols.add(symbol)
-                    terminal = re.split(r"[.#]|::", symbol.split("(", 1)[0])[-1]
-                    term = terminal or symbol
-                    found = fallback.search(
-                        paths.root,
+            excerpt_text = "\n".join(lines[start - 1 : end])
+            digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+            excerpt = redact_secrets(excerpt_text)
+            result.append(
+                {
+                    "id": "ev-"
+                    + hashlib.sha256(
+                        f"anchor:{relative}:{symbol}:{start}:{end}:{digest}".encode()
+                    ).hexdigest()[:20],
+                    "sourceType": _source_type(relative),
+                    "layer": "source",
+                    "authority": "current-implementation",
+                    "status": "current",
+                    "scope": dict(record.get("scope") or {}),
+                    "path": relative,
+                    "heading": None,
+                    "lineStart": start,
+                    "lineEnd": end,
+                    "symbol": symbol,
+                    "digest": digest,
+                    "scoreSignals": {"sourceLocation": 1.0},
+                    "excerpt": excerpt[:1200],
+                    "truncated": len(excerpt) > 1200,
+                    "readTarget": {"path": relative, "lineStart": start, "lineEnd": end},
+                }
+            )
+            if len(result) >= limit:
+                return result, gaps
+        except (KeyError, TypeError, BoundKnowledgeReadError, OSError, ValueError) as exc:
+            relative = str(raw.get("path") or "") if isinstance(raw, dict) else ""
+            symbol = str(raw.get("symbol") or "") if isinstance(raw, dict) else ""
+            gaps.append(
+                {
+                    "type": "source-anchor",
+                    "path": relative,
+                    "symbol": symbol,
+                    "reason": str(exc),
+                }
+            )
+            if symbol and symbol not in searched_symbols:
+                searched_symbols.add(symbol)
+                terminal = re.split(r"[.#]|::", symbol.split("(", 1)[0])[-1]
+                term = terminal or symbol
+                found = fallback.search(
+                    paths.root,
+                    term or query,
+                    max_results=2,
+                    path_prefixes=explicit_paths or (),
+                    deadline_monotonic=budget.deadline if budget else None,
+                )
+                gaps.extend(dict(issue) for issue in found.issues)
+                for fallback_path in found.files:
+                    ref = _source_ref(
+                        paths,
+                        fallback_path,
                         term or query,
-                        max_results=2,
-                        path_prefixes=explicit_paths or (),
-                        deadline_monotonic=budget.deadline if budget else None,
+                        [dict(hit) for hit in found.hits],
                     )
-                    gaps.extend(dict(issue) for issue in found.issues)
-                    for fallback_path in found.files:
-                        ref = _source_ref(
-                            paths,
-                            fallback_path,
-                            term or query,
-                            [dict(hit) for hit in found.hits],
-                        )
-                        if ref is not None and ref["id"] not in {item["id"] for item in result}:
-                            ref["scoreSignals"] = {"invalidAnchorRipgrepFallback": 1.0}
-                            result.append(ref)
-                        if len(result) >= limit:
-                            return result, gaps
+                    if ref is not None and ref["id"] not in {item["id"] for item in result}:
+                        ref["scoreSignals"] = {"invalidAnchorRipgrepFallback": 1.0}
+                        result.append(ref)
+                    if len(result) >= limit:
+                        return result, gaps
     return result, gaps
 
 
@@ -495,7 +536,7 @@ def finish_context(
     anchored, anchor_gaps = (
         _anchored_source_refs(
             paths,
-            [*module_route_records, *candidates],
+            [*candidates, *module_route_records],
             query_text,
             limit=body_limit,
             explicit_paths=source_scope,
@@ -536,12 +577,16 @@ def finish_context(
     collector = EvidenceCollector(limit=body_limit + len(routing_evidence))
     for ref in routing_evidence:
         collector.add(ref)
+    rules = [
+        *applicable_constraints,
+        *[item for item in additional_evidence or [] if _need_matches("business-rule", item)],
+    ]
+    needs_rules = bool({"business-rule", "engineering-constraint"} & set(query["evidenceNeeds"]))
+    domain_pool = [*rules, *knowledge] if needs_rules else knowledge
     pools = [
         [*anchored, *live],
-        [
-            *applicable_constraints,
-            *[item for item in additional_evidence or [] if _need_matches("business-rule", item)],
-        ],
+        [item for item in rules if needs_rules and item.get("sourceType") == "project-constraint"],
+        [item for item in domain_pool if _need_matches("domain-knowledge", item)],
         [*knowledge, *module_routes],
         list(additional_evidence or []),
     ]
@@ -613,7 +658,7 @@ def finish_context(
         ),
         "readTargets": [
             item["readTarget"]
-            for item in knowledge
+            for item in [*knowledge, *applicable_constraints]
             if item.get("readTarget")
             and (item.get("truncated") or item["id"] not in {ref["id"] for ref in evidence})
         ],

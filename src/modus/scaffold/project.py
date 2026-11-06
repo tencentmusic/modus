@@ -26,7 +26,6 @@ from ..config import (
     ModusConfig,
     reconcile_optional_config,
 )
-from ..hooks import bootstrap as _bootstrap
 from ..manifest import Manifest
 from ..paths import ModusPaths
 from ..platforms import Command, PlatformAdapter, Skill, get_adapters
@@ -130,19 +129,6 @@ class ProjectScaffolder:
                 for relative_path, content in sorted(skill.support_files.items())
             )
 
-        hook_assets = {
-            "modus-hook.py": _bootstrap.runtime_launcher(),
-            "run-hook.cmd": _bootstrap.run_hook_cmd(),
-            "session-start": _bootstrap.session_start_script(),
-        }
-        assets.extend(
-            ScaffoldAsset(
-                path=self.paths.relative(self.paths.hooks_dir / name),
-                content=content,
-                template=f"hooks/{name}",
-            )
-            for name, content in hook_assets.items()
-        )
         return assets
 
     def _knowledge_assets(self) -> list[ScaffoldAsset]:

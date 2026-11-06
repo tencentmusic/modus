@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
-from modus.commands.init_project import InitConflictError, run_init
+from _support.markdown import assert_local_markdown_links_resolve
+from modus import __version__
+from modus.cli import app
+from modus.commands.init_project import InitConflictError, run_init, run_workspace_init
 from modus.commands.uninstall import (
     UninstallPlanChangedError,
     apply_uninstall,
@@ -17,6 +23,7 @@ from modus.commands.uninstall import (
 from modus.commands.update import preview_update, run_update
 from modus.manifest import Manifest
 from modus.paths import ModusPaths
+from modus.platforms import available_platforms
 
 
 # 清单外的空文件仍可能属于用户，不能因为没有内容就接管。
@@ -46,6 +53,132 @@ def test_update_preserves_user_edits_and_untracked_collision(tmp_path: Path) -> 
     assert edited.relative_to(tmp_path).as_posix() in result["userEditedFiles"]
     assert missing.read_bytes() == b""
     assert edited.read_text(encoding="utf-8") == "my instructions"
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
+def test_update_retires_unused_references_but_preserves_user_changes(
+    tmp_path: Path, newline: str
+) -> None:
+    """共享规则归并后，各宿主旧支持文件按原清单退役，用户修改继续保留。"""
+
+    run_init(tmp_path, list(available_platforms()))
+    paths = ModusPaths.for_root(tmp_path)
+    manifest = Manifest.read(paths)
+    template = "skills/modus-init/references/retired-guide.md"
+    old_content = "# Previous guide" + newline
+    retired: set[str] = set()
+    for entry in list(manifest.files):
+        if entry.template != "skills/modus-init/SKILL.md":
+            continue
+        relative = (Path(entry.path).parent / "references/retired-guide.md").as_posix()
+        # 所有权摘要绑定实际字节；Windows 文本写入转换不应伪造一次用户编辑。
+        (tmp_path / relative).write_bytes(old_content.encode("utf-8"))
+        manifest.add_file(relative, old_content, template)
+        retired.add(relative)
+    manifest.write(paths)
+    edited = ".agents/skills/modus-init/references/retired-guide.md"
+    assert edited in retired
+    (tmp_path / edited).write_bytes(b"# User-maintained guide\n")
+
+    result = run_update(tmp_path)
+
+    assert result["status"] == "partial"
+    assert set(result["removedFiles"]) == retired - {edited}
+    assert result["userEditedFiles"] == [edited]
+    assert all(not (tmp_path / relative).exists() for relative in retired - {edited})
+    assert (tmp_path / edited).read_bytes() == b"# User-maintained guide\n"
+
+
+@pytest.mark.parametrize("kind", ["project", "workspace"])
+@pytest.mark.parametrize("installed_version", [__version__, "0.0.4"])
+def test_update_delivers_workflow_changes_to_every_host_and_retains_user_edits(
+    tmp_path: Path, kind: str, installed_version: str
+) -> None:
+    """旧安装与同版本更新均传播全部宿主资产，保留人工内容和成员仓库。"""
+    members = [tmp_path / name for name in ("orders", "payments")]
+    if kind == "workspace":
+        for member in members:
+            member.mkdir()
+            subprocess.run(["git", "init", "-q", str(member)], check=True)
+            (member / "source.txt").write_bytes(b"member-owned\n")
+        run_workspace_init(tmp_path, list(available_platforms()), ["orders", "payments"])
+    else:
+        run_init(tmp_path, list(available_platforms()))
+    member_before = {
+        p.relative_to(tmp_path): p.read_bytes()
+        for member in members
+        for p in member.rglob("*")
+        if p.is_file()
+    }
+    paths = ModusPaths.for_root(tmp_path)
+    config_before = paths.config_path.read_bytes() if paths.config_path.exists() else None
+    manifest = Manifest.read(paths)
+    manifest.framework_version = installed_version
+    workflow_files = [
+        entry for entry in manifest.files if entry.template.startswith(("skills/", "commands/"))
+    ]
+    expected = {entry.path: (tmp_path / entry.path).read_bytes() for entry in workflow_files}
+    added = {
+        entry.path
+        for entry in workflow_files
+        if entry.template.endswith("/authoring/incremental.md")
+    }
+    assert added
+    for entry in workflow_files:
+        target = tmp_path / entry.path
+        if entry.path in added:
+            target.unlink()
+        else:
+            old_text = "# Previous installed workflow\n"
+            target.write_text(old_text, encoding="utf-8", newline="")
+            manifest.add_file(entry.path, old_text, entry.template)
+    manifest.files = [entry for entry in manifest.files if entry.path not in added]
+    manifest.write(paths)
+
+    edited = ".agents/skills/modus-reinit/SKILL.md"
+    (tmp_path / edited).write_bytes(b"# User-owned workflow\n")
+    paths.constraint_dir.mkdir(parents=True, exist_ok=True)
+    paths.team_standard.write_bytes(b"# Human team policy\n")
+    topic = paths.constraint_dir / "team-standard/concurrency.md"
+    topic.parent.mkdir()
+    topic.write_bytes(b"# Human task policy\n")
+    card = paths.scope_confirmation_path
+    card.parent.mkdir(parents=True, exist_ok=True)
+    card_content = (
+        b"---\nmodus:\n  authoring:\n    schemaVersion: 2\n    executionMode: serial\n"
+        b"    domains:\n      orders:\n        status: pending\n---\n"
+        b"# Unfinished scope\nPreserve authorization, progress, and unresolved questions.\n"
+    )
+    card.write_bytes(card_content)
+
+    run = CliRunner().invoke(app, ["-C", str(tmp_path), "update", "--project", "--yes", "--json"])
+    assert run.exit_code == 0, run.output
+    result = json.loads(run.stdout)
+
+    assert result["status"] == "partial"
+    assert result["userEditedFiles"] == [edited]
+    assert added <= set(result["addedFiles"])
+    for relative, content in expected.items():
+        actual = (tmp_path / relative).read_bytes()
+        assert actual == (b"# User-owned workflow\n" if relative == edited else content), relative
+        assert_local_markdown_links_resolve(tmp_path / relative, root=tmp_path)
+    assert paths.team_standard.read_bytes() == b"# Human team policy\n"
+    assert topic.read_bytes() == b"# Human task policy\n"
+    assert card.read_bytes() == card_content
+    config_after = paths.config_path.read_bytes() if paths.config_path.exists() else None
+    assert config_after == config_before
+    assert {
+        p.relative_to(tmp_path): p.read_bytes()
+        for member in members
+        for p in member.rglob("*")
+        if p.is_file()
+    } == member_before
+
+    retry = run_update(tmp_path)
+    assert retry["status"] == "partial"
+    assert retry["userEditedFiles"] == [edited]
+    assert retry["appliedFiles"] == retry["addedFiles"] == []
+    assert card.read_bytes() == card_content
 
 
 # 首次安装同样遵守所有权边界，不能将空文件视为可用路径。
@@ -85,7 +218,12 @@ def test_uninstall_preserves_corrupt_shared_config_and_symlink_targets(
 ) -> None:
     run_init(tmp_path, ["codex"])
     hook = tmp_path / ".codex/hooks.json"
+    hook.parent.mkdir()
     hook.write_bytes(b"{broken")
+    paths = ModusPaths.for_root(tmp_path)
+    manifest = Manifest.read(paths)
+    manifest.add_file(".codex/hooks.json", "{broken", "hooks/codex-hooks.json")
+    manifest.write(paths)
     managed = tmp_path / ".agents/skills/modus-init/SKILL.md"
     external = tmp_path / "external-skill.md"
     external.write_text("external\n", encoding="utf-8")

@@ -4,7 +4,13 @@ from collections.abc import Iterable
 from types import MappingProxyType
 
 _PLATFORM_TITLES = MappingProxyType(
-    {"codex": "Codex", "codebuddy": "CodeBuddy", "cursor": "Cursor", "claude": "Claude Code"}
+    {
+        "codex": "Codex",
+        "codebuddy": "CodeBuddy",
+        "cursor": "Cursor",
+        "claude": "Claude Code",
+        "dsh": "DeepSeek Harness",
+    }
 )
 
 

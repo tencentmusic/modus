@@ -274,8 +274,7 @@ public final class ModusJavaAnalyzer {
         }
     }
 
-    // Emit only edges with admitted endpoints. The call-site identity includes
-    // path, line and column so repeated calls between the same symbols coexist.
+    // 完整区间区分同起点的链式调用；合成调用保留位置缺失和操作种类。
     private void emitEdge(String from, String to, String relation, String operation,
                           String dispatch, String resolution, Tree tree, String evidence) {
         if (!emittedNodes.contains(from) || !emittedNodes.contains(to)) {
@@ -291,7 +290,9 @@ public final class ModusJavaAnalyzer {
                 + "\",\"line\":" + line(tree) + ",\"column\":" + column(tree)
                 + rangeFields(unit, tree) + "}" : "null";
         String identity = from + "\u001f" + to + "\u001f" + relation + "\u001f" + rel(unit)
-                + "\u001f" + line(tree) + "\u001f" + column(tree);
+                + "\u001f" + positions.getStartPosition(unit, tree)
+                + "\u001f" + positions.getEndPosition(unit, tree)
+                + "\u001f" + tree.getKind() + "\u001f" + operation + "\u001f" + dispatch;
         System.out.println("{\"recordKind\":\"edge\",\"id\":\"java-edge:" + sha(identity)
                 + "\",\"from\":\"" + esc(from) + "\",\"to\":\"" + esc(to)
                 + "\",\"relation\":\"" + relation + "\",\"resolution\":\"" + resolution

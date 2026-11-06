@@ -21,7 +21,7 @@ TemplateCatalog ──经验证的 Command / Skill──▶ ProjectScaffolder
 
 | 模块 | 拥有 | 不拥有 |
 | --- | --- | --- |
-| `catalog.py` | 规范模板 ID、UTF-8 读取、frontmatter 验证、稳定顺序 | 项目路径、写入、创作语义 |
+| `catalog.py` | 规范模板 ID、UTF-8 读取、元数据与正文校验、支持文件完整加载 | 项目路径、写入、创作语义 |
 | `writer.py` | 目标路径、受管/用户种子所有权、执行位、清单登记 | 工作流选择、平台布局 |
 | `project.py` | 渲染编排、项目/工作区数据准备、版本检查、安全重入 | 宿主专有文件约定 |
 | `templates/` | 用户可读的工作流契约与知识种子 | 运行时控制流 |
@@ -30,11 +30,13 @@ TemplateCatalog ──经验证的 Command / Skill──▶ ProjectScaffolder
 
 创作参考是证据使用与正文契约的可评审主定义。`TemplateCatalog` 原样读取 Markdown，不从 Python 常量重建指令。检索可把熟悉的标题作为尽力而为的线索，核验不能依赖编辑结构。
 
+模板 ID 与资产路径复用平台模型的规范相对路径校验，在 `Path` 归一化前拒绝别名和非法片段；目录解析另行防止越出模板根。只有技能根的 `SKILL.md` 是入口，支持目录中的同名文档仍按相对路径分发。读取失败保留原因，格式缺陷在安装写入前报告。
+
 ## 所有权与失败
 
 - 受管资产可重建，最后写入的哈希保存在 `.modus/manifest.json` 中，保护后续用户修改。
 - 用户种子只写一次，已有可读内容作为清单基线保留，不能把项目知识重置为模板。
-- 共享宿主文件由适配器合并受管区块或钩子条目，不占有整份文件。
+- 共享宿主说明由适配器合并受管区块，不占有整份文件。旧 hook 容器只在升级和卸载时按命令签名清理。
 - 空数据目录不登记到清单；重跑 init 可恢复 `.gitkeep`，但不把运行数据变为框架资产。
 - 首次写入前验证平台名称与完整模板目录。已有清单不可读时抛出 `ScaffoldStateError`，不能当作首次安装授权。
 - 文件发布错误指出目标并保留原始异常原因。公开 CLI 用 `InstallTransaction` 包裹安装；失败恢复计划目标，清单最后写入，作为持久提交标记。
@@ -42,7 +44,7 @@ TemplateCatalog ──经验证的 Command / Skill──▶ ProjectScaffolder
 ## 扩展顺序
 
 1. 在 `modus.surface` 声明工作流，不能依靠目录发现暗中扩大公开接口。
-2. 增加具有有效 YAML frontmatter、非空 description 和末尾换行的命令或技能模板。
+2. 增加具有有效 YAML frontmatter、非空 description、正文和末尾换行的命令或技能模板。
 3. 支持文件链接相对于所属技能包。
 4. 新目标类型显式增加 `AssetOwnership` 策略，不把覆盖判断塞进编排器。
 5. 适配器消费中立的 `Skill` 与 `Command`，模板不硬编码宿主路径。

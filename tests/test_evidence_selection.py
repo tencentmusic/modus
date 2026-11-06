@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
@@ -17,6 +17,79 @@ from modus.machine import (
     query_evidence,
 )
 from modus.machine.store.bundle import canonical_bytes
+
+
+def test_many_diagnostics_leave_room_for_evidence_and_are_fully_pageable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import modus.machine.store.bundle as storage
+    from modus.machine.store.bundle_catalogs import service_catalog
+
+    original = service_catalog
+
+    def with_diagnostics(directory, services, snapshot, **kwargs):
+        return original(
+            directory,
+            {
+                **services,
+                "coverageGaps": [
+                    *services.get("coverageGaps", []),
+                    *(
+                        {
+                            "code": "machine.facts.unresolved",
+                            "provider": "java",
+                            "buildUnitId": f"unit-{index}",
+                            "subject": f"method-{index}",
+                        }
+                        for index in range(600)
+                    ),
+                ],
+            },
+            snapshot,
+            **kwargs,
+        )
+
+    monkeypatch.setattr(storage, "_service_catalog", with_diagnostics)
+    root = sample_project(tmp_path)
+    receipt = analyze_repository(root, AnalysisOptions(compiler_mode="off"))
+    bundle = open_analysis(root, receipt.identity)
+    first = query_evidence(bundle, EvidenceQuery(view="services"))
+    assert first.items
+    summary = next(
+        gap
+        for gap in first.coverage_gaps
+        if gap.reason_code == "machine.packet.coverage-gap-summary"
+    )
+    details = cast(dict[str, Any], summary.details)
+    assert details["totalCount"] >= 600
+    assert details["reasonCounts"]["machine.facts.unresolved"] == 600
+    assert details["expansionQuery"]["recordTypes"] == ["coverageGap"]
+    seen: set[str] = set()
+    cursors: set[str] = set()
+    cursor = None
+    while True:
+        page = query_evidence(
+            bundle,
+            EvidenceQuery(
+                view="services",
+                record_types=("coverageGap",),
+                cursor=cursor,
+                budget=EvidenceBudget(max_bytes=16 * 1024, max_items=23),
+            ),
+        )
+        assert not page.items
+        assert len(canonical_bytes(page.to_dict())) <= 16 * 1024
+        assert len(page.coverage_gaps) <= 23
+        for gap in page.coverage_gaps:
+            assert gap.record_id not in seen
+            seen.add(gap.record_id)
+        cursor = page.next_cursor
+        if cursor is None:
+            break
+        assert page.coverage_gaps and cursor not in cursors
+        cursors.add(cursor)
+    assert len(seen) >= 600
 
 
 # 构造足够多的源码强制形成多页，避免单页夹具无法观察惰性读取。
@@ -100,10 +173,18 @@ def test_selection_rechecks_source_drift_between_pages(tmp_path: Path) -> None:
         ),
     )
     assert second.coverage_gaps
-    assert all(
+    assert any(
         gap.reason_code == "machine.packet.source-changed-after-analysis"
+        or cast(dict[str, Any], gap.details.get("reasonCounts", {})).get(
+            "machine.packet.source-changed-after-analysis", 0
+        )
         for gap in second.coverage_gaps
     )
+    assert {gap.reason_code for gap in second.coverage_gaps} <= {
+        "machine.packet.source-changed-after-analysis",
+        "machine.corpus.input-not-admitted",
+        "machine.packet.coverage-gap-summary",
+    }
 
 
 # 条目数与字节数是两个同时生效的预算，任何一项都不能超限。

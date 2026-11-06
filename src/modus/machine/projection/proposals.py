@@ -15,6 +15,7 @@ from typing import Any
 
 from ..capability.contracts import CapabilityModel, CapabilitySlice
 from .contracts import AuthoringProjection, ProjectionIntent, Proposal, ProposalDisposition
+from .memberships import entry_memberships
 from .scope_profiles import StructuralBasis, build_candidate_profile
 
 _SPLIT_CAPABILITIES = 32
@@ -31,6 +32,10 @@ def _identity(kind: str, values: Sequence[str]) -> str:
 # 空路径过滤后排序，保留稳定且可追溯的成员列表。
 def _capability_files(capability: CapabilitySlice) -> tuple[str, ...]:
     paths = {
+        *(
+            str(step.anchor.get("path") or step.anchor.get("file") or "")
+            for step in capability.observed_entries
+        ),
         str((capability.entry.get("location") or {}).get("path") or ""),
         *(
             str(step.anchor.get("path") or step.anchor.get("file") or "")
@@ -348,59 +353,36 @@ def _remainder_candidates(
     return results
 
 
-# 使用已有符号和签名作为归属线索，不通过模糊子串猜测拥有者。
-def _entry_owner_keys(entry: Mapping[str, Any]) -> frozenset[str]:
-    return frozenset(
-        str(entry.get(name) or "")
-        for name in ("symbol", "displayName", "declarationName", "signature")
-        if entry.get(name)
-    )
-
-
-# 优先精确拥有者，只有文件唯一候选时才允许文件级回退。
-# 歧义归属计入缺口，不能把同一规则复制为每个候选的已知事实。
-# 新信号计数与已有摘要取较大值，避免重复输入造成双倍统计。
+# 摘要与明细复用同一声明身份关联，未知归属只计为缺口。
 def _merge_authoring_records(
     candidates: list[dict[str, Any]],
     records_by_path: Mapping[str, Sequence[Mapping[str, Any]]],
+    model: CapabilityModel,
 ) -> None:
-    """Attach rule signals only to one evidenced owner; ambiguous rows stay gaps."""
-
-    owners: defaultdict[tuple[str, str], set[int]] = defaultdict(set)
-    candidates_by_file: defaultdict[str, set[int]] = defaultdict(set)
-    for index, candidate in enumerate(candidates):
-        for entry in candidate.get("entries", []):
-            if not isinstance(entry, Mapping):
-                continue
-            location = entry.get("location") or {}
-            path = str(location.get("path") or entry.get("sourceFile") or "")
-            if not path:
-                continue
-            candidates_by_file[path].add(index)
-            for owner in _entry_owner_keys(entry):
-                owners[path, owner].add(index)
-
-    assigned: defaultdict[int, dict[str, Counter[str]]] = defaultdict(
+    memberships = entry_memberships(candidates, model)
+    candidates_by_file: defaultdict[str, set[str]] = defaultdict(set)
+    for candidate in candidates:
+        for path in candidate.get("files", []):
+            candidates_by_file[str(path)].add(str(candidate["candidateId"]))
+    assigned: defaultdict[str, dict[str, Counter[str]]] = defaultdict(
         lambda: {"entry": Counter(), "effect": Counter(), "resource": Counter()}
     )
-    unbound: Counter[int] = Counter()
+    unbound: Counter[str] = Counter()
     for path, records in sorted(records_by_path.items()):
-        file_candidates = candidates_by_file.get(path, set())
         for record in records:
-            owner = str(record.get("symbol") or "")
-            exact = owners.get((path, owner), set()) if owner else set()
-            targets = exact if len(exact) == 1 else file_candidates if not exact else exact
-            if len(targets) != 1:
-                for index in targets:
-                    unbound[index] += 1
-                continue
+            membership = memberships.get(str(record.get("entryId") or ""))
+            targets = membership.candidate_ids if membership else ()
+            if not targets:
+                unbound.update(candidates_by_file.get(path, ()))
             kind = str(record.get("kind") or "")
             evidence_kind = str(record.get("evidenceKind") or "")
             if kind in {"entry", "effect", "resource"} and evidence_kind:
-                assigned[next(iter(targets))][kind][evidence_kind] += 1
+                for target in targets:
+                    assigned[target][kind][evidence_kind] += 1
 
     axis_names = {"entry": "entries", "effect": "effects", "resource": "resources"}
-    for index, candidate in enumerate(candidates):
+    for candidate in candidates:
+        index = str(candidate["candidateId"])
         signals = candidate.get("capabilitySignals")
         if not isinstance(signals, dict):
             continue
@@ -451,7 +433,7 @@ def capability_first_scope(
     # 有逐条规则记录时重新归属，避免沿用无法解释的旧聚合。
     candidates = [*primary, *remainders]
     if authoring_records_by_path is not None:
-        _merge_authoring_records(candidates, authoring_records_by_path)
+        _merge_authoring_records(candidates, authoring_records_by_path, model)
     result = dict(legacy_scope)
     result.update(
         candidates=candidates,
@@ -511,6 +493,7 @@ def capability_navigation(
                         "candidateIds": [candidate_id],
                         "capabilityId": capability.capability_id,
                         "pathIndex": path_index,
+                        "stepIndex": edge_index,
                         "sourceSymbol": source.symbol,
                         "targetSymbol": target_symbol,
                         "resolution": str(path.resolution),

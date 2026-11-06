@@ -95,6 +95,8 @@ def portable(paths: ModusPaths, value: Any, key: str = "") -> Any:
             return Path(normalized).name
         if os.path.isabs(normalized):
             return "external:" + Path(normalized).name
+        # 正文中的外部本机路径也需去除用户目录，避免发布检查拒绝整包。
+        normalized = normalized.replace(str(Path.home()), "<HOME>")
         return normalized.replace("\\", "/")
     return value
 
@@ -233,6 +235,7 @@ class FrozenCorpus:
             "repository": repository.to_dict(),
             "analysisConfig": analysis_config,
             "sources": sources,
+            "sourceDispositions": list(self.snapshot.dispositions),
             "analysisInputs": inputs_summary,
             "buildContext": build_context,
             "providerContext": {

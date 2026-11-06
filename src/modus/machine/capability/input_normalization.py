@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Mapping
 from typing import Any
 
-from ..facts.entry_observation import entry_identity
+from ..facts.entry_observation import declaration_aliases, entry_identity
 from ..resolution.lifecycle import ResolvedProgram
 from ..states import Resolution
 from .composition_model import (
@@ -59,29 +59,6 @@ def _observations(
     return entries, relations, signals
 
 
-# 符号同名时用路径缩小候选，再按起始行距离选择邻近声明。
-# 缺少路径的信号仍可参与匹配，因此结果属于观察关联而非新解析。
-# 无候选时返回空身份，由调用方明确跳过。
-def _entry_by_signal(signal: Mapping[str, Any], entries: Mapping[str, Mapping[str, Any]]) -> str:
-    symbol = str(signal.get("symbol") or "")
-    path = str((signal.get("location") or {}).get("path") or "")
-    candidates = [
-        (identity, row)
-        for identity, row in entries.items()
-        if str(row.get("symbol") or row.get("displayName") or "") == symbol
-        and (not path or str((row.get("location") or {}).get("path") or "") == path)
-    ]
-    if not candidates:
-        return ""
-    line = (signal.get("location") or {}).get("startLine")
-    return min(
-        candidates,
-        key=lambda item: abs(
-            int((item[1].get("location") or {}).get("startLine") or 0) - int(line or 0)
-        ),
-    )[0]
-
-
 # 终态效果的分类只解释已有证据，不通过名称推导任意副作用。
 # 发布类写入和普通数据写入分开，以便能力摘要描述外部影响。
 # 缓存读取不算写效果；状态、锁和事务保留为状态转换。
@@ -121,16 +98,34 @@ def collect_inputs(
     dict[str, tuple[dict[str, Any], ...]],
 ]:
     entries, relations, signals = _observations(resolved)
+    aliases = declaration_aliases(list(entries.values()))
+
+    def canonical(identity: str) -> str:
+        return aliases.get(identity, identity)
+
+    def executable(identity: str) -> bool:
+        entry = entries.get(identity, {})
+        return entry.get("sourceRole") == "runtime" and entry.get("kind") in {
+            "function",
+            "method",
+            "constructor",
+            "handler",
+        }
+
     seeds: dict[str, _Seed] = {}
     effects: defaultdict[str, list[TerminalEffect]] = defaultdict(list)
     resources: defaultdict[str, list[str]] = defaultdict(list)
     transitions: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
     for signal in signals:
-        entry_id = _entry_by_signal(signal, entries)
-        if not entry_id or str(entries[entry_id].get("sourceRole") or "") != "runtime":
+        entry_id = canonical(str(signal.get("entryId") or ""))
+        if entry_id not in entries or str(entries[entry_id].get("sourceRole") or "") != "runtime":
             continue
         evidence_kind = str(signal.get("evidenceKind") or "")
-        if str(signal.get("kind") or "") == "entry" and evidence_kind in _ENTRY_SIGNAL_KINDS:
+        if (
+            str(signal.get("kind") or "") == "entry"
+            and evidence_kind in _ENTRY_SIGNAL_KINDS
+            and executable(entry_id)
+        ):
             signature = str(
                 signal.get("value")
                 or signal.get("contract")
@@ -181,9 +176,9 @@ def collect_inputs(
     for row in method_entries:
         if not isinstance(row, Mapping):
             continue
-        entry_id = entry_identity(str(row.get("symbolId") or ""))
+        entry_id = canonical(entry_identity(str(row.get("symbolId") or "")))
         entry = entries.get(entry_id)
-        if entry is None or str(entry.get("sourceRole") or "") != "runtime":
+        if entry is None or not executable(entry_id):
             continue
         signature = str(entry.get("signature") or entry.get("symbol") or entry_id)
         seeds.setdefault(
@@ -200,7 +195,7 @@ def collect_inputs(
     for graph_id, attrs in resolved.graph.nodes(data=True):
         if not attrs.get("exported"):
             continue
-        identity = entry_identity(str(graph_id))
+        identity = canonical(entry_identity(str(graph_id)))
         entry = entries.get(identity)
         if (
             entry is not None
@@ -223,7 +218,8 @@ def collect_inputs(
         relation = str(row.get("relation") or "")
         if relation not in _TRAVERSABLE_RELATIONS:
             continue
-        source, target = str(row.get("source") or ""), str(row.get("target") or "")
+        source = canonical(str(row.get("source") or ""))
+        target = canonical(str(row.get("target") or ""))
         if source and target and target in entries:
             adjacency[source].append(
                 _Edge(target, relation, _resolution(row.get("resolution"), Resolution.CANDIDATE))
@@ -236,9 +232,9 @@ def collect_inputs(
     for row in method_graph.get("edges", []) if isinstance(method_graph, Mapping) else []:
         if not isinstance(row, Mapping):
             continue
-        source = entry_identity(str(row.get("from") or ""))
+        source = canonical(entry_identity(str(row.get("from") or "")))
         target_id = str(row.get("to") or "")
-        target = entry_identity(target_id)
+        target = canonical(entry_identity(target_id))
         relation = str(row.get("relation") or "")
         resolution = _resolution(row.get("resolution"), Resolution.CANDIDATE)
         if relation in _TRAVERSABLE_RELATIONS and source in entries and target in entries:

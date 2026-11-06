@@ -150,7 +150,7 @@ CLI_COMMANDS: Final[tuple[CliCommand, ...]] = (
         short="接入 Modus 项目",
         role="项目接入",
         purpose="安装项目资产与平台技能；通过 /modus-init 创作知识。",
-        usage=("modus init", "modus init --all-platforms"),
+        usage=("modus init", "modus init --all-platforms", "modus init --platform dsh"),
         related=("/modus-init",),
         tier="common",
     ),
@@ -204,6 +204,7 @@ CLI_COMMANDS: Final[tuple[CliCommand, ...]] = (
             "modus knowledge verify",
             "modus knowledge verify --domain order --json",
             "modus knowledge verify --publication --json",
+            "modus knowledge verify --publication --member backend --json",
         ),
     ),
     CliCommand(
@@ -302,9 +303,9 @@ _SLASH_METADATA: tuple[SlashCommand, ...] = (
         short="根据新事实或材料更新相关知识",
         role="显式调用或通过自然语言路由接收材料",
         purpose=(
-            "冻结相关证据、确认增量范围，更新受影响的"
-            "领域、模块或业务材料；无需重建全仓"
-            "分析，也不修改无关知识。"
+            "核对当前源码和材料，确定增量范围，联动受影响的"
+            "主定义、消费者与导航；不构建或读取初始化证据包，"
+            "也不修改无关知识。人工内容仅在明确委托范围内维护。"
         ),
         usage=("/modus-update-knowledge 将这些需求和截图纳入项目知识",),
         related=("/modus-init", "modus knowledge update"),

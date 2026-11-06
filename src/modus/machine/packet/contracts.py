@@ -40,6 +40,7 @@ class HandleKind(StrEnum):
     PATH = "path"
     SYMBOL = "symbol"
     SOURCE_ANCHOR = "source-anchor"
+    BOUNDARY = "boundary"
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,6 +135,11 @@ class ContextRequest:
     budget: PacketBudget = PacketBudget()
 
     def __post_init__(self) -> None:
+        if self.scope.boundary_ids and self.intent is not TaskIntent.SERVICE_BOUNDARY:
+            raise ContractError(
+                "machine.packet.unsupported-boundary-filter",
+                "boundary selectors require service-boundary intent",
+            )
         if self.intent is TaskIntent.MODULE_AUTHORING and not self.scope.has_module_selector:
             raise ContractError(
                 "machine.packet.module-scope-required",
@@ -172,6 +178,10 @@ class AuthoringContextPacket:
     source_anchors: tuple[dict[str, Any], ...] = ()
     expansion_handles: tuple[ExpansionHandle, ...] = ()
     omitted_counts: dict[str, int] = field(default_factory=dict)
+    # 保留库存/关系原记录、真实缺口和可重放的公开查询。
+    evidence: tuple[dict[str, Any], ...] = ()
+    coverage_gaps: tuple[dict[str, Any], ...] = ()
+    expansion_queries: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -191,6 +201,9 @@ class AuthoringContextPacket:
             "sourceAnchors": [dict(row) for row in self.source_anchors],
             "expansionHandles": [handle.to_dict() for handle in self.expansion_handles],
             "omittedCounts": dict(self.omitted_counts),
+            "evidence": [dict(row) for row in self.evidence],
+            "coverageGaps": [dict(row) for row in self.coverage_gaps],
+            "expansionQueries": [dict(row) for row in self.expansion_queries],
         }
 
 

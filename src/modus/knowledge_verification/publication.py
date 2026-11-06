@@ -20,6 +20,7 @@ from ..paths import ModusPaths
 from ..skillmd import split_frontmatter
 from .authoring_card import (
     CARD_DOCUMENT,
+    AuthoringPlanSource,
     load_authoring_plan,
     string_mapping,
     verify_domain_coverage,
@@ -312,12 +313,13 @@ def verify_publication_readiness(
     inventory: KnowledgeInventory,
     *,
     domain: str | None,
+    plan_source: AuthoringPlanSource | None = None,
 ) -> tuple[list[VerificationFinding], dict[str, int]]:
     """Verify declared authoring commitments without grading narrative prose."""
     body_path_findings, body_path_documents, anchored_documents = _generated_body_source_paths(
         paths, inventory
     )
-    planned, findings = load_authoring_plan(paths)
+    planned, findings = load_authoring_plan(paths, source=plan_source)
     findings.extend(body_path_findings)
     signals = _knowledge_signals(
         paths,

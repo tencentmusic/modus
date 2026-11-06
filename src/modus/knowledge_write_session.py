@@ -1,4 +1,4 @@
-"""Atomic Markdown writes with source ownership, file locks and required CAS."""
+"""知识发布边界：所有权决定可写范围，文档锁与 CAS 保护观察版本。"""
 
 from __future__ import annotations
 
@@ -6,8 +6,10 @@ import hashlib
 import os
 import re
 import stat
+from contextlib import ExitStack
+from enum import Enum
 from pathlib import Path
-from typing import Final
+from typing import Final, Self
 
 from .artifacts_io import (
     atomic_write_text,
@@ -30,7 +32,30 @@ _CAS_UNSET: Final = object()
 
 
 class KnowledgeWriteSessionError(RuntimeError):
-    """A knowledge mutation violated path ownership, locking, or CAS policy."""
+    """写入或退役未满足路径、所有权、锁或 CAS 条件。"""
+
+
+class TeamStandardWriteMode(Enum):
+    """将兼容协议的两个权限字段收敛为互斥模式，不从文件状态推导授权。"""
+
+    PROTECTED = "protected"
+    INITIALIZE = "initialize"
+    MAINTAIN = "maintain"
+
+    @classmethod
+    def from_flags(cls, *, initialize: object, maintain: object) -> Self:
+        """批量预检与直接写入共用此边界；无效权限在任何副作用前失败。"""
+        if not isinstance(maintain, bool):
+            raise ValueError("allowTeamStandard 必须为布尔值")
+        if not isinstance(initialize, bool):
+            raise ValueError("initializeTeamStandard 必须为布尔值")
+        if initialize and maintain:
+            raise ValueError("首次填充与人工维护不能同时启用；请选择一种 team-standard 写入方式")
+        if initialize:
+            return cls.INITIALIZE
+        if maintain:
+            return cls.MAINTAIN
+        return cls.PROTECTED
 
 
 def _read_existing(paths: ModusPaths, target: Path) -> tuple[str, str | None]:
@@ -54,10 +79,35 @@ def _assert_cas(target: Path, current_hash: str | None, expected_hash: str | Non
 
 
 def _is_team_standard_seed(text: str) -> bool:
-    """Recognize exact shipped seeds, never a manifest's adopted user bytes."""
+    """只接受精确的随包种子；清单收录的人工内容不因此获得种子身份。"""
     from .knowledge_seeds import is_constraint_seed
 
     return is_constraint_seed("modus/knowledge/constraint/team-standard.md", text)
+
+
+def _assert_team_standard_write_allowed(
+    paths: ModusPaths,
+    mode: TeamStandardWriteMode,
+    *,
+    is_entry: bool,
+    existing: str,
+    digest: str | None,
+) -> None:
+    """在所需文档锁内检查实际变更；只有入口享有精确种子的填充例外。"""
+    if mode is TeamStandardWriteMode.MAINTAIN:
+        return
+    if mode is TeamStandardWriteMode.PROTECTED:
+        raise KnowledgeWriteSessionError(
+            "Team Standard 入口及专题仅在首次初始化时生成；后续修改需要用户明确要求维护"
+        )
+    if digest is not None and not (is_entry and _is_team_standard_seed(existing)):
+        raise KnowledgeWriteSessionError("Team Standard 已包含保留内容；首次初始化不能覆盖它")
+    if not is_entry:
+        entry_text, entry_digest = _read_existing(paths, paths.team_standard)
+        if entry_digest is not None and not _is_team_standard_seed(entry_text):
+            raise KnowledgeWriteSessionError(
+                "Team Standard 入口已包含保留内容；新增专题需要明确维护授权"
+            )
 
 
 def write_document(
@@ -70,15 +120,18 @@ def write_document(
     initialize_team_standard: bool = False,
     allow_team_standard: bool = False,
 ) -> Path:
-    """Write one selected document; neither metadata nor a cache grants permission.
+    """按所有权与读时摘要写入；元数据和缓存均不授予修改权限。
 
-    Only first-time init authors opt into initialize_team_standard. Even with
-    that flag, existing prose cannot be replaced. Update and sync never opt in.
-    Explicit user-directed team-standard maintenance can opt in separately;
-    ordinary generated writes never acquire that permission from a path alone.
+    首次 init 作者通过更新入口显式选择 initialize_team_standard，只能填充
+    缺失入口或精确入口种子；缺失专题还要求入口仍未成稿。后续人工正文维护
+    使用独立授权，普通 reinit/update/sync 工作流不自动启用任一种权限。
+    锁内复查种子与摘要，防止调查后的人工作品被覆盖。
     """
-    from .knowledge_identity import _target_parts
+    from .knowledge_identity import _target_parts, is_team_standard_path
 
+    team_standard_mode = TeamStandardWriteMode.from_flags(
+        initialize=initialize_team_standard, maintain=allow_team_standard
+    )
     parts = _target_parts(paths, target)
     if parts is None or parts[:2] != ("modus", "knowledge") or not target.endswith(".md"):
         raise KnowledgeWriteSessionError(f"知识目标不安全： {target}")
@@ -90,23 +143,34 @@ def write_document(
     if human and not allow_human:
         raise KnowledgeWriteSessionError(f"自动同步不能修改人工知识： {target}")
     destination = paths.root / target
-    with required_reentrant_file_lock(paths.knowledge_document_lock(destination)):
+    team_target = is_team_standard_path(target)
+    team_entry = parts[2:] == ("constraint", "team-standard.md")
+    with ExitStack() as locks:
+        # 首次专题先锁入口再锁专题，防止入口已交还人工后继续扩写。
+        # 保持逐文件 CAS；此锁序不提供多文件事务或自动回滚。
+        if (
+            team_target
+            and not team_entry
+            and team_standard_mode is TeamStandardWriteMode.INITIALIZE
+        ):
+            locks.enter_context(
+                required_reentrant_file_lock(paths.knowledge_document_lock(paths.team_standard))
+            )
+        locks.enter_context(
+            required_reentrant_file_lock(paths.knowledge_document_lock(destination))
+        )
         existing, digest = _read_existing(paths, destination)
         _assert_cas(destination, digest, expected_hash)
-        if parts[2:] == ("constraint", "team-standard.md") and existing != text:
-            if not allow_team_standard and not initialize_team_standard:
-                raise KnowledgeWriteSessionError(
-                    "team-standard.md 仅在首次初始化时生成；后续修改需要用户明确要求维护"
-                )
-            if (
-                not allow_team_standard
-                and digest is not None
-                and not _is_team_standard_seed(existing)
-            ):
-                raise KnowledgeWriteSessionError(
-                    "team-standard.md 已包含保留内容；首次初始化不能覆盖它"
-                )
-        if existing != text:
+        needs_write = digest is None or existing != text
+        if team_target and needs_write:
+            _assert_team_standard_write_allowed(
+                paths,
+                team_standard_mode,
+                is_entry=team_entry,
+                existing=existing,
+                digest=digest,
+            )
+        if needs_write:
             atomic_write_text(destination, text)
     return destination
 
@@ -293,4 +357,9 @@ def delete_document(paths: ModusPaths, target: str, *, expected_hash: str) -> bo
         return _delete_bound_regular_file(destination, expected_hash)
 
 
-__all__ = ["KnowledgeWriteSessionError", "delete_document", "write_document"]
+__all__ = [
+    "KnowledgeWriteSessionError",
+    "TeamStandardWriteMode",
+    "delete_document",
+    "write_document",
+]

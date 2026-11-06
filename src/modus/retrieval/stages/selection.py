@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import math
+import posixpath
 import re
 import time
 from collections import Counter, defaultdict
 from collections.abc import MutableMapping, Sequence
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import unquote, urlsplit
 
 from ...knowledge_reader import BoundKnowledgeReadError, read_bound_regular_text
 from ...paths import ModusPaths
 from ..settings import RetrievalSettings
-from .documents import _LABELED_LINK_RE, MAX_DOCUMENT_BYTES, classify_document
+from .documents import _LABELED_LINK_RE, MAX_DOCUMENT_BYTES, classify_document, strip_fenced_code
+from .lexical import tokenize
 
 _MAX_SEARCH_RESULTS = 256
 
@@ -148,6 +151,12 @@ def select_query_targets(
 
     limit = max(1, RetrievalSettings.read(paths).max_candidates)
     route_terms = extract_terms(query, limit=64)
+    # 已知源码路径可命中正文的结构化锚点，不需要常驻源码到领域反向索引。
+    source_terms = [
+        path
+        for path in explicit_paths
+        if path != "." and not path.startswith(("modus/", ".modus/"))
+    ][:16]
     by_path = {paths.relative(path): path for path in targets}
     direct_target = bool(explicit_paths) or has_explicit_locator(query)
     if direct_target:
@@ -163,7 +172,7 @@ def select_query_targets(
         doc_targets=targets,
         max_results=_MAX_SEARCH_RESULTS,
         timeout_seconds=1.0,
-        terms=route_terms,
+        terms=list(dict.fromkeys([*source_terms, *route_terms])),
         deadline_monotonic=deadline_monotonic,
     )
     scores = cast(MutableMapping[str, float], Counter(hit["file"] for hit in hits.hits))
@@ -225,4 +234,71 @@ def select_query_targets(
 # Compatibility with the original internal stage name.
 _query_targets = select_query_targets
 
-__all__ = ["select_query_targets"]
+
+def select_link_targets(
+    records: list[dict[str, Any]],
+    available_paths: set[str],
+    query: str,
+    *,
+    limit: int,
+    deadline_monotonic: float | None = None,
+) -> tuple[list[dict[str, Any]], bool]:
+    """从已读且命中的正文单跳展开链接，保留片段，不递归遍历知识树。"""
+    terms = set(tokenize(query))
+    matches: dict[tuple[str, str], dict[str, Any]] = {}
+    exhausted = False
+    for record in records:
+        if deadline_monotonic is not None and time.monotonic() >= deadline_monotonic:
+            exhausted = True
+            break
+        if record.get("status") != "current":
+            continue
+        # 不用全局祖先标题触发所有导航行；领域名称命中不等于每个专题都相关。
+        headings = set(tokenize(record["heading"])) if record.get("headingLevel", 1) > 1 else set()
+        for offset, line in enumerate(
+            strip_fenced_code(str(record.get("text") or "")).splitlines()
+        ):
+            if deadline_monotonic is not None and time.monotonic() >= deadline_monotonic:
+                exhausted = True
+                break
+            links = list(_LABELED_LINK_RE.finditer(line))
+            if not links:
+                continue
+            overlap = terms & (headings | set(tokenize(line)))
+            if not overlap:
+                continue
+            for match in links:
+                raw = unquote(match[2].strip())
+                # 只使用已安全发现的知识坐标；不 resolve 链接路径，避免经符号链接改道。
+                if "\\" in raw or "\x00" in raw:
+                    continue
+                try:
+                    link = urlsplit(raw)
+                except ValueError:
+                    continue
+                if link.scheme or link.netloc or link.path.startswith("/") or link.query:
+                    continue
+                relative = (
+                    posixpath.normpath(posixpath.join(posixpath.dirname(record["path"]), link.path))
+                    if link.path
+                    else record["path"]
+                )
+                if relative not in available_paths:
+                    continue
+                key = (relative, link.fragment.casefold())
+                score = len(overlap)
+                if key not in matches or score > matches[key]["score"]:
+                    matches[key] = {
+                        "path": relative,
+                        "fragment": key[1],
+                        "score": score,
+                        "fromPath": record["path"],
+                        "fromLine": record["lineStart"] + offset,
+                    }
+    ranked = sorted(
+        matches.values(), key=lambda item: (-item["score"], item["path"], item["fragment"])
+    )
+    return ranked[:limit], exhausted or len(ranked) > limit
+
+
+__all__ = ["select_link_targets", "select_query_targets"]
