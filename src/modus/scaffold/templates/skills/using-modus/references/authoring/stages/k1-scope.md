@@ -7,7 +7,7 @@
 ## 输入与必读
 
 - 输入：当前工作流、用户授权、已有知识树、本轮构建结果或不可用原因。
-- 读取[证据原则](../evidence/index.md)、[机器证据合同](../evidence/machine-packet.md)、[范围与执行卡](../evidence/scope-modeling.md)。
+- 调查前读取[证据原则](../evidence/index.md)，按其中[定位、读取与复用](../evidence/index.md#定位读取与复用)确定路径、读取边界与失败处置；联读[机器证据合同](../evidence/machine-packet.md)、[范围与执行卡](../evidence/scope-modeling.md)。
 - reinit 同时读取现有 Domain/Module 身份、人工材料和相关正文，按稳定身份比较变化。
 
 ## 执行

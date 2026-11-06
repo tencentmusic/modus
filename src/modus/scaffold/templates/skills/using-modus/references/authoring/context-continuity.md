@@ -36,7 +36,7 @@ init/reinit 的串行作者与已授权 Domain worker 共用本合同。唯一�
 3. **相关正文。** 读取本域路由、将编辑或引用的专题主定义、Module 场景、跨域主定义及人工材料。首次创建时确认文件确实不存在。未知写入先与原预期比较，区分未落盘、已落盘待验和冲突，不直接重放。保留原 CAS 基线；文件与卡片不一致时先核对原因，不能刷新哈希后覆盖或自动推进状态。
 4. **适用规范。** 读取[当前阶段](index.md)和完整[框架](framework/index.md)，联读[布局](framework/layout.md)、[Surface](framework/surface-profiles.md)、[本地化](framework/localization.md)、[编辑](framework/editorial.md)、[图文](framework/visual-expression.md)，以及 [Domain](framework/deliverables/domain.md)、[Module](framework/deliverables/module.md)、[六专题](framework/deliverables/topics.md)中本域实际需要的详细合同；按需读取[样稿](framework/examples.md)。索引或上一个域的摘要不能替代适用规范。
 
-读取前用文件清单或定向搜索定位真实路径，再按标题/行段限制输出并记录已读边界；截断后补齐缺失段，搜索无匹配只说明该查询未命中。CLI 参数以当前 checkout/安装版本的帮助为准，不凭历史拼写调用。复用记录须能对应同一证据双摘要、正文哈希和规范版本。
+上述读取共用[定位、读取与复用](evidence/index.md#定位读取与复用)，首次调查也适用。恢复时另外核对原卡中的执行位置、授权和验收债务；普通读取失败不自动重置已确认范围或已完成状态。
 
 范围、证据、正文和规范一致后，从最早未完成动作继续。同一 Domain 未丢失上下文且证据仍可用时复用调查，不为不同专题重复扫描。
 
