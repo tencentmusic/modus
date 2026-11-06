@@ -37,3 +37,14 @@ description: 当任务需要本项目的源码或实现证据时使用，包括�
 `modus context resolve "问题" --scope project-read` 是便利接口；变更调查可以用 `--purpose change`。续查时重新传入具体问题、purpose 和显式 path，每轮读取当前正文与源码。CLI、知识、缓存和安装记录均不是前提。普通消费不初始化、不构图、不补模板、不改写知识。
 
 用户明确请求创建或维护知识时，分别使用 `modus-init`、`modus-reinit` 或 `modus-update-knowledge`；材料用于当前任务不自动代表持久保存授权。显式要求更新 Modus 软件包时读[包更新说明](references/framework-update.md)。
+
+## Git 提交信息
+
+生成或润色提交信息时，以本次拟提交的实际差异为依据，并遵循以下约定：
+
+1. 优先遵循用户要求和项目明确的提交规范；没有明确规范时参考相关模块的历史约定；仍无约定时采用 [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)。语言、长度等要求随项目约定，不额外设置统一限制。
+2. 采用 Conventional Commits 时，标题格式为 `<type>[(<scope>)][!]: <summary>`，方括号表示可选部分。按实际行为选择 type：新增能力用 `feat`，修复错误用 `fix`，不改变行为的重构用 `refactor`，仅修改说明文档用 `docs`；其他类型沿用项目约定。Skill 模板可能定义产品行为，不能仅凭 Markdown 扩展名归为 `docs`。
+3. 摘要写清改动对象和结果，避免仅写“优化”“完善”“调整”。简单变更可以只有标题；复杂变更在空行后的正文说明问题或动机、修改后的行为、相关验证与兼容性影响，不罗列文件清单代替解释。验证只记录实际执行的检查及结果，未执行或未通过的检查如实说明。
+4. 采用 Conventional Commits 且存在破坏兼容性的变更时，用 `!` 或 `BREAKING CHANGE:` 标记，并说明影响与迁移方式；关联事项和其他页脚按项目约定填写。
+
+这些约定只规范提交信息，不授予 Git 提交、推送或改写历史的权限；相关操作沿用当前任务已有授权。
