@@ -260,6 +260,7 @@ def _exercise_authoring_contract() -> None:
         "skills/using-modus/references/authoring/stages/k5-constraints.md",
         "skills/using-modus/references/authoring/stages/k6-publish.md",
         "skills/using-modus/references/authoring/context-continuity.md",
+        "skills/using-modus/references/authoring/execution-strategy.md",
         "skills/using-modus/references/authoring/cross-domain.md",
         "skills/using-modus/references/authoring/domain-worker-prompt.md",
         "skills/using-modus/references/authoring/evidence/index.md",

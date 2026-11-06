@@ -26,7 +26,7 @@ description: 用户请求全量复核或重建已有项目知识时使用，保�
 | K5 | [项目约束](../using-modus/references/authoring/stages/k5-constraints.md) | 复核规范适用性与偏差，默认保护 Team Standard；明确委托时才维护，缺失不自动补建 |
 | K6 | [系统概览与发布](../using-modus/references/authoring/stages/k6-publish.md) | 核对全部交接，按 K4/K5 的真实影响修订概览，新增域补 business 索引；全局验收及发布 |
 
-先做全局 K2，再逐域 K2 → K3 ↔ K4，最后 K5/K6。进入阶段确保已完整读取适用细则，仍完整有效的内容按上下文合同复用，逐域保留相同深度；默认串行，仅明确授权后按[并行协议](../using-modus/references/authoring/parallel-domain-authoring.md)和固定委托合同执行。
+先做全局 K2，再逐域 K2 → K3 ↔ K4，最后 K5/K6。进入阶段确保已完整读取适用细则，仍完整有效的内容按上下文合同复用，逐域保留相同深度；未授权委派时由同一作者持续执行；仅明确授权后按[并行协议](../using-modus/references/authoring/parallel-domain-authoring.md)和固定委托合同执行。
 
 图表在参与者、方向、所有权、状态、条件、完成/恢复变化或阅读缺陷时更新；准确且满足要求的原图复用。结构迁移先写新落点、回读并修入链，再按原哈希删除旧生成文件；符号消失、partial 或锚点移动都不能单独证明退役。每次写入遵守 CAS，冲突只处理受影响目标。
 

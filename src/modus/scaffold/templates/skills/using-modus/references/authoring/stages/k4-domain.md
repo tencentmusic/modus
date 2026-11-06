@@ -10,8 +10,8 @@
 | 当前产物或问题 | 共享细则 |
 | --- | --- |
 | 全部正文 | [框架与质量要求](../framework/index.md)、[布局](../framework/layout.md)、[Surface](../framework/surface-profiles.md)、[本地化](../framework/localization.md)、[编辑](../framework/editorial.md)、[图文](../framework/visual-expression.md) |
-| 领域与场景 | [Domain](../framework/deliverables/domain.md)、[Module](../framework/deliverables/module.md) |
-| 六专题 | [总则](../framework/deliverables/topics.md)、[API](../framework/deliverables/api.md)、[Object](../framework/deliverables/object.md)、[Rule](../framework/deliverables/rule.md)、[State](../framework/deliverables/state-machine.md)、[Downstream](../framework/deliverables/collaboration.md)、[Infrastructure](../framework/deliverables/infrastructure.md) |
+| 路由 / 模块场景 | 写对应产物前分别读 [Domain](../framework/deliverables/domain.md) / [Module](../framework/deliverables/module.md) |
+| 专题 | 先读[总则](../framework/deliverables/topics.md)，再按当前单元涉及的主定义选读 [API](../framework/deliverables/api.md)、[Object](../framework/deliverables/object.md)、[Rule](../framework/deliverables/rule.md)、[State](../framework/deliverables/state-machine.md)、[Downstream](../framework/deliverables/collaboration.md)、[Infrastructure](../framework/deliverables/infrastructure.md)；不一次展开全部专题 |
 | 回读与写入 | [发布合同](../publication.md)、[跨域协作](../cross-domain.md) |
 
 ## 执行
