@@ -274,6 +274,8 @@ def plan_uninstall(
         handled.update(entry.path for entry in projected)
         removed_files.extend(entry.path for entry in projected)
         removed_sections.extend(f"{entry.path}#{entry.marker}" for entry in marked)
+        # 与执行顺序一致，最后一个使用共享区块的平台负责移除它。
+        safe_manifest.platforms.remove(adapter.name)
 
     for entry in files:
         if entry.path in handled or entry.path.startswith("modus/knowledge/"):

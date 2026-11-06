@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from ..precedence import MODUS_DISPATCHER_FALLBACK, USER_INVOKED_WORKFLOWS_SENTENCE
 from .base import Command, PlatformAdapter, Skill
 from .models import InstructionFile, PlatformLayout
-from .rendering import render_invocation_metadata, render_skill_index
+from .rendering import render_agents_instructions, render_invocation_metadata
 
 _LAYOUT = PlatformLayout(
     skills_root=".dsh/skills",
     owned_file_prefixes=(".dsh/skills/",),
-    instructions=InstructionFile(path="AGENTS.md", marker="modus-dsh"),
+    instructions=InstructionFile(path="AGENTS.md", marker="modus"),
 )
 
 
@@ -32,5 +31,4 @@ class DshAdapter(PlatformAdapter):
         )
 
     def _render_instructions(self, skills: list[Skill], _commands: list[Command]) -> str:
-        heading = f"## Modus\n\n{MODUS_DISPATCHER_FALLBACK} {USER_INVOKED_WORKFLOWS_SENTENCE}:"
-        return render_skill_index(skills, heading)
+        return render_agents_instructions(skills)

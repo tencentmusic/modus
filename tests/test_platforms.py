@@ -28,7 +28,7 @@ from modus.surface import CORE_SKILLS
 
 
 # 名称集合一致只能证明发现能力；顺序和独立路径还保护安装行为。
-# 标记与 hook 路径必须互不冲突，否则卸载一个宿主会影响另一个。
+# Hook 路径独立；Codex 与 DSH 共用同一个指令区块。
 def test_builtin_registry_and_host_contracts_share_one_complete_vocabulary() -> None:
     assert set(BUILTIN_REGISTRY.names) == {*SUPPORTED_HOSTS, "dsh"}
     assert available_platforms() == sorted([*SUPPORTED_HOSTS, "dsh"])

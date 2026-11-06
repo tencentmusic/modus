@@ -7,12 +7,14 @@
 | 平台 | 技能位置 | 指令/规则 | Hook 配置 |
 | --- | --- | --- | --- |
 | Claude | `.claude/skills` | `CLAUDE.md` 的 `modus-claude` 区块 | `.claude/settings.json` |
-| Codex | `.agents/skills` | `AGENTS.md` 的 `modus-codex` 区块 | `.codex/hooks.json` |
+| Codex | `.agents/skills` | `AGENTS.md` 的共享 `modus` 区块 | `.codex/hooks.json` |
 | Cursor | `.cursor/skills` | `.cursor/rules/modus.mdc` | `.cursor/hooks.json` |
 | CodeBuddy | `.codebuddy/skills`，另有 `.codebuddy/commands` | `CODEBUDDY.md` 的 `modus-codebuddy` 区块 | `.codebuddy/settings.json` |
-| DSH | `.dsh/skills` | `AGENTS.md` 的 `modus-dsh` 区块 | 原生插件提供运行时指引与工具 |
+| DSH | `.dsh/skills` | `AGENTS.md` 的共享 `modus` 区块 | 原生插件提供运行时指引与工具 |
 
 `.modus/skills` 是接入项目的中立权威源，宿主目录是投影副本。扩展不要让模板硬编码宿主路径或通过目录扫描隐式新增用户工作流。
+
+Codex 与 DSH 通过 `platforms/rendering.py: render_agents_instructions` 渲染同一份 `AGENTS.md` 指引。安装清单按 `(path, marker)` 记录一份区块；平台增减仍保留这份指引，直到最后一个使用它的平台移除。适配器卸载同时更新清单的平台列表，完整卸载的预览按相同顺序计算共享区块的删除归属。
 
 Claude 与 DSH 的 model-invocable/user-invocable 两轴独立：自动能力 model-only，显式 init/reinit user-only，update-knowledge 支持二者。两者通过 `platforms/rendering.py: render_invocation_metadata` 共享已验证的 frontmatter 转换，其他宿主由各自适配器决定权限投影。
 

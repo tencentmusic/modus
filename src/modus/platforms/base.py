@@ -117,7 +117,7 @@ class PlatformAdapter(ABC):
         self._write_hook_config(paths, manifest)
 
     def uninstall(self, paths: ModusPaths, manifest: Manifest) -> None:
-        """Remove this adapter's manifest-owned projection."""
+        """Remove this platform, retaining sections still used by other platforms."""
 
         from .hooks import unmerge_hook
 
@@ -134,6 +134,8 @@ class PlatformAdapter(ABC):
         for section_entry in sections:
             remove_section(paths.root / section_entry.path, section_entry.marker)
             manifest.sections.remove(section_entry)
+        if self.name in manifest.platforms:
+            manifest.platforms.remove(self.name)
 
     @abstractmethod
     def _render_instructions(
@@ -288,6 +290,16 @@ class PlatformAdapter(ABC):
             for entry in manifest.sections
             if entry.path == instructions.path and entry.marker == instructions.marker
         ]
+        if sections:
+            from .registry import get_adapters
+
+            remaining = get_adapters([name for name in manifest.platforms if name != self.name])
+            if any(
+                (adapter.layout.instructions.path, adapter.layout.instructions.marker)
+                == (instructions.path, instructions.marker)
+                for adapter in remaining
+            ):
+                sections = []
         return files, sections
 
     def preview_uninstall(

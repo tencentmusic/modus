@@ -9,15 +9,14 @@ the deliberately narrow clear-session singleton recovery is required.
 from __future__ import annotations
 
 from ..hooks import bootstrap
-from ..precedence import MODUS_DISPATCHER_FALLBACK, USER_INVOKED_WORKFLOWS_SENTENCE
 from .base import Command, PlatformAdapter, Skill
 from .models import HookFile, InstructionFile, PlatformLayout
-from .rendering import render_skill_index
+from .rendering import render_agents_instructions
 
 _LAYOUT = PlatformLayout(
     skills_root=".agents/skills",
     owned_file_prefixes=(".agents/skills/",),
-    instructions=InstructionFile(path="AGENTS.md", marker="modus-codex"),
+    instructions=InstructionFile(path="AGENTS.md", marker="modus"),
     hook=HookFile(
         path=".codex/hooks.json",
         template="hooks/codex-hooks.json",
@@ -37,5 +36,4 @@ class CodexAdapter(PlatformAdapter):
         skills: list[Skill],
         _commands: list[Command],
     ) -> str:
-        heading = f"## Modus\n\n{MODUS_DISPATCHER_FALLBACK} {USER_INVOKED_WORKFLOWS_SENTENCE}:"
-        return render_skill_index(skills, heading)
+        return render_agents_instructions(skills)

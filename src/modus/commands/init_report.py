@@ -117,10 +117,13 @@ def _platform_tree(platforms: list[str]) -> tuple[TreeNode, ...]:
                     "供 Codex 读取的技能",
                     (TreeNode("skills/"),),
                 ),
-                TreeNode("AGENTS.md", "Modus 受管区块中的 Codex 指引"),
                 TreeNode(".codex/", "", (TreeNode("hooks.json", "Codex 会话钩子"),)),
             )
         )
+    if "dsh" in selected:
+        nodes.append(TreeNode(".dsh/", "供 DSH 读取的技能", (TreeNode("skills/"),)))
+    if selected & {"codex", "dsh"}:
+        nodes.append(TreeNode("AGENTS.md", "Modus 共享指引区块"))
     if "codebuddy" in selected:
         nodes.extend(
             (

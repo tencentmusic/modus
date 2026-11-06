@@ -48,7 +48,7 @@ uv sync --locked
 
 记录该 checkout 中 `.venv/bin/modus` 的绝对路径，后续作为 `executable`。仅凭已安装 CLI 的版本号，不能判断它是否包含 DSH adapter。
 
-已有多个平台的项目需在 `init` 中列出全部要保留的平台，例如 `--platform codex --platform dsh`。安装会写入 `.dsh/skills/` 和 `AGENTS.md` 中的 `modus-dsh` 区块，保留已有知识。知识正文由用户在 DSH 中明确调用 `/modus-init` 后创作。
+已有多个平台的项目需在 `init` 中列出全部要保留的平台，例如 `--platform codex --platform dsh`。安装会写入 `.dsh/skills/` 和 `AGENTS.md` 中的 `modus` 区块，保留已有知识。Codex 与 DSH 共用这一份指引；移除其中一个平台时保留区块，最后一个使用它的平台移除后才删除。知识正文由用户在 DSH 中明确调用 `/modus-init` 后创作。
 
 ### 2. 获取插件
 

@@ -6,10 +6,21 @@ from collections.abc import Sequence
 
 import yaml
 
-from ..precedence import MODUS_PRECEDENCE_NOTICE
+from ..precedence import (
+    MODUS_DISPATCHER_FALLBACK,
+    MODUS_PRECEDENCE_NOTICE,
+    USER_INVOKED_WORKFLOWS_SENTENCE,
+)
 from ..skillmd import split_frontmatter
 from ..surface import EXPLICIT_SKILLS, INTENT_ROUTED_SKILLS
 from .models import Skill
+
+
+def render_agents_instructions(skills: Sequence[Skill]) -> str:
+    """Render the AGENTS.md section shared by Codex and DSH."""
+
+    heading = f"## Modus\n\n{MODUS_DISPATCHER_FALLBACK} {USER_INVOKED_WORKFLOWS_SENTENCE}:"
+    return render_skill_index(skills, heading)
 
 
 def render_invocation_metadata(content: str, *, model_invocable: bool, user_invocable: bool) -> str:

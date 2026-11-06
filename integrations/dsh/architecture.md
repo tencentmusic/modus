@@ -25,7 +25,7 @@ flowchart TB
 
 | 所有者 | 拥有的状态与决定 | 边界 |
 | --- | --- | --- |
-| `src/modus/platforms/dsh.py` | Skill 投影、`modus-dsh` 指引区块 | 复用安装生命周期；不修改 DSH profile |
+| `src/modus/platforms/dsh.py` | Skill 投影、与 Codex 共用的 `AGENTS.md` 中的 `modus` 指引区块 | 复用安装生命周期；不修改 DSH profile |
 | DSH profile / Cordis | 插件配置、工具和上下文注册 | 加载、卸载与服务生命周期由宿主管理 |
 | DSH 执行服务 | 会话目录、环境、取消、超时与沙箱 | 项目 I/O 发生在会话的执行环境 |
 | Modus CLI | 检索、影响候选、核验与 CAS 写入规则 | TypeScript 不维护第二套业务判断 |
@@ -46,7 +46,7 @@ TypeScript 源码位于仓库的 `integrations/dsh/src/`。按一次调用的路
 
 工具声明依赖 `ModusRunner` 函数契约，不直接访问 Shell。协议模块不依赖 Cordis 或会话状态。组合入口绑定这些具体实现；当前只有一种执行方式，无需再引入执行器注册表或通用插件框架。
 
-Python 的 `DshAdapter` 只声明布局与渲染差异。Claude 与 DSH 已验证共享相同的两个调用权限字段，因此复用 `render_invocation_metadata`；其他平台继续由自己的适配器决定投影方式。
+Python 的 `DshAdapter` 只声明布局与渲染差异。Codex 与 DSH 通过 `render_agents_instructions` 渲染同一份指引，清单按文件路径和标记记录一份共享区块；卸载时最后一个使用它的平台负责删除。Claude 与 DSH 已验证共享相同的两个调用权限字段，因此复用 `render_invocation_metadata`；其他平台继续由自己的适配器决定投影方式。
 
 ## 一次工具调用
 
