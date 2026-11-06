@@ -1,10 +1,10 @@
 <div align="center">
 
-# Modus
+<h1><img src="../docs/assets/modus-wordmark.png" alt="Modus" width="360" /></h1>
 
 **Take coding beyond code**
 
-Already installed? Run `modus update`
+Install with `uv tool install openmodus` · Update with `modus update`
 
 <p>
   <strong>Coding-agent platforms</strong><br />
@@ -52,6 +52,10 @@ Modus builds a project knowledge base that coding agents can trace back to sourc
 
 > The open-source release currently covers Modus's project knowledge base. Its broader AI workflow solution is also evolving, and we will share updates as it develops.
 
+**A real example: RuoYi source + official documentation → traceable project knowledge.** Install or update, connect the project, supply several official documents to `/modus-init`, and follow role and department data access into its implementation. Keep the resulting Markdown for the next development task.
+
+![RuoYi walkthrough: installation, project setup, multiple materials and knowledge use](../docs/assets/ruoyi-demo.en.gif)
+
 ---
 
 ## Core features
@@ -61,6 +65,8 @@ Modus treats project knowledge as a maintainable engineering asset: local analys
 ### Build a project map from evidence
 
 During initialization, local analysis extracts bounded evidence from source, build context, and available toolchains to locate entry points, relationships, and key behavior. The agent then rereads source, tests, configuration, and business material to confirm system architecture, domain boundaries, and real scenarios, recording its conclusions in the system overview, Domain, Module, and topic documents.
+
+**Code to MD · Code link MD** can happen in the same `/modus-init` run. Alongside source, you can provide multiple requirements documents, designs, team standards, Markdown from local wikis or LLM wikis, and accessible web pages. The agent checks their business concepts, rules, and scenarios against the implementation, giving code its business context and documents a traceable connection to code.
 
 ### Assemble task context progressively
 
@@ -76,17 +82,17 @@ After a code change, the agent checks whether responsibilities, contracts, rules
 
 ## Quick start
 
-Install the CLI from source, connect a target repository, then have your agent author its first project knowledge from evidence. The CLI handles host integration; reviewed Markdown is the durable result kept in the repository.
+Install the CLI from PyPI, connect a target repository, then have your agent build project knowledge from source and business material. The resulting Markdown lives in the project and can be reviewed alongside the code.
 
 ### 1. Install the CLI
 
-From the Modus source repository root (containing `pyproject.toml`), install the CLI with [`uv`](https://docs.astral.sh/uv/) (Python 3.11–3.14 required):
+**Install the release from PyPI** by running this command in a terminal. It requires `uv` and Python 3.11–3.14. [Install uv](https://docs.astral.sh/uv/getting-started/installation/)
 
 ```bash
-uv tool install .
+uv tool install openmodus
 ```
 
-You can also install the published package from PyPI with `uv tool install openmodus`. When developing Modus, `uv tool install --editable .` makes source changes take effect directly. The installed command is `modus` in either case. See [Installation and connection options](#installation-and-connection-options) for other methods and index configuration.
+The PyPI package is named `openmodus`. The installed command is `modus`. Source installation, `pipx`, and package index configuration are covered in [Installation and connection options](#installation-and-connection-options). [PyPI release page](https://pypi.org/project/openmodus/)
 
 ### 2. Connect a project
 
@@ -97,17 +103,35 @@ cd path/to/your-project
 modus init
 ```
 
-In an interactive terminal, select Claude Code, Codex, Cursor, CodeBuddy, or DeepSeek Harness (preview). The CLI installs platform-neutral Skills and commands into the project, projects them through the selected host adapter, and records ownership of managed files. See [Installation and connection options](#installation-and-connection-options) for scripted and multi-platform setup and installation checks.
+In an interactive terminal, select Claude Code, Codex, Cursor, CodeBuddy, or DeepSeek Harness (preview, currently requires a source installation). The CLI installs platform-neutral Skills and commands into the project, projects them through the selected host adapter, and records ownership of managed files. See [Installation and connection options](#installation-and-connection-options) for scripted and multi-platform setup and installation checks.
 
 ### 3. Author project knowledge
 
-Open the project in your selected coding agent and invoke this workflow in the conversation:
+**Code to MD builds project knowledge from source.** Open the project in your selected coding agent and invoke the following workflow in the conversation. The agent starts with current source, tests, configuration, and material already in the project.
 
 ```text
 /modus-init
 ```
 
-This is the knowledge-authoring workflow, distinct from the `modus init` Shell command. The agent uses local analysis to locate leads, checks current source, tests, configuration, and any business material you provide, then authors knowledge after the project boundaries are confirmed. If a host exposes Skills by name instead of slash commands, ask it to “use modus-init to initialize knowledge for this project.”
+**Code link MD brings existing business knowledge into that understanding.** Include paths, directories, or links to multiple sources in the same message as `/modus-init`. Requirements explain the intended outcome, designs explain tradeoffs, team standards set constraints, and wikis and business websites supply scenarios. Replace the examples below with your own sources.
+
+```text
+/modus-init
+Create project knowledge using the current source and these materials:
+- Requirements under docs/requirements/
+- Technical design in docs/design.md
+- Team standards in docs/team-standard.md
+- Local wiki or LLM wiki Markdown under ../project-wiki/
+- Business and technical documentation at https://example.com/project/docs
+- Order and refund pages at https://example.com/project/app, read-only
+
+Connect business concepts, rules, and scenarios to the code.
+Identify differences between the material and the current implementation.
+```
+
+The agent reads each source within the confirmed scope, follows document collections into their subdirectories and child pages, and checks the content against current implementation. Access depends on the coding agent’s file, document, and web tools. Websites that require login or interaction need browser or Computer Use capabilities, along with access and a reading scope supplied by you. The current workflow defines these steps in its [material coverage contract](../src/modus/scaffold/templates/skills/using-modus/references/authoring/evidence/index.md#材料覆盖).
+
+`/modus-init` is the knowledge-authoring workflow in an agent conversation; the terminal command `modus init` connects the project. The agent confirms the Domain and Module scope before authoring each Domain. If the host exposes Skills by name, ask it to “use modus-init to initialize knowledge from this project and these materials.”
 
 When the workflow finishes, `.modus/` holds platform-neutral integration assets, `modus/knowledge/` holds Markdown knowledge reviewed alongside code, and `modus/.cache/` holds disposable initialization evidence. Everyday tasks read the relevant knowledge and current source without rerunning initialization analysis. See the [User guide](#user-guide) for first-run review and later maintenance.
 
@@ -354,6 +378,8 @@ The [Quick start](#quick-start) gives the shortest path. This section adds conne
 
 The public PyPI distribution is named `openmodus`; no private index is required. You can also use `pipx install openmodus`. If your custom index does not proxy public PyPI, run `uv tool install --default-index https://pypi.org/simple openmodus`.
 
+To use features in the current source, run `uv tool install .` from the Modus repository root containing `pyproject.toml`. For development, `uv tool install --editable .` makes source changes take effect directly. Both methods also install the `modus` command.
+
 `modus init` selects a host in an interactive terminal. For scripts or noninteractive terminals, specify one with `modus init --platform codex`, repeat `--platform` for several hosts, or use `modus init --all-platforms`. A first noninteractive run without a platform selection connects all supported hosts. The same neutral Skill contracts are projected into each selected host.
 
 After connecting, run `modus status` in the target repository. The output `Installation: installed` means the project assets are in place. The CLI places starter files in `modus/knowledge/`, but you still need `/modus-init` in an agent to author the prose. The knowledge document count reported by `status` includes starter files and does not by itself show that authoring is complete.
@@ -396,7 +422,7 @@ Use these entry points in an AI coding environment, not in a Shell.
 | `/modus-reinit` | Reuse stable Domain and Module identities while fully reviewing and reorganizing existing prose. |
 | `/modus-update-knowledge` | Update knowledge affected by explicit material or local facts without rerunning repository-wide analysis. |
 
-On the first `/modus-init` run, you can give the agent known project boundaries, business material, and team constraints. The agent first organizes the Domain and Module scope for confirmation, then rereads source domain by domain and writes the prose. Afterward, start at `modus/knowledge/architecture-overview.md`, follow a Domain's `SKILL.md` into a relevant Module, and check that one real scenario's rules, failure recovery, and verification entry points are grounded in current source. Review the new prose as you would code.
+On the first `/modus-init` run, you can provide project boundaries, multiple business and technical documents, wiki directories, websites you authorize the agent to read, and team constraints. See [Author project knowledge](#3-author-project-knowledge) for an example prompt. The agent first organizes the Domain and Module scope for confirmation, then rereads source domain by domain and writes the prose. Afterward, start at `modus/knowledge/architecture-overview.md`, follow a Domain's `SKILL.md` into a relevant Module, and check that one real scenario's rules, failure recovery, and verification entry points are grounded in current source. Review the new prose as you would code.
 
 For existing knowledge, use `/modus-reinit` when overall boundaries change or a full review is needed. To incorporate specific new material or local facts, use `/modus-update-knowledge` and provide the material path and affected scope. Ordinary coding tasks do not need these authoring workflows rerun.
 

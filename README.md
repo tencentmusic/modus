@@ -1,10 +1,10 @@
 <div align="center">
 
-# Modus
+<h1><img src="docs/assets/modus-wordmark.png" alt="Modus" width="360" /></h1>
 
 **让 Coding 不止于 Code**
 
-已安装？运行 `modus update`。
+安装 `uv tool install openmodus` · 更新 `modus update`
 
 <p>
   <strong>Coding Agent 平台</strong><br />
@@ -52,6 +52,10 @@ Modus 为 Coding Agent 建立可追溯的项目知识库。本地分析把入口
 
 > 目前开源的是 Modus 的项目知识库部分；配套的 AI 工作流开源方案也在持续完善，后续会更新进展。
 
+**看一个真实案例：RuoYi 源码 + 官网文档 → 可追溯的项目知识。** 从安装或更新开始，接入项目，在 `/modus-init` 中补充多份官网材料，再沿“角色与部门数据权限”核对实现、沉淀 Markdown，为下一次开发提供上下文。
+
+![RuoYi 案例：安装、接入、多材料初始化与知识使用](docs/assets/ruoyi-demo.gif)
+
 ---
 
 ## 核心功能
@@ -61,6 +65,8 @@ Modus 把项目知识作为可维护的工程资产：本地分析提供线索�
 ### 从证据建立项目地图
 
 初始化时，本地分析从源码、构建上下文和可用工具链提取有界证据，帮助定位入口、关系与关键行为。Agent 再回读源码、测试、配置和业务材料，确认系统架构、领域边界与真实场景，将判断写入系统概览、领域、模块及专题文档。
+
+**Code to MD · Code link MD** 可以在同一次 `/modus-init` 中完成。从源码建立第一份知识时，可以一并提供多份需求、设计、团队规范，以及本地 Wiki、LLM Wiki 中的 Markdown 或可访问的网页。Agent 将材料中的业务概念、规则和场景与真实实现核对，让代码有业务背景可解释，让文档有实现可追溯。
 
 ### 为任务渐进装配上下文
 
@@ -76,17 +82,17 @@ Modus 把项目知识作为可维护的工程资产：本地分析提供线索�
 
 ## 快速开始
 
-从源码安装 CLI，接入目标仓库，再由 Agent 基于项目证据创建第一份知识。CLI 负责平台接入；经确认的 Markdown 才是留在仓库中的长期产物。
+从 PyPI 安装 CLI，接入目标仓库，再由 Agent 结合源码与业务材料创建第一份知识。最终的 Markdown 保存在项目中，可以随代码一起评审。
 
 ### 1. 安装 CLI
 
-在 Modus 源码仓库根目录（包含 `pyproject.toml`），使用 [`uv`](https://docs.astral.sh/uv/) 安装 CLI（需要 Python 3.11–3.14）：
+**从 PyPI 安装发布版**，在终端运行以下命令（需要 `uv` 和 Python 3.11–3.14）。[uv 安装说明](https://docs.astral.sh/uv/getting-started/installation/)
 
 ```bash
-uv tool install .
+uv tool install openmodus
 ```
 
-也可以从 PyPI 安装发布包：`uv tool install openmodus`。参与 Modus 开发时，使用 `uv tool install --editable .` 可让源码修改直接生效。无论安装来源，命令都是 `modus`。其他安装方式与索引配置见[安装与接入选项](#安装与接入选项)。
+PyPI 上的包名是 `openmodus`，安装后的命令是 `modus`。源码安装、`pipx` 与软件源配置见[安装与接入选项](#安装与接入选项)。[PyPI 发布页](https://pypi.org/project/openmodus/)
 
 ### 2. 接入项目
 
@@ -97,17 +103,34 @@ cd path/to/your-project
 modus init
 ```
 
-在交互式终端中选择 Claude Code、Codex、Cursor、CodeBuddy 或 DeepSeek Harness（预览）。CLI 将平台中立的 Skill 与命令安装到项目，再通过对应适配器接入所选平台，并记录受管文件的所有权。脚本接入、多平台接入和安装状态检查见[安装与接入选项](#安装与接入选项)。
+在交互式终端中选择 Claude Code、Codex、Cursor、CodeBuddy 或 DeepSeek Harness（预览，当前需源码安装）。CLI 将平台中立的 Skill 与命令安装到项目，再通过对应适配器接入所选平台，并记录受管文件的所有权。脚本接入、多平台接入和安装状态检查见[安装与接入选项](#安装与接入选项)。
 
 ### 3. 创建项目知识
 
-在所选 Coding Agent 中打开该项目，在对话中运行：
+**Code to MD，从代码建立项目知识。** 在所选 Coding Agent 中打开项目，在对话中运行以下工作流，Agent 会从当前源码、测试、配置与项目内已有材料开始调查。
 
 ```text
 /modus-init
 ```
 
-这是知识创作工作流，与 Shell 中的 `modus init` 不同。Agent 会使用本地分析定位线索，回读当前源码、测试、配置和你提供的业务材料，并在确认项目边界后撰写知识。若平台以 Skill 名称而非斜杠命令呈现能力，直接要求它“使用 modus-init 初始化当前项目知识”即可。
+**Code link MD，用已有业务材料补全项目理解。** 运行 `/modus-init` 时，可以在同一条消息中附上多份材料的路径、目录或链接。需求说明业务目标，设计文档解释取舍，团队规范给出约束，Wiki 和业务网站补充实际场景。把下面的示例替换为你的材料即可。
+
+```text
+/modus-init
+请结合当前项目源码和以下材料创建项目知识：
+- docs/requirements/ 下的需求文档
+- docs/design.md 技术设计
+- docs/team-standard.md 团队规范
+- ../project-wiki/ 下的本地 Wiki 或 LLM Wiki Markdown
+- https://example.com/project/docs 业务与技术文档
+- https://example.com/project/app 的订单与退款页面，仅查阅
+
+将业务概念、规则和场景关联到实际代码，标明材料与当前实现的差异。
+```
+
+Agent 会逐份读取已确认范围内的材料，继续查看文档集合的子目录与子文档，再与当前实现交叉核验。材料的读取依赖 Agent 平台可用的文件、文档或网页工具。查阅需要登录或交互的业务网站时，平台需具备浏览器或 Computer Use 能力，并由你提供访问权限与查阅范围。当前工作流的材料覆盖细则见[证据创作契约](src/modus/scaffold/templates/skills/using-modus/references/authoring/evidence/index.md#材料覆盖)。
+
+`/modus-init` 是 Agent 对话中的知识创作工作流；终端里的 `modus init` 负责项目接入。Agent 会先确认 Domain/Module 范围，再逐域撰写正文。若平台以 Skill 名称呈现能力，可直接要求它“使用 modus-init，结合当前项目和这些材料初始化知识”。
 
 完成后，`.modus/` 保存平台中立的接入资产，`modus/knowledge/` 保存与代码一起评审的 Markdown 知识，`modus/.cache/` 保存可丢弃的初始化证据。日常任务按需读取知识与当前源码，无需重跑初始化分析。首次创作的验收与后续维护见[使用手册](#使用手册)。
 
@@ -354,6 +377,8 @@ Modus 自身也遵守它倡导的边界：入口层保持窄，应用编排与�
 
 公网 PyPI 发行包名是 `openmodus`，安装不需要私有软件源。也可以用 `pipx install openmodus`；如果本机自定义索引不代理公网 PyPI，可以运行 `uv tool install --default-index https://pypi.org/simple openmodus`。
 
+体验当前源码中的能力时，在 Modus 源码仓库根目录（包含 `pyproject.toml`）运行 `uv tool install .`。参与开发时可用 `uv tool install --editable .`，让源码修改直接生效。两种方式安装后的命令也都是 `modus`。
+
 `modus init` 在交互式终端中选择平台；脚本或非交互终端中可显式指定，例如 `modus init --platform codex`，需要多个平台时重复 `--platform`，或用 `modus init --all-platforms`。未指定平台的首次非交互运行会接入全部支持的平台。同一份中立 Skill 合同会投影到所选平台。
 
 DeepSeek Harness（预览）使用 `modus init --platform dsh` 接入项目工作流；原生插件 `@modus-ai/modus` 额外提供上下文检索、知识状态、影响检查和核验工具。Python CLI 当前需从包含 DSH 集成的源码安装，原生插件可从 npm 安装；兼容 DSH `0.2.1-rc.3` / `0.2.2-alpha.2`。参见 [DSH 安装与使用](integrations/dsh/README.md)、[集成设计](integrations/dsh/architecture.md)。
@@ -396,7 +421,7 @@ modus uninstall --person --dry-run
 | `/modus-reinit` | 复用稳定 Domain/Module 身份，全量复核并重新整理已有正文。 |
 | `/modus-update-knowledge` | 针对明确材料或局部事实，更新受影响知识而不重跑全仓分析。 |
 
-首次运行 `/modus-init` 时，可向 Agent 提供已知的项目边界、业务材料和团队约束。Agent 会先整理 Domain/Module 范围供确认，再逐域回读源码并写入正文。完成后从 `modus/knowledge/architecture-overview.md` 沿 Domain 的 `SKILL.md` 进入相关 Module，抽查一个真实场景的规则、失败恢复与验证入口是否能在当前源码中找到依据，并像审阅代码一样审阅新增正文。
+首次运行 `/modus-init` 时，可同时向 Agent 提供已知的项目边界、多份业务与技术文档、Wiki 目录、授权查阅的网站和团队约束。具体提示词见[创建项目知识](#3-创建项目知识)。Agent 会先整理 Domain/Module 范围供确认，再逐域回读源码并写入正文。完成后从 `modus/knowledge/architecture-overview.md` 沿 Domain 的 `SKILL.md` 进入相关 Module，抽查一个真实场景的规则、失败恢复与验证入口是否能在当前源码中找到依据，并像审阅代码一样审阅新增正文。
 
 已有知识时，涉及整体边界或需要全量复核可运行 `/modus-reinit`；有明确的新材料或局部事实要纳入知识时，运行 `/modus-update-knowledge` 并给出材料路径及受影响范围。普通编码任务不需要重新执行这些创作工作流。
 
