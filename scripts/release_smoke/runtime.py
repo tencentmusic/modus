@@ -392,6 +392,31 @@ def _exercise_init_analysis(
     )
 
 
+def _exercise_mobile_grammars(root: Path) -> None:
+    """已安装产物必须包含语言访问器，且依赖可实际解析，不能静默退回文本。"""
+    from modus.machine.facts.structural import extract
+
+    root.mkdir()
+    sources = {
+        "View.h": "@interface View : NSObject\n- (void)refresh;\n@end",
+        "View.m": "@implementation View\n- (void)refresh {}\n@end",
+        "View.mm": "namespace Shared { void run() {} }\n@implementation View\n@end",
+        "View.swift": "struct View { func refresh() {} }",
+        "View.kt": "class View { fun refresh() {} }",
+        "Model.hpp": "namespace Shared { class Model { public: void run(); }; }",
+    }
+    for name, source in sources.items():
+        (root / name).write_text(source, encoding="utf-8")
+    result = extract([root / name for name in sources], cache_root=root)
+    require(len(result["fileFacts"]) == len(sources), "安装后的移动端源码发现不完整")
+    for facts in result["fileFacts"]:
+        require(bool(facts["declarations"]), f"安装后的语言观察缺少声明：{facts['path']}")
+        require(
+            not any(row.get("kind") == "source-text" for row in facts["nodes"]),
+            f"安装后的语言观察意外回退为通用文本：{facts['path']}",
+        )
+
+
 # 新安装应被识别为最新，验证清单与模板版本的一致性。
 # 额外放入用户文件，以真实数据验证卸载的所有权边界。
 # 默认卸载保留知识，再次初始化也必须继续保留。
@@ -542,23 +567,12 @@ def exercise_installed_wheel(wheel: Path) -> RuntimeVerification:
             _exercise_authoring_contract()
             project_root = workspace / "project"
             project_root.mkdir()
-            from modus.machine.corpus.source_snapshot import SourceSnapshot
-            from modus.machine.facts.structural import _get_extractor
-
-            for name, source in {
-                "View.m": "@implementation View\n- (void)run {}\n@end",
-                "View.mm": "@implementation View\n- (void)run {}\n@end",
-                "View.swift": "class View { func run() {} }",
-                "View.kt": "class View { fun run() {} }",
-            }.items():
-                path = project_root / name
-                facts = _get_extractor(path)(SourceSnapshot(path, source))
-                require(bool(facts.get("declarations")), f"安装后的语言解析不可用：{name}")
             (project_root / "main.py").write_text(SAMPLE_SOURCE, encoding="utf-8")
             project = SmokeProject(project_root, app, CliRunner())
 
             retained_knowledge = _exercise_knowledge_paths(project)
             _exercise_init_analysis(project, retained_knowledge)
+            _exercise_mobile_grammars(workspace / "mobile")
             _exercise_maintenance_paths(project)
             _exercise_workspace_uninstall_boundary(workspace, app, CliRunner())
             platforms = frozenset(available_platforms())

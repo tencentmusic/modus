@@ -243,7 +243,11 @@ class _FileParser:
         anchor = self.anchor(node)
         body = (expression or node).child_by_field_name("body")
         signature_end = body.start_byte if body is not None else node.end_byte
-        full_signature = self.raw[node.start_byte : signature_end].decode("utf-8").strip()
+        # 专用语法适配器可提供精确签名，但截断与省略量仍由共同边界维护。
+        details = dict(metadata or {})
+        full_signature = details.pop(
+            "signature", self.raw[node.start_byte : signature_end].decode("utf-8").strip()
+        )
         signature = full_signature[:1000]
         qualified = ".".join((*owners, name))
         inner = self.new_scope(identity, scope["id"], kind, identity)
@@ -261,7 +265,7 @@ class _FileParser:
             "endLine": anchor["endLine"],
             "column": anchor["column"],
             "name_line": name_node.start_point.row + 1 if name_node else anchor["line"],
-            **(metadata or {}),
+            **details,
         }
         if self.language == "java":
             parameters = node.child_by_field_name("parameters")

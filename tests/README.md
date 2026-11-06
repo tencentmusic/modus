@@ -14,6 +14,7 @@
 | `test_cli_localization.py` | 中文帮助、参数错误、交互、输出流及协议稳定性 |
 | `test_project_lifecycle.py`、`test_install_safety.py`、`test_workspace_lifecycle.py` | 安装、五平台工作流升级、所有权、回滚、并发与工作区成员只读 |
 | `test_analysis_pipeline.py`、`test_evidence_selection.py`、`machine/` | 公开分析生命周期、分层、模式、降级与存储 |
+| `machine/test_mobile_adapters.py`、`machine/test_mobile_integration.py` | Kotlin/Swift/Objective-C/C++ 结构、混编坐标、保守绑定、发现与缺工具降级 |
 | `test_knowledge_identity.py`、`test_knowledge_retrieval.py`、`test_knowledge_update.py`、`test_verify_knowledge.py` | 路径所有权、检索边界、哈希条件写入与客观知识完整性 |
 | `test_platforms.py`、`test_legacy_hook_cleanup.py`、`test_sensitive_literals.py` | 宿主扩展、旧安装迁移与安全输出 |
 | `test_dsh.py`、[DSH 插件测试](../integrations/dsh/architecture.md#贡献与验证) | 项目投影与用户资产保护、宿主执行边界、CLI 报告与隔离分发 |
