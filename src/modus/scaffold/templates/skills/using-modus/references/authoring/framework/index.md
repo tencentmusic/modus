@@ -46,7 +46,7 @@ init/reinit 进入或恢复 Domain 时，按[上下文合同](../context-continu
 - 按产物读取[根概览](deliverables/root.md)、[Domain](deliverables/domain.md)、[六专题](deliverables/topics.md)、[Module](deliverables/module.md)及特殊人工产物合同。
 - init/reinit 和涉及图表的局部维护读取[图文表达](visual-expression.md)。
 
-事实只在一个主落点完整定义。其他页面说明该事实在当前上下文中的作用，并精确链接主定义；不得复制整段定义或完整 Mermaid。源码位置只写入生成文档 frontmatter 的少量 `anchors.locations`；读者正文不出现完整源码路径、行号或证据清单。
+事实只在一个主落点完整定义。其他页面说明该事实在当前上下文中的作用，并精确链接主定义；不得复制整段定义或完整 Mermaid。源码关联按[布局约定](layout.md)写入各文档现有 frontmatter；读者正文不出现完整源码路径、行号或证据清单。
 
 ## 内容形成节奏
 

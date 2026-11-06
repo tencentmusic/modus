@@ -172,3 +172,50 @@ def test_project_update_failure_keeps_the_cli_error_contract(
         assert payload["scope"] == "project"
     after = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
     assert after == before
+
+
+def test_anchor_routing_without_parser_reports_gap_and_keeps_current_source_hint(
+    tmp_path: Path,
+) -> None:
+    """普通检索在声明解析器不可用时仍可定位，但不能声称锚点已核验。"""
+    source = tmp_path / "Runner.java"
+    source.write_text("class Runner { void run() {} }\n", encoding="utf-8")
+    document = tmp_path / "modus/knowledge/domain/core/references/api.md"
+    document.parent.mkdir(parents=True)
+    document.write_text(
+        "---\nanchors:\n  locations:\n    - path: Runner.java\n      symbol: Runner.run\n      startLine: 1\n---\n# 运行\nRunner.run 执行任务。\n",
+        encoding="utf-8",
+    )
+    original = document.read_bytes()
+    program = """
+import importlib.abc
+import json
+import sys
+from typer.testing import CliRunner
+class NoParser(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == 'modus.machine' or fullname.split('.')[0] in {'networkx', 'tree_sitter'}:
+            raise ModuleNotFoundError('parser unavailable', name=fullname)
+sys.meta_path.insert(0, NoParser())
+from modus.cli import app
+result = CliRunner().invoke(app, ['context', 'resolve', 'Runner.run', '--scope', 'project-read'])
+assert result.exit_code == 0, (result.output, result.exception)
+context = json.loads(result.output)
+assert any('anchor_verification_unavailable' in gap.get('reason', '') for gap in context['groundingGaps'])
+sources = [row for row in context['evidence'] if row.get('layer') == 'source']
+assert sources and all('sourceLocation' not in row['scoreSignals'] for row in sources)
+assert 'modus.machine' not in sys.modules
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", program],
+        shell=False,
+        cwd=tmp_path,
+        env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert document.read_bytes() == original
+    assert not (tmp_path / "modus/.cache").exists()

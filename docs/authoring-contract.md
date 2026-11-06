@@ -225,7 +225,7 @@ init/reinit 按[初始化质量要求](../src/modus/scaffold/templates/skills/us
 
 模块回应九类问题：`boundary`、`scenario`、`data-state`、`public-entry`、`collaboration`、`runtime`、`constraint`、`recovery`、`implementation`。它们是评审维度，不是九个必需标题。默认按边界、真实场景、实现/扩展/验证组织，按需展开。非平凡场景必须解释不同字段、决策、写入、完成、失败、恢复和验证；表格与方法名不足以闭环。
 
-来源追溯复用 frontmatter 中的现有元数据；代表性文件使用 `anchors.paths`，源码位置使用 `anchors.locations`，包括支撑术语解释的定义、注释与行为位置，不虚构符号或行号。生成正文不得放完整源码路径、行号、`path#L` 引用或证据目录。根与领域路由保持稳定导航。隐藏 frontmatter 后，因果叙述仍须可读；元数据不能成为隐藏证据倾倒区。
+来源追溯复用 frontmatter 中的现有元数据；文件级依据使用 `anchors.paths`，源码声明使用 `anchors.locations`。从每份文档讲述的关键事实反查关联，按需补足限定符号与准确范围，不限定数量、不罗列全部方法、不虚构符号或行号；注释和配置等材料不冒充源码声明。不同产物的选择与核对遵循[源码关联约定](../src/modus/scaffold/templates/skills/using-modus/references/authoring/framework/layout.md)。生成正文不得放完整源码路径、行号、`path#L` 引用或证据目录。根与领域路由保持稳定导航。隐藏 frontmatter 后，因果叙述仍须可读；元数据不能成为隐藏证据倾倒区。
 
 ### 术语解释、行为表达与来源追溯
 

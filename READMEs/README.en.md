@@ -52,9 +52,9 @@ Modus builds a project knowledge base that coding agents can trace back to sourc
 
 > The open-source release currently covers Modus's project knowledge base. Its broader AI workflow solution is also evolving, and we will share updates as it develops.
 
-**A real example: RuoYi source + official documentation → traceable project knowledge.** Install or update, connect the project, supply several official documents to `/modus-init`, and follow role and department data access into its implementation. Keep the resulting Markdown for the next development task.
+**A complete workflow: project source + business materials → traceable project knowledge.** Follow an illustrative business management system: install or update, choose your Agent platforms, supply requirements and design documents, business pages (when the platform supports Computer Use), and images such as flowcharts and screenshots to `/modus-init`, then use the resulting Markdown to find the code behind order access rules.
 
-![RuoYi walkthrough: installation, project setup, multiple materials and knowledge use](../docs/assets/ruoyi-demo.en.gif)
+![Modus workflow: installation, platform selection, documents, web pages, images, knowledge creation and code navigation](../docs/assets/modus-demo.en.gif)
 
 ---
 
@@ -66,7 +66,7 @@ Modus treats project knowledge as a maintainable engineering asset: local analys
 
 During initialization, local analysis extracts bounded evidence from source, build context, and available toolchains to locate entry points, relationships, and key behavior. The agent then rereads source, tests, configuration, and business material to confirm system architecture, domain boundaries, and real scenarios, recording its conclusions in the system overview, Domain, Module, and topic documents.
 
-**Code to MD · Code link MD** can happen in the same `/modus-init` run. Alongside source, you can provide multiple requirements documents, designs, team standards, Markdown from local wikis or LLM wikis, and accessible web pages. The agent checks their business concepts, rules, and scenarios against the implementation, giving code its business context and documents a traceable connection to code.
+**Code to MD · Code link MD** can happen in the same `/modus-init` run. Alongside source, you can provide multiple requirements documents, designs, team standards, Markdown from local wikis or LLM wikis, accessible web pages, and images such as flowcharts and product screenshots. The agent checks their business concepts, rules, and scenarios against the implementation, giving code its business context and documents a traceable connection to code.
 
 ### Assemble task context progressively
 
@@ -113,7 +113,7 @@ In an interactive terminal, select Claude Code, Codex, Cursor, CodeBuddy, or Dee
 /modus-init
 ```
 
-**Code link MD brings existing business knowledge into that understanding.** Include paths, directories, or links to multiple sources in the same message as `/modus-init`. Requirements explain the intended outcome, designs explain tradeoffs, team standards set constraints, and wikis and business websites supply scenarios. Replace the examples below with your own sources.
+**Code link MD brings existing business knowledge into that understanding.** Attach multiple documents or images, or include material paths, directories and web links, in the same message as `/modus-init`. Requirements explain the intended outcome, designs explain tradeoffs, team standards set constraints, and wikis, business websites, flowcharts and product screenshots supply scenarios. Replace the examples below with your own sources.
 
 ```text
 /modus-init
@@ -124,12 +124,13 @@ Create project knowledge using the current source and these materials:
 - Local wiki or LLM wiki Markdown under ../project-wiki/
 - Business and technical documentation at https://example.com/project/docs
 - Order and refund pages at https://example.com/project/app, read-only
+- Business flowchart in docs/order-flow.png and product screenshots attached to this message
 
 Connect business concepts, rules, and scenarios to the code.
 Identify differences between the material and the current implementation.
 ```
 
-The agent reads each source within the confirmed scope, follows document collections into their subdirectories and child pages, and checks the content against current implementation. Access depends on the coding agent’s file, document, and web tools. Websites that require login or interaction need browser or Computer Use capabilities, along with access and a reading scope supplied by you. The current workflow defines these steps in its [material coverage contract](../src/modus/scaffold/templates/skills/using-modus/references/authoring/evidence/index.md#材料覆盖).
+The agent reads each source within the confirmed scope, follows document collections into their subdirectories and child pages, and checks the content against current implementation. Access depends on the coding agent’s file, document, web and image-reading capabilities. Websites that require login or interaction need browser or Computer Use capabilities, along with access and a reading scope supplied by you. The current workflow defines these steps in its [material coverage contract](../src/modus/scaffold/templates/skills/using-modus/references/authoring/evidence/index.md#材料覆盖).
 
 `/modus-init` is the knowledge-authoring workflow in an agent conversation; the terminal command `modus init` connects the project. The agent confirms the Domain and Module scope before authoring each Domain. If the host exposes Skills by name, ask it to “use modus-init to initialize knowledge from this project and these materials.”
 

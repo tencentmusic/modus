@@ -2,11 +2,48 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from typing import Any
 
 from .documents import canonical_json, matches_knowledge_need
 from .lexical import BM25Query, tokenize
+
+
+def rank_source_locations(
+    records: list[dict[str, Any]], query: str
+) -> list[tuple[dict[str, Any], Any]]:
+    """优先问题匹配及命中正文提及的声明，文件头顺序不代表相关性。"""
+    query_terms = tokenize(query)
+    ranked: list[tuple[tuple[int, int, int, int], dict[str, Any], Any]] = []
+    for record in records:
+        heading = str(record.get("heading") or "")
+        text = str(record.get("text") or "")
+        heading_relevance = sum(term in heading.casefold() for term in query_terms)
+        locations = record.get("sourceLocations") or []
+        for raw in locations if isinstance(locations, list) else [locations]:
+            score = (0, 0, 0, 0)
+            if isinstance(raw, dict):
+                symbol = str(raw.get("symbol") or "")
+                identity = (symbol + " " + str(raw.get("path") or "")).casefold()
+                # 小节可能只写类名（如任务入口），不一定重复 execute 等方法名。
+                names = [
+                    name for name in re.split(r"[.#]|::", symbol.split("(", 1)[0])[-2:] if name
+                ]
+                pattern = rf"(?<![\w$])(?:{'|'.join(re.escape(name) for name in names)})(?![\w$])"
+                in_heading = int(bool(names and re.search(pattern, heading)))
+                in_text = int(bool(names and re.search(pattern, text)))
+                score = (
+                    sum(term in identity for term in query_terms),
+                    heading_relevance if in_heading or in_text else 0,
+                    in_heading,
+                    in_text,
+                )
+            ranked.append((score, record, raw))
+    # 同分保留文档检索顺序；这里只给读取优先级，不声称小节与锚点精确绑定。
+    return [
+        (record, raw) for _, record, raw in sorted(ranked, key=lambda row: row[0], reverse=True)
+    ]
 
 
 # 显式范围是过滤边界，推断领域和模块只影响排序。

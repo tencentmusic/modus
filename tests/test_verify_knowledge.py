@@ -61,26 +61,26 @@ def test_anchor_declarations_ignore_mentions_and_preserve_concurrent_edits(
 
 
 def test_java_anchor_signature_separates_overloads(tmp_path: Path) -> None:
-    from modus.commands.verify_anchors import _declaration_matches, _source_declarations
     from modus.scope_models import SourceLocation
+    from modus.source_anchors import declaration_matches, source_declarations
 
     code = ["class A {", " void run(String value) {}", " void run(int value) {}", "}"]
-    declarations = _source_declarations("A.java", code)
+    declarations = source_declarations("A.java", code)
     assert declarations is not None
-    assert _declaration_matches(declarations, SourceLocation("A.java", "A.run(String)", 1)) == [
+    assert declaration_matches(declarations, SourceLocation("A.java", "A.run(String)", 1)) == [
         (2, 2)
     ]
-    assert _declaration_matches(declarations, SourceLocation("A.java", "A.run(int)", 1)) == [(3, 3)]
-    fields = _source_declarations("A.java", ["class A { int run; }"])
+    assert declaration_matches(declarations, SourceLocation("A.java", "A.run(int)", 1)) == [(3, 3)]
+    fields = source_declarations("A.java", ["class A { int run; }"])
     assert fields is not None
-    assert _declaration_matches(fields, SourceLocation("A.java", "A.run()", 1)) == []
+    assert declaration_matches(fields, SourceLocation("A.java", "A.run()", 1)) == []
 
 
 def test_python_constant_anchors_preserve_kind_owner_and_range() -> None:
-    from modus.commands.verify_anchors import _declaration_matches, _source_declarations
     from modus.scope_models import SourceLocation
+    from modus.source_anchors import declaration_matches, source_declarations
 
-    declarations = _source_declarations(
+    declarations = source_declarations(
         "settings.py",
         [
             "# MAX_ROWS = 99 is only a comment",
@@ -96,15 +96,15 @@ def test_python_constant_anchors_preserve_kind_owner_and_range() -> None:
         ],
     )
     assert declarations is not None
-    assert _declaration_matches(declarations, SourceLocation("settings.py", "MAX_ROWS", 1)) == [
+    assert declaration_matches(declarations, SourceLocation("settings.py", "MAX_ROWS", 1)) == [
         (2, 2)
     ]
-    assert _declaration_matches(declarations, SourceLocation("settings.py", "RIGHT", 1)) == [(3, 3)]
-    assert _declaration_matches(
+    assert declaration_matches(declarations, SourceLocation("settings.py", "RIGHT", 1)) == [(3, 3)]
+    assert declaration_matches(
         declarations, SourceLocation("settings.py", "Settings.LIMIT", 1)
     ) == [(5, 7)]
-    assert _declaration_matches(declarations, SourceLocation("settings.py", "MAX_ROWS()", 2)) == []
-    assert _declaration_matches(declarations, SourceLocation("settings.py", "limit", 10)) == []
+    assert declaration_matches(declarations, SourceLocation("settings.py", "MAX_ROWS()", 2)) == []
+    assert declaration_matches(declarations, SourceLocation("settings.py", "limit", 10)) == []
 
 
 def test_java_multiline_anchor_keeps_range_and_syntax_parameter_types(tmp_path: Path) -> None:
@@ -149,10 +149,10 @@ def test_java_multiline_anchor_keeps_range_and_syntax_parameter_types(tmp_path: 
 
 
 def test_cpp_anchor_preserves_namespace_owner_and_parameter_qualification() -> None:
-    from modus.commands.verify_anchors import _declaration_matches, _source_declarations
     from modus.scope_models import SourceLocation
+    from modus.source_anchors import declaration_matches, source_declarations
 
-    declarations = _source_declarations(
+    declarations = source_declarations(
         "service.cpp",
         [
             "namespace First {",
@@ -163,10 +163,10 @@ def test_cpp_anchor_preserves_namespace_owner_and_parameter_qualification() -> N
         ],
     )
     assert declarations is not None
-    assert _declaration_matches(
+    assert declaration_matches(
         declarations, SourceLocation("service.cpp", "First::run(const std::string&)", 1)
     ) == [(2, 3)]
-    assert _declaration_matches(
+    assert declaration_matches(
         declarations, SourceLocation("service.cpp", "Second::run(const std::string&)", 1)
     ) == [(5, 5)]
 

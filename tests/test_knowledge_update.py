@@ -653,3 +653,97 @@ def test_initialization_rechecks_seed_after_preflight(
     assert result["status"] == "partial"
     assert result["writes"] == []
     assert target.read_text(encoding="utf-8") == human
+
+
+def test_sync_discovers_topic_file_links_and_protected_candidates_without_writing(
+    tmp_path: Path,
+) -> None:
+    from modus.skillmd import render
+
+    _put(tmp_path, "refund.py", "# run is no longer declared\nmessage = 'run'\n")
+    _put(tmp_path, "settings.yaml", "limit: 3\n")
+    _module(tmp_path, "refund", "refund.py", "run")
+    _put(
+        tmp_path,
+        API_SHARD,
+        render(
+            {"anchors": {"locations": [{"path": "refund.py", "symbol": "run", "startLine": 1}]}},
+            "# 接口\n",
+        ),
+    )
+    rule = "modus/knowledge/domain/order/references/rule.md"
+    _put(tmp_path, rule, render({"anchors": {"paths": ["settings.yaml"]}}, "# 规则\n"))
+    _put(tmp_path, TEAM, render({"anchors": {"paths": ["settings.yaml"]}}, "# 人工规范\n"))
+    originals = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    result = knowledge_sync.inspect_knowledge_impact(str(tmp_path), ["refund.py", "settings.yaml"])
+    candidates = {row["path"]: row for row in result["candidates"]}
+    assert set(candidates) == {MODULE, API_SHARD, rule, TEAM}
+    assert candidates[MODULE]["moduleId"] == "order/refund"
+    assert candidates[API_SHARD]["moduleId"] is None
+    assert candidates[rule]["confidence"] == "path-only"
+    assert candidates[rule]["matchedSourcePaths"] == ["settings.yaml"]
+    assert {row["document"] for row in result["anchorReviewCandidates"]} == {MODULE, API_SHARD}
+    assert all(
+        row["disposition"] == "anchor-symbol-missing" for row in result["anchorReviewCandidates"]
+    )
+    assert result["writes"] == [] and not result["conflicts"]
+    assert {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == originals
+    protected = update_knowledge(
+        str(tmp_path),
+        {TEAM: "# Changed\n"},
+        expected_hashes={TEAM: _digest((tmp_path / TEAM).read_text())},
+    )
+    assert protected["conflicts"] and (tmp_path / TEAM).read_bytes() == originals[tmp_path / TEAM]
+
+
+@pytest.mark.parametrize(
+    ("source", "symbol", "line", "disposition"),
+    [
+        ("\n\ndef run():\n    pass\n", "run", 1, "anchor-line-drift"),
+        (
+            "# run\nclass A:\n    def run(self): pass\nclass B:\n    def run(self): pass\n",
+            "run",
+            1,
+            "anchor-ambiguous",
+        ),
+        ("def run(:\n", "run", 1, "anchor-verification-unavailable"),
+    ],
+)
+def test_sync_reports_declaration_review_reasons(
+    tmp_path: Path, source: str, symbol: str, line: int, disposition: str
+) -> None:
+    _put(tmp_path, "source.py", source)
+    _module(tmp_path, "refund", "source.py", symbol)
+    result = knowledge_sync.inspect_knowledge_impact(str(tmp_path), ["source.py"])
+    assert result["anchorReviewCandidates"][0]["disposition"] == disposition
+    assert not result["writes"]
+
+
+def test_moved_source_is_routable_after_existing_cas_maintenance(tmp_path: Path) -> None:
+    from modus.commands.verify_anchors import run_verify_anchors
+    from modus.orchestrator.context_resolver import resolve_context
+    from modus.skillmd import render
+
+    old = {"path": "old.py", "symbol": "refund", "startLine": 1}
+    original = render({"anchors": {"locations": [old]}}, "# 退款\n退款由 `refund` 执行。\n")
+    _put(tmp_path, API_SHARD, original)
+    _put(tmp_path, "new.py", "def refund():\n    return 'settled'\n")
+    unmatched = knowledge_sync.inspect_knowledge_impact(str(tmp_path), ["new.py"])
+    assert not unmatched["candidates"] and unmatched["skipped"]
+    impact = knowledge_sync.inspect_knowledge_impact(str(tmp_path), ["old.py", "new.py"])
+    assert [row["path"] for row in impact["candidates"]] == [API_SHARD]
+    assert impact["anchorReviewCandidates"][0]["disposition"] == "anchor-symbol-missing"
+    revised = render(
+        {"anchors": {"locations": [{**old, "path": "new.py", "endLine": 2}]}},
+        "# 退款\n退款由 `refund` 执行，返回已结算结果。\n",
+    )
+    updated = update_knowledge(
+        str(tmp_path), {API_SHARD: revised}, expected_hashes={API_SHARD: _digest(original)}
+    )
+    assert updated["writes"] == [API_SHARD]
+    assert run_verify_anchors(str(tmp_path))["status"] == "clean"
+    context = resolve_context(str(tmp_path), "退款 refund", scope="project-read")
+    assert any(
+        row["path"] == "new.py" and row.get("symbol") == "refund" for row in context["evidence"]
+    )
+    assert not context["groundingGaps"]

@@ -52,9 +52,9 @@ Modus 为 Coding Agent 建立可追溯的项目知识库。本地分析把入口
 
 > 目前开源的是 Modus 的项目知识库部分；配套的 AI 工作流开源方案也在持续完善，后续会更新进展。
 
-**看一个真实案例：RuoYi 源码 + 官网文档 → 可追溯的项目知识。** 从安装或更新开始，接入项目，在 `/modus-init` 中补充多份官网材料，再沿“角色与部门数据权限”核对实现、沉淀 Markdown，为下一次开发提供上下文。
+**看一段完整流程：项目源码 + 业务资料 → 可追溯的项目知识。** 以一个业务管理系统为例，从安装或更新、选择 Agent 平台开始，在 `/modus-init` 中提供需求与设计文档、业务网页（平台支持 Computer Use 时）以及流程图、截图等图片，沉淀 Markdown，再沿订单权限规则定位到实现。
 
-![RuoYi 案例：安装、接入、多材料初始化与知识使用](docs/assets/ruoyi-demo.gif)
+![Modus 操作演示：安装、选择平台、读取文档网页与图片、生成知识并定位代码](docs/assets/modus-demo.gif)
 
 ---
 
@@ -66,7 +66,7 @@ Modus 把项目知识作为可维护的工程资产：本地分析提供线索�
 
 初始化时，本地分析从源码、构建上下文和可用工具链提取有界证据，帮助定位入口、关系与关键行为。Agent 再回读源码、测试、配置和业务材料，确认系统架构、领域边界与真实场景，将判断写入系统概览、领域、模块及专题文档。
 
-**Code to MD · Code link MD** 可以在同一次 `/modus-init` 中完成。从源码建立第一份知识时，可以一并提供多份需求、设计、团队规范，以及本地 Wiki、LLM Wiki 中的 Markdown 或可访问的网页。Agent 将材料中的业务概念、规则和场景与真实实现核对，让代码有业务背景可解释，让文档有实现可追溯。
+**Code to MD · Code link MD** 可以在同一次 `/modus-init` 中完成。从源码建立第一份知识时，可以一并提供多份需求、设计、团队规范，以及本地 Wiki、LLM Wiki 中的 Markdown、可访问的网页和流程图、产品截图等图片。Agent 将材料中的业务概念、规则和场景与真实实现核对，让代码有业务背景可解释，让文档有实现可追溯。
 
 ### 为任务渐进装配上下文
 
@@ -113,7 +113,7 @@ modus init
 /modus-init
 ```
 
-**Code link MD，用已有业务材料补全项目理解。** 运行 `/modus-init` 时，可以在同一条消息中附上多份材料的路径、目录或链接。需求说明业务目标，设计文档解释取舍，团队规范给出约束，Wiki 和业务网站补充实际场景。把下面的示例替换为你的材料即可。
+**Code link MD，用已有业务材料补全项目理解。** 运行 `/modus-init` 时，可以在同一条消息中附上多份文档、图片，或提供材料的路径、目录和网页链接。需求说明业务目标，设计文档解释取舍，团队规范给出约束，Wiki、业务网站、流程图和产品截图补充实际场景。把下面的示例替换为你的材料即可。
 
 ```text
 /modus-init
@@ -124,11 +124,12 @@ modus init
 - ../project-wiki/ 下的本地 Wiki 或 LLM Wiki Markdown
 - https://example.com/project/docs 业务与技术文档
 - https://example.com/project/app 的订单与退款页面，仅查阅
+- docs/order-flow.png 业务流程图，以及随消息附上的产品截图
 
 将业务概念、规则和场景关联到实际代码，标明材料与当前实现的差异。
 ```
 
-Agent 会逐份读取已确认范围内的材料，继续查看文档集合的子目录与子文档，再与当前实现交叉核验。材料的读取依赖 Agent 平台可用的文件、文档或网页工具。查阅需要登录或交互的业务网站时，平台需具备浏览器或 Computer Use 能力，并由你提供访问权限与查阅范围。当前工作流的材料覆盖细则见[证据创作契约](src/modus/scaffold/templates/skills/using-modus/references/authoring/evidence/index.md#材料覆盖)。
+Agent 会逐份读取已确认范围内的材料，继续查看文档集合的子目录与子文档，再与当前实现交叉核验。材料的读取依赖 Agent 平台可用的文件、文档、网页与图像读取能力。查阅需要登录或交互的业务网站时，平台需具备浏览器或 Computer Use 能力，并由你提供访问权限与查阅范围。当前工作流的材料覆盖细则见[证据创作契约](src/modus/scaffold/templates/skills/using-modus/references/authoring/evidence/index.md#材料覆盖)。
 
 `/modus-init` 是 Agent 对话中的知识创作工作流；终端里的 `modus init` 负责项目接入。Agent 会先确认 Domain/Module 范围，再逐域撰写正文。若平台以 Skill 名称呈现能力，可直接要求它“使用 modus-init，结合当前项目和这些材料初始化知识”。
 

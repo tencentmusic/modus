@@ -43,4 +43,6 @@ delivery.py    公平采集、覆盖统计与上下文预算
 
 新检索信号属于 `stages/ranking.py`，新证据源属于 `pipeline.py`，交付策略属于 `delivery.py`。外部映射键保持既有 camelCase，Python 标识使用 snake_case。可恢复的阶段返回诊断与部分结果；无效调用契约或无法解释的状态才抛异常。
 
+Module 与专题的源码锚点按问题和命中条目优先读取，声明核验与 sync、verify 共用 `source_anchors.py`，单请求内复用当前文件的解析。未填写 `endLine` 时读取当前声明范围；唯一行号漂移可定位到当前声明，同时保留文件头待维护的缺口。注释、调用和其他所有者的同名符号不能冒充有效锚点；歧义或解析不可用时返回缺口与有界搜索线索。锚点是文档级关联，不能证明某个小节的语义或行为完整。
+
 变更意图或显式 `purpose=change` 增补 `domain-knowledge` 与 `engineering-constraint` 两类覆盖提示，分别表示业务正文与工程约束到场。旧 `business-rule` 保留兼容语义；新提示仍是 `retrieval-hint-only`，缺失不构成任务门禁。实现适用性、C4 决定及 C5 验收由 [using-modus](../scaffold/templates/skills/using-modus/SKILL.md) 和助手拥有。
