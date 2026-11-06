@@ -3,6 +3,8 @@
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
+
 from modus.machine import (
     AnalysisOptions,
     EvidenceQuery,
@@ -17,9 +19,14 @@ from modus.machine.projection.lifecycle import project
 from modus.machine.resolution import resolve
 
 
-def test_material_blocks_preserve_text_order_and_explicit_associations(tmp_path: Path) -> None:
+@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
+def test_material_blocks_preserve_text_order_and_explicit_associations(
+    tmp_path: Path, newline: str
+) -> None:
     content = "# Request\n`Dto.enabled` 可省略，不能解释为 false。\n\n| 字段 | 单位 |\n| --- | --- |\n| amount | 分 |\n\n```java\nBoolean enabled;\n```\n"
-    (tmp_path / "guide.md").write_text(content, encoding="utf-8")
+    # 材料保留原始换行；夹具明确落盘字节，不能依赖宿主的文本换行转换。
+    content = content.replace("\n", newline)
+    (tmp_path / "guide.md").write_bytes(content.encode("utf-8"))
     (tmp_path / "Dto.java").write_text("class Dto { Boolean enabled; }", encoding="utf-8")
     (tmp_path / "manual.pdf").write_bytes(b"%PDF\0unsupported")
     (tmp_path / "node_modules").mkdir()

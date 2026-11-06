@@ -55,20 +55,24 @@ def test_update_preserves_user_edits_and_untracked_collision(tmp_path: Path) -> 
     assert edited.read_text(encoding="utf-8") == "my instructions"
 
 
-def test_update_retires_unused_references_but_preserves_user_changes(tmp_path: Path) -> None:
+@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
+def test_update_retires_unused_references_but_preserves_user_changes(
+    tmp_path: Path, newline: str
+) -> None:
     """共享规则归并后，各宿主旧支持文件按原清单退役，用户修改继续保留。"""
 
     run_init(tmp_path, list(available_platforms()))
     paths = ModusPaths.for_root(tmp_path)
     manifest = Manifest.read(paths)
     template = "skills/modus-init/references/retired-guide.md"
-    old_content = "# Previous guide\n"
+    old_content = "# Previous guide" + newline
     retired: set[str] = set()
     for entry in list(manifest.files):
         if entry.template != "skills/modus-init/SKILL.md":
             continue
         relative = (Path(entry.path).parent / "references/retired-guide.md").as_posix()
-        (tmp_path / relative).write_text(old_content, encoding="utf-8")
+        # 所有权摘要绑定实际字节；Windows 文本写入转换不应伪造一次用户编辑。
+        (tmp_path / relative).write_bytes(old_content.encode("utf-8"))
         manifest.add_file(relative, old_content, template)
         retired.add(relative)
     manifest.write(paths)

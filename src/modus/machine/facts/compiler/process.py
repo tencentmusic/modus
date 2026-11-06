@@ -61,6 +61,8 @@ def _run_process(
     """
     allowed = {
         "PATH",
+        "SYSTEMROOT",
+        "WINDIR",
         "LANG",
         "LC_ALL",
         "JAVA_HOME",
@@ -79,10 +81,22 @@ def _run_process(
         "NO_PROXY",
     }
     source_env = dict(env) if env is not None else dict(os.environ)
-    bounded_env = {key: value for key, value in source_env.items() if key in allowed}
+    bounded_env = {key: value for key, value in source_env.items() if key.upper() in allowed}
     bounded_env.setdefault("PATH", os.defpath)
     with tempfile.TemporaryDirectory(prefix="modus-provider-runtime-") as temporary:
-        bounded_env.update({"HOME": temporary, "TMPDIR": temporary, "LC_ALL": "C"})
+        # Windows 的 Go 用 LOCALAPPDATA 定位必需的构建缓存，不读取 HOME。
+        # 用户目录和临时目录都指向本轮隔离空间，既可构建又不继承用户配置。
+        bounded_env.update(
+            {
+                "HOME": temporary,
+                "USERPROFILE": temporary,
+                "LOCALAPPDATA": temporary,
+                "TMPDIR": temporary,
+                "TEMP": temporary,
+                "TMP": temporary,
+                "LC_ALL": "C",
+            }
+        )
         with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
             # NOCA:dangerous-subprocess-use-audit(内部提供器构造参数数组，保留环境白名单及输出超时边界，不经过 shell)
             process = subprocess.Popen(
@@ -250,7 +264,8 @@ def _compile_asset(
                 "could not compile bundled Javac provider: " + completed.stderr.strip()[-2000:]
             )
         return output_dir
-    marker = output_dir / "modus-go-analyzer"
+    # Windows 通过显式 .exe 路径启动提供器，不依赖隐式扩展名查找。
+    marker = output_dir / ("modus-go-analyzer.exe" if os.name == "nt" else "modus-go-analyzer")
     if marker.is_file():
         return marker
     env = _go_env()
