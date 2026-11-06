@@ -51,6 +51,8 @@ def test_java_batch_uses_existing_capabilities_and_preserves_failure_contract(
             "-encoding",
             "UTF-8",
             "-Xlint:unchecked",
+            # 新 JDK 会警告 Java 8 编译目标过时；源码告警仍由 -Werror 严格拒绝。
+            "-Xlint:-options",
             "-Werror",
             "-d",
             str(tmp_path),

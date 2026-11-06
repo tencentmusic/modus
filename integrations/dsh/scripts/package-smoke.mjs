@@ -4,6 +4,7 @@ import { copyFile, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/p
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseArgs, promisify } from 'node:util'
+import { createInstallProfile } from './package-profile.mjs'
 
 const execute = promisify(execFile)
 const npm = process.env.npm_execpath
@@ -44,17 +45,18 @@ async function packPlugin() {
 }
 
 async function installProfile(manifest) {
-  // 按锁文件离线重建宿主，不在验收时漂移依赖；npm ci 需预先填充本机缓存。
+  // npm ci 只需缓存中的锁定 tarball；再次 npm install 会重解 peer 范围并依赖元数据缓存。
   const source = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
   const lock = JSON.parse(await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'))
-  source.name = lock.name = lock.packages[''].name = 'modus-dsh-smoke-profile'
-  delete source.dsh
-  delete source.scripts
-  await writeFile(join(root, 'package.json'), JSON.stringify(source))
-  await writeFile(join(root, 'package-lock.json'), JSON.stringify(lock))
+  const archive = await execute('tar', ['-xOf', join(root, manifest.filename), 'package/package.json'])
+  const { profile, profileLock } = createInstallProfile(source, lock, manifest, JSON.parse(archive.stdout))
+  await writeFile(join(root, 'package.json'), JSON.stringify(profile))
+  await writeFile(join(root, 'package-lock.json'), JSON.stringify(profileLock))
   const installOptions = ['--offline', '--ignore-scripts', '--no-audit', '--no-fund']
+  console.log('隔离安装：按宿主锁及归档声明安装插件，保持依赖严格校验。')
   await runNpm(['ci', ...installOptions], root)
-  await runNpm(['install', ...installOptions, join(root, manifest.filename)], root)
+  await runNpm(['ls', '--all', '--json', '--offline'], root)
+  console.log('隔离安装：完整依赖树校验通过。')
 }
 
 async function verifyInstalledPlugin() {

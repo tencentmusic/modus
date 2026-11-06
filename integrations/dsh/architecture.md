@@ -98,13 +98,14 @@ npm run smoke:package
 npm run smoke:registry -- @modus-ai/modus@1.0.0
 ```
 
-两条入口共用隔离安装和行为检查。registry 模式从官方 npm 仓库获取指定版本，不会用本地构建替换它；输出记录实际包标识、来源、完整性摘要和 CLI 验证状态。宿主依赖按锁文件从 `npm ci` 已填充的缓存离线安装。两步需使用同一 npm 缓存；验证不触碰用户的 DSH profile。
+两条入口共用隔离安装和行为检查。registry 模式从官方 npm 仓库获取指定版本，不会用本地构建替换它；输出记录实际包标识、来源、完整性摘要和 CLI 验证状态。隔离清单和锁文件保留宿主的精确版本，只补入待验 tarball 的完整性摘要及归档内的依赖声明；一次 `npm ci --offline` 完成安装，再用 `npm ls --all` 拒绝缺失或不兼容的依赖。宿主 tarball 来自前置 `npm ci` 填充的同一缓存，验收不依赖历史包元数据，不触碰用户的 DSH profile。
 
 | 验证入口 | 证明的行为 |
 | --- | --- |
 | `test/protocol.test.mjs` | 配置边界、版本门槛与报告解码 |
 | `test/plugin.test.mjs` | 官方 Cordis 注册与释放、参数校验、会话隔离、执行失败和业务退出码 |
 | `test/cli.test.mjs` | 四个工具调用真实 CLI；只读调用保留项目字节，CAS 更新可被再次检索，过期摘要和非法路径拒绝写入 |
+| `test/package-profile.test.mjs` | 空缓存下离线安装真实 tarball，保持锁文件不变，并拒绝插件与宿主的 peer 不兼容组合 |
 | `test/support/` | 复用官方 Cordis 生命周期与参数校验；隔离样例、Bash 进程和字节快照只属于测试环境 |
 | `scripts/package-smoke.mjs` | 检查本地或 registry tarball 的交付内容，隔离安装后通过包的公开入口运行同一组消费者测试 |
 | `scripts/verify-installed.mjs` | 从隔离产物加载 DSH patch、注册并释放工具 |
