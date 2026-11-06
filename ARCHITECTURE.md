@@ -37,7 +37,7 @@ flowchart TB
 | 协议值的展示名称 | `display_labels.py` | 终端与 Markdown 复用；未知值保留原标识 |
 | 安装与维护事务 | `commands/` | 返回结构化结果，展示由 `*_report.py` 负责 |
 | 平台中立的工作流分发 | `scaffold/` | 验证静态模板并记录资产所有权 |
-| 宿主差异 | `platforms/`、`hooks/` | 声明布局，复用合并与卸载契约；`platforms/display.py` 统一平台显示名与交互顺序 |
+| 宿主差异 | `platforms/` | 声明布局，复用合并与卸载契约；`platforms/display.py` 统一平台显示名与交互顺序 |
 | 初始化分析 | `machine/` | 单向语义阶段，显式覆盖缺口 |
 | 任务编排 | `orchestrator/` | 组合证据与策略，不拥有搜索算法或写入 |
 | 检索 | `retrieval/` | 共享截止时间与输出预算，明确返回部分结果 |

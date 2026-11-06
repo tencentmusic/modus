@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import shutil
 from dataclasses import dataclass
 from enum import StrEnum
@@ -11,6 +10,7 @@ from typing import Any
 
 from .. import git_hygiene
 from ..config import ModusConfig
+from ..legacy_hooks import clean_legacy_hook_config
 from ..manifest import ManagedFile, ManagedSection, Manifest, serialized_install
 from ..paths import ModusPaths
 from ..platforms import get_adapters
@@ -167,13 +167,8 @@ def _partition_removals(
         if not target.exists():
             safe_files.append(entry)
             continue
-        if entry.is_hook_config:
-            try:
-                payload = json.loads(target.read_text(encoding="utf-8"))
-            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-                manual.append(entry.path)
-                continue
-            if not isinstance(payload, dict):
+        if entry.is_legacy_hook_config:
+            if not clean_legacy_hook_config(target, apply=False):
                 manual.append(entry.path)
                 continue
         elif not target.is_file():

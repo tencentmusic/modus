@@ -130,7 +130,9 @@ Modus supports Python 3.11–3.14, and the installed command is `modus`. The sup
   <img src="https://img.shields.io/badge/CodeBuddy-Skills_%26_Commands-1F6FEB" alt="CodeBuddy Skills and Commands" />
 </p>
 
-Each adapter declares its Skill directory, resident instructions, and Hook layout. The shared installer owns deterministic writes, the ownership manifest, upgrade reconciliation, and safe uninstall behavior.
+Each adapter declares its Skill directory and resident instructions. The shared installer owns deterministic writes, the ownership manifest, upgrade reconciliation, and safe uninstall behavior. Modus provides project guidance through resident instructions and Skills on demand, without installing session-start hooks.
+
+For older projects, `modus update --project` removes manifest-tracked Modus hook entries and unmodified launchers while preserving other tools’ commands and user configuration. Malformed configurations are preserved and reported; retry the update after repairing them.
 
 #### Language capabilities
 
@@ -274,7 +276,7 @@ Modus follows the boundaries it advocates: the entry surface stays narrow, appli
 | `modus.machine` | The machine layer: freezes inputs, observes facts, resolves relationships, and publishes an immutable, bounded evidence bundle for the current init/reinit run along the N1–N6 lifecycle (corpus → facts → resolution → capability → projection → packet). |
 | `modus.orchestrator` | Composes preflight, task context, and knowledge-impact candidates without owning retrieval algorithms or knowledge writes. |
 | `modus.retrieval` | Progressively selects prose, current source, and constraints under one time and output budget, reporting partial results explicitly. |
-| `modus.platforms` / `modus.hooks` | Projects canonical Skills into five hosts while isolating host directories, resident instructions, and session Hooks. |
+| `modus.platforms` | Projects canonical Skills into five hosts while isolating host directories, resident instructions, and invocation policies. |
 | `modus.scaffold` | Packages neutral templates and owns deterministic project installation, upgrade reconciliation, ownership records, and safe uninstall. |
 | `knowledge_verification` / `knowledge_write_session` | Separate mechanical integrity checks, human ownership, compare-and-swap writes, and atomic publication. |
 
@@ -303,7 +305,7 @@ The CLI installs, maintains, and inspects Modus. Run `modus help` for the comple
 | Command | Purpose |
 | --- | --- |
 | `modus init` | Install neutral project assets and project them into the selected coding-agent hosts. |
-| `modus update` | Update the local CLI and reconcile Modus-managed Skills and Hooks in the current project. |
+| `modus update` | Update the local CLI and reconcile Modus-managed Skills and resident instructions in the current project. |
 | `modus help` | Show CLI commands, explicit knowledge workflows, and automatic knowledge capabilities. |
 | `modus uninstall` | Show a plan, then remove the current project's managed assets and the personal CLI after interactive confirmation by default; authored knowledge is retained. |
 | `modus status` | Read installation, version, and authored-knowledge status without reading initialization caches. |

@@ -130,7 +130,9 @@ Modus 需要 Python 3.11–3.14，安装后的命令是 `modus`。下面按平�
   <img src="https://img.shields.io/badge/CodeBuddy-Skills_%26_Commands-1F6FEB" alt="CodeBuddy Skills and Commands" />
 </p>
 
-每个适配器声明自己的 Skill 目录、常驻说明和 Hook 布局；共享安装器负责确定性写入、所有权清单、升级合并与安全卸载。
+每个适配器声明自己的 Skill 目录与常驻说明；共享安装器负责确定性写入、所有权清单、升级合并与安全卸载。Modus 通过常驻说明与 Skills 按需提供项目指引，不安装会话启动 hook。
+
+旧项目执行 `modus update --project` 时，会按安装清单移除 Modus 的 hook 条目和未被用户修改的启动脚本，保留其他工具的命令与用户配置。损坏的配置会保留并报告，修复后可再次更新。
 
 #### 语言能力
 
@@ -274,7 +276,7 @@ Modus 自身也遵守它倡导的边界：入口层保持窄，应用编排与�
 | `modus.machine` | 机器层：按 N1–N6 生命周期（corpus→facts→resolution→capability→projection→packet）冻结输入、观察事实、解析关系，并为当前 init/reinit 发布不可变、有界的证据包。 |
 | `modus.orchestrator` | 组合预检、任务上下文与知识影响候选；不拥有检索算法或知识写入。 |
 | `modus.retrieval` | 在统一时间与输出预算下渐进选择正文、当前源码和约束，并显式报告部分结果。 |
-| `modus.platforms` / `modus.hooks` | 把中立 Skill 投影到五个平台，隔离宿主目录、说明文件与会话 Hook 差异。 |
+| `modus.platforms` | 把中立 Skill 投影到五个平台，隔离宿主目录、常驻说明与调用权限差异。 |
 | `modus.scaffold` | 打包中立模板，执行确定性项目安装、升级协调、所有权记录与安全卸载。 |
 | `knowledge_verification` / `knowledge_write_session` | 分离机械完整性核验、人工所有权、比较并交换写入和原子发布。 |
 
@@ -303,7 +305,7 @@ CLI 用于安装、维护和检查 Modus。运行 `modus help` 可以查看当�
 | 命令 | 用途 |
 | --- | --- |
 | `modus init` | 为当前项目安装中立资产，并投影到选择的 Coding Agent 平台。 |
-| `modus update` | 更新本机 CLI，并协调当前项目中由 Modus 管理的 Skill 与 Hook。 |
+| `modus update` | 更新本机 CLI，并协调当前项目中由 Modus 管理的 Skills 与常驻说明。 |
 | `modus help` | 查看 CLI、主动知识工作流和自动知识能力。 |
 | `modus uninstall` | 默认展示计划，经交互确认后卸载当前项目资产与个人 CLI；正文知识默认保留。 |
 | `modus status` | 只读查看安装、版本与正文知识状态，不读取初始化分析缓存。 |

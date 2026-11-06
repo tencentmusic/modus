@@ -30,17 +30,12 @@ MODUS_PRECEDENCE_NOTICE: Final = "\n".join(
         "其他工作流在用户提出相应需求后，按该需求的范围运行。",
     ]
 )
-MODUS_DISPATCHER_FALLBACK: Final = (
-    "SessionStart 仅在 <MODUS_CONTEXT> 中提供任务适用性提示。"
-    "需要项目实现证据时，再按需加载完整的 using-modus 技能。"
-)
 MODUS_SKILL_GATE_NOTICE: Final = MODUS_PRECEDENCE_NOTICE
 USER_INVOKED_WORKFLOWS_SENTENCE: Final = (
     f"由用户调用的 Modus 工作流：{_skill_names(EXPLICIT_SKILLS)}"
 )
 
 __all__ = [
-    "MODUS_DISPATCHER_FALLBACK",
     "MODUS_PRECEDENCE_NOTICE",
     "MODUS_SKILL_GATE_NOTICE",
     "USER_INVOKED_WORKFLOWS_SENTENCE",

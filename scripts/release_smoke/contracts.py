@@ -138,10 +138,10 @@ PACKAGE_BOUNDARIES = (
         "modus/display_labels.py",
         "modus/platforms/display.py",
         "modus/commands/install_state.py",
+        "modus/legacy_hooks.py",
     ),
     _boundary(
         "knowledge orchestration",
-        "modus/hooks/bootstrap.py",
         "modus/knowledge_update.py",
         "modus/orchestrator/context_resolver.py",
         "modus/paths.py",
@@ -247,7 +247,15 @@ SDIST_EXCLUSIONS = ExclusionPolicy(
 # 退役接口不能因构建目录残留重新进入公开产物。
 # 公共排除策略同时应用于两种发行格式。
 PUBLIC_ARCHIVE_EXCLUSIONS = ExclusionPolicy(
-    prefixes=("third_party/", "modus/licenses/", "src/modus/licenses/"),
+    prefixes=(
+        "third_party/",
+        "modus/licenses/",
+        "src/modus/licenses/",
+        "modus/hooks/",
+        "src/modus/hooks/",
+        "modus/platforms/hooks.py",
+        "src/modus/platforms/hooks.py",
+    ),
     fragments=(
         "dashboard",
         "/planflow/",

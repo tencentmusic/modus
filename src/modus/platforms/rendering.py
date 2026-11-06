@@ -7,7 +7,6 @@ from collections.abc import Sequence
 import yaml
 
 from ..precedence import (
-    MODUS_DISPATCHER_FALLBACK,
     MODUS_PRECEDENCE_NOTICE,
     USER_INVOKED_WORKFLOWS_SENTENCE,
 )
@@ -19,7 +18,7 @@ from .models import Skill
 def render_agents_instructions(skills: Sequence[Skill]) -> str:
     """Render the AGENTS.md section shared by Codex and DSH."""
 
-    heading = f"## Modus\n\n{MODUS_DISPATCHER_FALLBACK} {USER_INVOKED_WORKFLOWS_SENTENCE}:"
+    heading = f"## Modus\n\n{USER_INVOKED_WORKFLOWS_SENTENCE}:"
     return render_skill_index(skills, heading)
 
 
@@ -63,7 +62,7 @@ def render_skill_index(skills: Sequence[Skill], heading: str) -> str:
     if dispatcher is not None:
         lines.extend(
             [
-                "**项目证据与生命周期协调（按需读取；启动时仅提示入口）：**",
+                "**项目证据与生命周期协调（按需读取）：**",
                 _skill_line(dispatcher),
                 "",
             ]

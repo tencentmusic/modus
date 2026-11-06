@@ -6,7 +6,7 @@ invariants shared by every host:
 
 * only the canonical public surface is projected;
 * every write is deterministic and recorded in the install manifest;
-* shared instruction and hook files are merged non-destructively; and
+* shared instruction files are merged non-destructively; and
 * uninstall removes only assets covered by the adapter's ownership contract.
 
 Compatibility imports in this module intentionally preserve the original
@@ -21,6 +21,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import ClassVar
 
+from ..legacy_hooks import LEGACY_HOOK_PATHS, clean_legacy_hook_config
 from ..manifest import ManagedFile, ManagedSection, Manifest
 from ..paths import ModusPaths
 from ..surface import (
@@ -67,11 +68,7 @@ def is_user_invocable_skill(name: str) -> bool:
 def is_executable_asset(relative_path: str) -> bool:
     """Return whether a projected asset must carry executable permission bits."""
 
-    return (
-        "/hooks/" in relative_path
-        or "/scripts/" in relative_path
-        or relative_path.endswith((".sh", ".cmd"))
-    )
+    return "/scripts/" in relative_path or relative_path.endswith((".sh", ".cmd"))
 
 
 def _ensure_executable(path: Path, relative_path: str) -> None:
@@ -86,7 +83,7 @@ class PlatformAdapter(ABC):
 
     Subclasses supply declarative layout data and instruction rendering only.
     The orchestration sequence is deliberately uniform: skills, optional native
-    commands, instructions, then the session hook. New adapters therefore align
+    commands, then instructions. New adapters therefore align
     with manifest and uninstall semantics by construction.
     """
 
@@ -114,19 +111,16 @@ class PlatformAdapter(ABC):
             self._render_instructions(public_skills, public_commands),
             manifest,
         )
-        self._write_hook_config(paths, manifest)
 
     def uninstall(self, paths: ModusPaths, manifest: Manifest) -> None:
         """Remove this platform, retaining sections still used by other platforms."""
 
-        from .hooks import unmerge_hook
-
         files, sections = self._collect_managed(manifest)
-        hook_path = self.layout.hook.path if self.layout.hook is not None else None
         for file_entry in files:
             target = paths.root / file_entry.path
-            if hook_path is not None and file_entry.path == hook_path:
-                unmerge_hook(target)
+            if file_entry.is_legacy_hook_config:
+                if not clean_legacy_hook_config(target):
+                    continue
             elif target.exists():
                 target.unlink()
             manifest.files.remove(file_entry)
@@ -261,15 +255,6 @@ class PlatformAdapter(ABC):
         block = inject_section(target, target_spec.marker, content)
         manifest.add_section(target_spec.path, target_spec.marker, block)
 
-    def _write_hook_config(self, paths: ModusPaths, manifest: Manifest) -> None:
-        from .hooks import merge_hook
-
-        hook = self.layout.hook
-        if hook is None:
-            return
-        content = merge_hook(paths.root / hook.path, hook.render_config())
-        manifest.add_file(hook.path, content, hook.template)
-
     def _collect_managed(
         self,
         manifest: Manifest,
@@ -277,12 +262,11 @@ class PlatformAdapter(ABC):
         """Return the exact manifest entries covered by this adapter's ownership."""
 
         prefixes = self.layout.owned_file_prefixes
-        hook_path = self.layout.hook.path if self.layout.hook is not None else None
         instructions = self.layout.instructions
         files = [
             entry
             for entry in manifest.files
-            if (hook_path is not None and entry.path == hook_path)
+            if (entry.is_legacy_hook_config and entry.path in LEGACY_HOOK_PATHS.get(self.name, ()))
             or entry.path.startswith(prefixes)
         ]
         sections = [

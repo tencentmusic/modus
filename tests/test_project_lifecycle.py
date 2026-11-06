@@ -130,30 +130,13 @@ def test_fresh_init_conflict_is_actionable_and_writes_nothing(project: Path) -> 
     assert _tree_snapshot(project) == before
 
 
-# 坏共享配置不能通过备份再覆盖来绕过所有权判断。
 # 父目录软链会改变所有写入目标，必须在预检时拒绝。
 # 同时检查项目和外部目标，覆盖隐蔽的越界写入。
 # 平台不支持软链时明确跳过该场景，不将环境限制当产品失败。
-def test_fresh_init_rejects_corrupt_hook_and_symlink_without_side_effects(
+def test_fresh_init_rejects_symlink_without_side_effects(
     project: Path,
     tmp_path: Path,
 ) -> None:
-    hook = project / ".codex/hooks.json"
-    hook.parent.mkdir(parents=True)
-    hook.write_text("{broken", encoding="utf-8")
-    before = _tree_snapshot(project)
-
-    corrupt = runner.invoke(
-        app,
-        ["-C", str(project), "init", "--platform", "codex"],
-    )
-    assert corrupt.exit_code == 2
-    assert ".codex/hooks.json" in corrupt.output
-    assert not list(hook.parent.glob("*.modus-corrupt-*.bak"))
-    assert _tree_snapshot(project) == before
-
-    hook.unlink()
-    hook.parent.rmdir()
     external = tmp_path / "external-agents"
     external.mkdir()
     try:

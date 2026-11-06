@@ -1,22 +1,16 @@
-"""Claude Code projection: Agent Skills, ``CLAUDE.md``, and lifecycle hooks."""
+"""Claude Code 接入：Agent Skills 与 CLAUDE.md 常驻指引。"""
 
 from __future__ import annotations
 
-from ..hooks import bootstrap
-from ..precedence import MODUS_DISPATCHER_FALLBACK, USER_INVOKED_WORKFLOWS_SENTENCE
+from ..precedence import USER_INVOKED_WORKFLOWS_SENTENCE
 from .base import Command, PlatformAdapter, Skill
-from .models import HookFile, InstructionFile, PlatformLayout
+from .models import InstructionFile, PlatformLayout
 from .rendering import render_invocation_metadata, render_skill_index
 
 _LAYOUT = PlatformLayout(
     skills_root=".claude/skills",
     owned_file_prefixes=(".claude/skills/",),
     instructions=InstructionFile(path="CLAUDE.md", marker="modus-claude"),
-    hook=HookFile(
-        path=".claude/settings.json",
-        template="hooks/claude-settings.json",
-        render_config=bootstrap.claude_hook_config,
-    ),
 )
 
 
@@ -42,5 +36,5 @@ class ClaudeAdapter(PlatformAdapter):
         skills: list[Skill],
         _commands: list[Command],
     ) -> str:
-        heading = f"## Modus\n\n{MODUS_DISPATCHER_FALLBACK} {USER_INVOKED_WORKFLOWS_SENTENCE}:"
+        heading = f"## Modus\n\n{USER_INVOKED_WORKFLOWS_SENTENCE}:"
         return render_skill_index(skills, heading)

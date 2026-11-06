@@ -1,6 +1,6 @@
 """各平台共享的激活与交付检查规则。
 
-规则不依赖平台实现，钩子与接入文件引用同一份文本，避免行为随宿主漂移。
+规则不依赖平台实现，各平台常驻指引引用同一份文本，避免行为随宿主漂移。
 """
 
 from typing import Final
@@ -22,7 +22,7 @@ _KNOWLEDGE_RETENTION_CHECKPOINT: Final = (
     "审批或持久化状态。"
 )
 
-# 供钩子、优先级说明与平台接入文件共同引用的稳定入口。
+# 供优先级说明与平台常驻指引共同引用的稳定入口。
 MODUS_ENTRY_HINT: Final = " ".join((_PROJECT_EVIDENCE_ACTIVATION, _KNOWLEDGE_RETENTION_CHECKPOINT))
 
 __all__ = ["MODUS_ENTRY_HINT"]

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import json
+import errno
 import os
 import stat
 import tempfile
@@ -12,6 +12,7 @@ from typing import cast
 from .. import __version__, git_hygiene
 from ..artifacts_io import atomic_write_text
 from ..config import ModusConfig, reconcile_optional_config
+from ..legacy_hooks import clean_legacy_hook_config
 from ..manifest import (
     ManagedFile,
     ManagedSection,
@@ -22,7 +23,6 @@ from ..manifest import (
 )
 from ..paths import ModusPaths
 from ..platforms.base import is_executable_asset
-from ..platforms.hooks import merge_hook, unmerge_hook
 from ..platforms.sections import (
     inject_section,
     remove_section,
@@ -101,7 +101,7 @@ def _render_desired(
 
 
 # 清单摘要表示框架拥有的基线，用户编辑不能被重新认领为可覆盖内容。
-# 普通文件、共享 Hook 和标记区块分别使用对应的合并策略。
+# 普通文件和标记区块分别协调；旧 Hook 仅按签名撤销。
 # 可延迟清单落盘，让外层事务统一控制提交标记。
 def reconcile_desired_manifest(
     paths: ModusPaths,
@@ -116,6 +116,7 @@ def reconcile_desired_manifest(
     applied: list[str] = []
     added: list[str] = []
     removed: list[str] = []
+    removed_directories: list[str] = []
     user_edited: list[str] = []
     conflicted: list[str] = []
 
@@ -139,26 +140,6 @@ def reconcile_desired_manifest(
             # the user's content.  Retain the prior ownership hash, or use the
             # rendered template hash when repairing an untracked seed.
             next_manifest.files.append(old_file or desired_file)
-            continue
-
-        if desired_file.is_hook_config:
-            entry, action = _apply_hook_config(
-                target,
-                source,
-                old_file,
-                desired_file,
-                rel,
-                conflicted,
-            )
-            if entry is None:
-                if old_file is not None:
-                    next_manifest.files.append(old_file)
-                continue
-            next_manifest.files.append(entry)
-            if action == "added":
-                added.append(rel)
-            elif action == "applied":
-                applied.append(rel)
             continue
 
         desired_content = source.read_text(encoding="utf-8")
@@ -195,6 +176,18 @@ def reconcile_desired_manifest(
         elif action == "skipped":
             next_manifest.files.append(old_file)
 
+    # 旧启动器按清单摘要退役后只移除空容器，保留用户追加的脚本。
+    if any(rel.startswith(".modus/hooks/") for rel in old_files):
+        hooks_directory = paths.root / ".modus/hooks"
+        if hooks_directory.is_dir() and not hooks_directory.is_symlink():
+            try:
+                hooks_directory.rmdir()
+            except OSError as exc:
+                if exc.errno not in {errno.ENOTEMPTY, errno.EEXIST}:
+                    raise
+            else:
+                removed_directories.append(".modus/hooks")
+
     _apply_sections(
         paths, old, old_files, desired_paths, desired, next_manifest, applied, added, user_edited
     )
@@ -205,7 +198,7 @@ def reconcile_desired_manifest(
         "appliedFiles": sorted(set(applied)),
         "addedFiles": sorted(set(added)),
         "removedFiles": sorted(set(removed)),
-        "removedDirectories": [],
+        "removedDirectories": removed_directories,
         "userEditedFiles": sorted(set(user_edited)),
         "conflictedFiles": sorted(set(conflicted)),
     }
@@ -247,42 +240,6 @@ def _apply_file(
     return "applied"
 
 
-# 共享 JSON 通过键级合并更新，只在结构可解析时操作。
-# 报告动作由合并前后内容决定，避免把无变化重复计为更新。
-def _apply_hook_config(
-    target: Path,
-    source: Path,
-    old_file: ManagedFile | None,
-    desired_file: ManagedFile,
-    rel: str,
-    conflicted: list[str],
-) -> tuple[ManagedFile | None, str]:
-    try:
-        config = json.loads(source.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        conflicted.append(rel)
-        return None, "conflict"
-
-    existed = target.exists()
-    before = target.read_text(encoding="utf-8") if existed else ""
-    if existed:
-        try:
-            json.loads(before)
-        except json.JSONDecodeError:
-            conflicted.append(rel)
-            return None, "conflict"
-
-    merged = merge_hook(target, config)
-    entry = ManagedFile(
-        rel, hash_text(merged), old_file.template if old_file else desired_file.template
-    )
-    if not existed:
-        return entry, "added"
-    if before != merged:
-        return entry, "applied"
-    return entry, "unchanged"
-
-
 # 退休资产仍需匹配旧摘要；用户改动的文件继续保留。
 # Hook 容器按受管条目撤销，不删除整个共享配置。
 def _remove_unused_managed_file(
@@ -293,19 +250,10 @@ def _remove_unused_managed_file(
 ) -> str:
     if not target.exists():
         return "removed"
-    if old_file.is_hook_config:
-        # Hook files are shared JSON containers, not wholly Modus-owned files.
-        # A valid user-edited config can be safely unmerged entry-by-entry; an
-        # unreadable/malformed config remains user-owned and must be preserved.
-        try:
-            hook_data = json.loads(target.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+    if old_file.is_legacy_hook_config:
+        if not clean_legacy_hook_config(target):
             user_edited.append(rel)
             return "skipped"
-        if not isinstance(hook_data, dict):
-            user_edited.append(rel)
-            return "skipped"
-        unmerge_hook(target)
         return "removed"
     if hash_file(target) != old_file.sha256:
         user_edited.append(rel)
@@ -497,7 +445,12 @@ def run_update(root: str | Path, accept_major: bool = False, allow_downgrade: bo
             transaction.rollback()
             raise
     blocked = bool(result["userEditedFiles"] or result["conflictedFiles"])
-    changed = bool(result["appliedFiles"] or result["addedFiles"] or result["removedFiles"])
+    changed = bool(
+        result["appliedFiles"]
+        or result["addedFiles"]
+        or result["removedFiles"]
+        or result["removedDirectories"]
+    )
     status = "partial" if blocked else "updated" if changed else "up-to-date"
     return {
         "status": status,
@@ -543,6 +496,14 @@ def preview_update(
                 destination = target / rel
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_bytes(raw)
+        # 目录退役预览只记录非受管子项的存在，不读取或复制用户脚本。
+        legacy_directory = paths.root / ".modus/hooks"
+        if any(entry.path.startswith(".modus/hooks/") for entry in manifest.files):
+            if legacy_directory.is_dir() and not legacy_directory.is_symlink():
+                preview_directory = target / ".modus/hooks"
+                preview_directory.mkdir(parents=True, exist_ok=True)
+                if any(paths.relative(child) not in rels for child in legacy_directory.iterdir()):
+                    tempfile.mkdtemp(prefix="unmanaged-", dir=preview_directory)
         result = run_update(target, accept_major=accept_major, allow_downgrade=allow_downgrade)
     result["dryRun"] = True
     result["message"] = "[dry-run] " + result.get("message", "")

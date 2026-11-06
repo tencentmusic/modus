@@ -18,7 +18,7 @@ uv run --locked --extra test python -m modus --help
 | --- | --- |
 | CLI 隔离/中文/真实命令 | `test_cli_boundaries.py`、`test_cli_localization.py`、`test_documented_cli.py` |
 | 项目生命周期/用户文件保护 | `test_project_lifecycle.py`、`test_install_safety.py`、`test_scaffold.py` |
-| 平台/Hook | `test_platforms.py`、`test_hooks.py`、安装安全测试 |
+| 平台/旧安装迁移 | `test_platforms.py`、`test_legacy_hook_cleanup.py`、安装安全测试 |
 | 分析生命周期/包确定性/漂移 | `test_analysis_pipeline.py`、`test_evidence_selection.py` |
 | 语义分层/状态/语言缓存 | `machine/test_architecture.py`、`test_states.py`、`test_contracts.py`、`test_language_fixtures.py`、`test_extraction_cache_identity.py`、`test_corpus.py` |
 | 能力/投影/局部降级 | `machine/test_capability_composer.py`、`test_projection.py`、`test_lifecycle_degradation.py` |

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import tempfile
 from pathlib import Path
 
@@ -48,22 +47,6 @@ def _section_conflict(target: Path, marker: str) -> str | None:
     return f"{target.name} 存在同名标记的非受管区块"
 
 
-# 共享 Hook 配置必须为对象，才能按键安全合并。
-# 空文件允许作为空配置，非法 JSON 保留给用户修复。
-def _hook_conflict(target: Path) -> str | None:
-    try:
-        raw = target.read_text(encoding="utf-8")
-        value = {} if not raw.strip() else json.loads(raw)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        return f"{target.name} 不是可安全合并的 JSON： {exc}"
-    if not isinstance(value, dict):
-        return f"{target.name} 的顶层必须为 JSON 对象"
-    hooks = value.get("hooks")
-    if hooks is not None and not isinstance(hooks, dict):
-        return f"{target.name} 的 hooks 字段必须为 JSON 对象"
-    return None
-
-
 # 先收集全部冲突，再决定是否写入，避免安装一半才发现阻塞。
 # 种子规范允许复用；其他已有非受管文件不得被初始化覆盖。
 # 孤立配置读取失败也必须阻止写入，故在此边界汇总任意解析异常。
@@ -81,11 +64,6 @@ def _fresh_install_conflicts(paths: ModusPaths, desired: Manifest) -> list[str]:
             conflicts.append(issue)
             continue
         if not target.exists() or entry.path in seed_paths:
-            continue
-        if entry.is_hook_config:
-            issue = _hook_conflict(target)
-            if issue:
-                conflicts.append(f"{entry.path}: {issue}")
             continue
         if entry.path in section_paths:
             continue
@@ -130,7 +108,6 @@ def _planned_targets(
     relative_paths = {
         *(entry.path for entry in desired.files),
         *(entry.path for entry in desired.sections),
-        ".agents/hooks.json",
     }
     if previous is not None:
         relative_paths.update(entry.path for entry in previous.files)

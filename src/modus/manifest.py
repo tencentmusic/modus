@@ -42,13 +42,8 @@ class ManagedFile:
     template: str  # template source id this file was rendered from
 
     @property
-    def is_hook_config(self) -> bool:
-        """Whether this entry is a shared platform hook JSON container.
-
-        Hook configs (e.g. ``.claude/settings.json``) may also hold user
-        content, so update and uninstall merge/unmerge Modus' signed entry
-        instead of treating the whole file as Modus-owned.
-        """
+    def is_legacy_hook_config(self) -> bool:
+        """旧清单中的共享 hook 容器，仅按签名清理，不能整文件删除。"""
         return self.template.startswith("hooks/") and self.path.endswith(".json")
 
 

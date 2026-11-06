@@ -28,7 +28,7 @@ python3.11 "$SKILL_DIR/scripts/inspect_repository.py" --root .
 | 功能开发、修复、重构、源码评审 | [开发流程](references/development.md) + 对应模块 + [验证与发布](references/modules/quality-release.md) |
 | 帮助、参数、退出码、中文体验、个人包维护 | [CLI 与维护入口](references/modules/cli-maintenance.md) |
 | 接入、升级、卸载、清单、资产冲突、Git 保护 | [项目安装与所有权](references/modules/installation.md) |
-| CodeBuddy / Claude / Cursor / Codex / DSH 接入与运行时 | [平台与钩子](references/modules/platforms-hooks.md) |
+| CodeBuddy / Claude / Cursor / Codex / DSH 接入与运行时 | [平台与常驻指引](references/modules/platforms-hooks.md) |
 | 源码发现、冻结、解析、编译器、语言扩展、缓存命中 | [N1–N2：源码与观察](references/modules/machine-corpus-facts.md) |
 | 身份解析、调用关系、拓扑、入口到效果、能力遍历 | [N3–N4：解析与能力](references/modules/machine-resolution-capability.md) |
 | 范围候选、聚类建议、证据包、上下文、游标、摘要 | [N5–N6：投影与交付](references/modules/machine-projection-packet.md) |

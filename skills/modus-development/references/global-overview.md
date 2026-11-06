@@ -29,7 +29,7 @@ flowchart TD
 | `cli.py`、`cli_commands/`、`command_reference.py`、`surface.py` | 命令树、参数/交互/退出码、帮助元数据、五个内置技能的调用类别 |
 | `commands/` | 安装、更新、卸载、个人包维护、状态与核验等应用服务；`*_report.py` 负责展示 |
 | `scaffold/`、`scaffold/templates/` | 模板目录、受管写入、中立接入资产；模板定义助手行为与知识种子 |
-| `platforms/`、`hooks/` | 宿主的布局投影、共享区块/钩子合并、启动事件与最小指引 |
+| `platforms/` | 宿主布局投影、共享区块合并、调用权限与常驻指引 |
 | 仓库 `integrations/dsh/` | DSH 原生工具、会话执行与 CLI 协议适配；项目 Skill 投影仍由 Python 平台层管理 |
 | `machine/` | 初始化分析的 N1–N6、资源策略、不可变证据存储与有界查询 |
 | `orchestrator/`、`retrieval/` | 当前源码与知识的路由、搜索、共享预算、影响候选与上下文交付 |
@@ -61,8 +61,7 @@ flowchart TD
 ├── .modus/                      接入控制面
 │   ├── config.yaml
 │   ├── manifest.json
-│   ├── commands/、skills/       平台中立工作流权威源
-│   └── hooks/                   启动器
+│   └── commands/、skills/       平台中立工作流权威源
 └── modus/
     ├── .cache/                  可重建证据、临时执行卡及锁
     └── knowledge/

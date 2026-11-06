@@ -44,7 +44,6 @@ def _install_tree() -> tuple[TreeNode, ...]:
             (
                 TreeNode("commands/", "命令模板"),
                 TreeNode("skills/", "五个知识技能的中立源文件"),
-                TreeNode("hooks/", "会话引导脚本"),
                 TreeNode("manifest.json", "供 modus update 使用的所有权清单"),
             ),
         ),
@@ -79,7 +78,6 @@ def _workspace_install_tree() -> tuple[TreeNode, ...]:
                 TreeNode("config.yaml", "kind: workspace 与已确认成员"),
                 TreeNode("commands/"),
                 TreeNode("skills/"),
-                TreeNode("hooks/"),
                 TreeNode("manifest.json"),
             ),
         ),
@@ -117,7 +115,6 @@ def _platform_tree(platforms: list[str]) -> tuple[TreeNode, ...]:
                     "供 Codex 读取的技能",
                     (TreeNode("skills/"),),
                 ),
-                TreeNode(".codex/", "", (TreeNode("hooks.json", "Codex 会话钩子"),)),
             )
         )
     if "dsh" in selected:
@@ -136,7 +133,6 @@ def _platform_tree(platforms: list[str]) -> tuple[TreeNode, ...]:
                             "commands/",
                             "/modus-init, /modus-reinit, /modus-update-knowledge",
                         ),
-                        TreeNode("settings.json", "CodeBuddy 会话钩子"),
                     ),
                 ),
                 TreeNode("CODEBUDDY.md", "Modus 受管区块中的 CodeBuddy 指引"),
@@ -150,7 +146,6 @@ def _platform_tree(platforms: list[str]) -> tuple[TreeNode, ...]:
                 (
                     TreeNode("skills/"),
                     TreeNode("rules/", "", (TreeNode("modus.mdc", "Cursor 常驻指引"),)),
-                    TreeNode("hooks.json", "Cursor 会话钩子"),
                 ),
             )
         )
@@ -160,10 +155,7 @@ def _platform_tree(platforms: list[str]) -> tuple[TreeNode, ...]:
                 TreeNode(
                     ".claude/",
                     "供 Claude Code 读取的技能",
-                    (
-                        TreeNode("skills/"),
-                        TreeNode("settings.json", "Claude Code 会话钩子"),
-                    ),
+                    (TreeNode("skills/"),),
                 ),
                 TreeNode("CLAUDE.md", "Modus 受管区块中的 Claude Code 指引"),
             )

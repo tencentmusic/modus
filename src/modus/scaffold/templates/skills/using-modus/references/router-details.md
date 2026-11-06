@@ -59,7 +59,7 @@
 
 ## 普通工作流边界
 
-`using-modus`、context、hooks、update/sync 和公开 status 都不
+`using-modus`、context、update/sync 和公开 status 都不
 导入、不读取、不构建 `modus/.cache/init-analysis/`。即使缓存存在也
 一样。调用链、影响面、资源效应和拓扑问题通过正文定位后直接核验源码。
 

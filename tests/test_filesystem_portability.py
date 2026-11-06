@@ -12,7 +12,6 @@ import pytest
 from modus import artifacts_io, atomic_writes, knowledge_reader
 from modus import knowledge_write_session as session
 from modus.cli_commands.presentation import _parser_detail
-from modus.hooks import SUPPORTED_HOSTS
 from modus.knowledge_reader import (
     BoundKnowledgeReadError,
     read_bound_regular_bytes,
@@ -20,6 +19,7 @@ from modus.knowledge_reader import (
 )
 from modus.knowledge_update import update_knowledge
 from modus.manifest import hash_file
+from modus.platforms import available_platforms
 from modus.scaffold import scaffold_project
 
 
@@ -269,7 +269,7 @@ def test_install_manifest_matches_bytes_with_windows_default_newlines(
         )
 
     monkeypatch.setattr(Path, "write_text", windows_write_text)
-    first = scaffold_project(tmp_path, list(SUPPORTED_HOSTS))
+    first = scaffold_project(tmp_path, available_platforms())
     assert all(entry.sha256 == hash_file(tmp_path / entry.path) for entry in first.files)
-    second = scaffold_project(tmp_path, list(SUPPORTED_HOSTS))
+    second = scaffold_project(tmp_path, available_platforms())
     assert first.to_dict() == second.to_dict()

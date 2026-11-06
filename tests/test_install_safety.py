@@ -184,7 +184,12 @@ def test_uninstall_preserves_corrupt_shared_config_and_symlink_targets(
 ) -> None:
     run_init(tmp_path, ["codex"])
     hook = tmp_path / ".codex/hooks.json"
+    hook.parent.mkdir()
     hook.write_bytes(b"{broken")
+    paths = ModusPaths.for_root(tmp_path)
+    manifest = Manifest.read(paths)
+    manifest.add_file(".codex/hooks.json", "{broken", "hooks/codex-hooks.json")
+    manifest.write(paths)
     managed = tmp_path / ".agents/skills/modus-init/SKILL.md"
     external = tmp_path / "external-skill.md"
     external.write_text("external\n", encoding="utf-8")

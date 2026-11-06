@@ -1,13 +1,11 @@
-"""CodeBuddy adapter: commands under ``.codebuddy/commands`` + a CODEBUDDY.md
-section + a best-effort session-start hook in ``.codebuddy/settings.json``."""
+"""CodeBuddy 接入：技能、原生命令与 CODEBUDDY.md 常驻指引。"""
 
 from __future__ import annotations
 
-from ..hooks import bootstrap
-from ..precedence import MODUS_DISPATCHER_FALLBACK, USER_INVOKED_WORKFLOWS_SENTENCE
+from ..precedence import USER_INVOKED_WORKFLOWS_SENTENCE
 from ..surface import command_invocation
 from .base import Command, PlatformAdapter, Skill
-from .models import HookFile, InstructionFile, PlatformLayout
+from .models import InstructionFile, PlatformLayout
 from .rendering import render_skill_index
 
 _LAYOUT = PlatformLayout(
@@ -15,11 +13,6 @@ _LAYOUT = PlatformLayout(
     commands_root=".codebuddy/commands",
     owned_file_prefixes=(".codebuddy/",),
     instructions=InstructionFile(path="CODEBUDDY.md", marker="modus-codebuddy"),
-    hook=HookFile(
-        path=".codebuddy/settings.json",
-        template="hooks/codebuddy-hooks.json",
-        render_config=bootstrap.codebuddy_hook_config,
-    ),
 )
 
 
@@ -38,7 +31,7 @@ class CodeBuddyAdapter(PlatformAdapter):
         commands: list[Command],
     ) -> str:
         heading = (
-            f"## Modus\n\n{MODUS_DISPATCHER_FALLBACK} "
+            f"## Modus\n\n"
             "`.modus/skills/` 是权威源文件；`.codebuddy/skills/` 是 CodeBuddy 接入副本。"
             f"{USER_INVOKED_WORKFLOWS_SENTENCE}."
         )

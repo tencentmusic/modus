@@ -15,7 +15,7 @@
 | `test_project_lifecycle.py`、`test_install_safety.py`、`test_workspace_lifecycle.py` | 安装、五平台工作流升级、所有权、回滚、并发与工作区成员只读 |
 | `test_analysis_pipeline.py`、`test_evidence_selection.py`、`machine/` | 公开分析生命周期、分层、模式、降级与存储 |
 | `test_knowledge_identity.py`、`test_knowledge_retrieval.py`、`test_knowledge_update.py`、`test_verify_knowledge.py` | 路径所有权、检索边界、哈希条件写入与客观知识完整性 |
-| `test_platforms.py`、`test_hooks.py`、`test_sensitive_literals.py` | 宿主扩展与安全输出 |
+| `test_platforms.py`、`test_legacy_hook_cleanup.py`、`test_sensitive_literals.py` | 宿主扩展、旧安装迁移与安全输出 |
 | `test_dsh.py`、[DSH 插件测试](../integrations/dsh/architecture.md#贡献与验证) | 项目投影与用户资产保护、宿主执行边界、CLI 报告与隔离分发 |
 | `test_scaffold.py` | 随包模板目录 |
 | `test_team_standard_examples.py`、[编码演练](fixtures/team_standard/README.md) | Java/TS 真实编译与编码行为；Kotlin、混合/未知技术、规则冲突的人工回读边界 |
