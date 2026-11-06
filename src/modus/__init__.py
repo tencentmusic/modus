@@ -8,6 +8,6 @@ convenience namespace with an accidental compatibility burden.
 
 from typing import Final
 
-__version__: Final = "0.0.6"
+__version__: Final = "0.0.7"
 
 __all__ = ["__version__"]
