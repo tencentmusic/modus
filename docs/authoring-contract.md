@@ -65,6 +65,8 @@ K1 完整范围 → K2 全局主定义与跨域依赖
 
 ### K1：范围建模
 
+单域任务仍完成 K1～K6，共享规范与概览只处理已授权范围的影响，保留其他域与人工内容；具体执行见 [K1](../src/modus/scaffold/templates/skills/using-modus/references/authoring/stages/k1-scope.md)。
+
 使用本轮经过身份核验的 `scope-discovery` 上下文；重建时使用 `reinit-diff` 获取当前基线证据，再由作者比较旧知识和当前实现；此 intent 不执行新旧差分。通过 `context` 和定向 `select` 消费证据，不把证据包目录或数据文件作为创作协议。机器证据不可用时读取当前源码、测试、配置并记录覆盖缺口，不借用旧包冒充本轮证据，也不把有界查询替换为全仓扫描。
 
 对每项能力确定触发、期望结果、权威对象、写入者、最终可见效果、失败责任与生命周期。模块代表输入、决策、结果与变更责任一致的任务；领域按长期结果、权威对象或变更责任聚合模块。非商业项目的领域可以是能力边界。目录接近、聚类、通用基础设施、框架适配器或 controller/DAO 技术层本身不构成领域。
@@ -102,6 +104,8 @@ K1 完整范围 → K2 全局主定义与跨域依赖
 init/reinit 在进入领域或中断恢复时，按[上下文合同](../src/modus/scaffold/templates/skills/using-modus/references/authoring/context-continuity.md)依次读取原卡、对应证据、相关正文和适用规范。每个可恢复单元原位保存关键条件、来源、跨域边界、文件版本与验收债务；未知写入先核对实际文件。容量不足缩小工作单元，不能缩减范围、重跑 build 或凭摘要续写。
 
 K2 必须为全范围先建立[跨域协作基线](../src/modus/scaffold/templates/skills/using-modus/references/authoring/cross-domain.md)：提供方/使用方、主定义、字段/状态映射、术语、交接前已提交事实、完成与恢复责任、双向依据及受影响页。先稳定依赖契约，循环依赖由根作者联合取证；K3/K4 发现变化立即传播并重验受影响页，不能等 K6 才拼接。基线标识与变化记录放原卡正文，不扩机器 schema。
+
+K2 提前确认实际预览环境，最终分别报告机械核验、语义回读、整页与逐图结果；具体边界见[发布合同](../src/modus/scaffold/templates/skills/using-modus/references/authoring/publication.md)。
 
 现在规划图表候选与合理豁免，在 K3 揭示当前工作单元的实际机制后、相应正文生成前确定本单元的图形安排；随后续单元继续完善同一领域计划。记录问题、图表类型、唯一所有者、证据与引用页面。导航表不能代替异步交接、持久状态、多条件决策、对象映射或资源生命周期的机制说明。
 

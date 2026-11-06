@@ -330,7 +330,8 @@
         "diagrams": 2,
         "full_page_reviewed": true
       }
-    ]
+    ],
+    "applies_to_recorded_hashes_only": true
   },
   "content_review": {
     "status": "author_reviewed",
@@ -391,6 +392,132 @@
       "清理第二套样稿及所有相关引用",
       "未发现参考项目标识、内部地址、凭证或本机绝对路径",
       "教学源码、正文示例和运行输出的数据映射一致"
+    ]
+  },
+  "visual_follow_up": {
+    "checked_on": "2026-11-04",
+    "status": "author_reviewed",
+    "scope": "恢复演练副本的全部 11 篇正式知识页面与 6 幅图；10 篇与仓库逐字一致，对象页是在仓库正文后追加人工授权说明的副本；修订的 3 篇正文均已逐字同步回仓库。",
+    "renderer": {
+      "browser": "Codex in-app browser",
+      "markdown": "marked 15.0.12",
+      "mermaid_asset_sha256": "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8",
+      "viewport": {
+        "width": 749,
+        "height": 984
+      },
+      "article_width": 734,
+      "content_width": 670,
+      "method": "本地既有阅读器，隐藏 frontmatter；连续重叠视口逐屏实际查看至页尾，修订后重看整页；未缩小字体或放宽正文宽度。"
+    },
+    "pages_reviewed": 11,
+    "diagrams_reviewed": 6,
+    "final_version_screenshots": 60,
+    "corrections": [
+      "状态图：缩短并分行两类失败、部分成功与恢复条件标签，消除遮挡；完整条件保留在相邻正文。",
+      "协作图：六泳道改为三个调用角色；内存结构表示为导入器内部动作，数据交接详情仍由相邻表格说明。",
+      "接口页：三段完整 JSON 响应格式化，消除代码块长行越界；解析后的字段和值与修订前及实际运行结果相同。"
+    ],
+    "mechanical_verification": {
+      "ordinary_knowledge_verify": "仓库主夹具与恢复副本均为 clean，各 11 文档",
+      "python_examples_executed": 9,
+      "json_responses_equal_runtime": 3
+    },
+    "limitations": [
+      "作者自查，不是独立读者或全部宿主验收。",
+      "11 篇正式知识的本次整页验收不包含维护者 README、底稿、读者问题和随包成对示例的新一轮预览。",
+      "普通 clean 与机械覆盖检查不能替代本次实际视觉查看；未执行简化演练卡的 publication。",
+      "替代阅读器的固定导航会覆盖锚点标题，跨页点击后上移少量视口核对了规则 R2 和对外任务快照；未将此阅读器行为算成正文缺陷。"
+    ],
+    "documents": [
+      {
+        "path": "modus/knowledge/domain/contact-import/references/object.md",
+        "reviewed_sha256": "8fa1d46b9990e8f03793e78b2d2c72a734f0eddbcda91ac5ce7932f8f7a37035",
+        "canonical_sha256": "c08637eadcdc847acf5faec985f24aa5eec193e1fb2c6cdb9efb378b6e973b8a",
+        "diagrams": 1,
+        "full_page_reviewed": true,
+        "viewport_screenshots": 7
+      },
+      {
+        "path": "modus/knowledge/architecture-overview.md",
+        "reviewed_sha256": "65d4591f4571aa4bb0230dd3d29f838c1ecfcec098d403fe63546b4c8277bc9e",
+        "canonical_sha256": "65d4591f4571aa4bb0230dd3d29f838c1ecfcec098d403fe63546b4c8277bc9e",
+        "diagrams": 1,
+        "full_page_reviewed": true,
+        "viewport_screenshots": 4
+      },
+      {
+        "path": "modus/knowledge/constraint/team-standard.md",
+        "reviewed_sha256": "fc843dd09dca94bbf3f3b9e39f58f96f6ea062a69446d6d6901229d9c1ae9ae3",
+        "canonical_sha256": "fc843dd09dca94bbf3f3b9e39f58f96f6ea062a69446d6d6901229d9c1ae9ae3",
+        "diagrams": 0,
+        "full_page_reviewed": true,
+        "viewport_screenshots": 4
+      },
+      {
+        "path": "modus/knowledge/domain/contact-import/SKILL.md",
+        "reviewed_sha256": "5f92d4639b41028ec1a38c5202f861ca176c0424c25f801927907cd558a290cd",
+        "canonical_sha256": "5f92d4639b41028ec1a38c5202f861ca176c0424c25f801927907cd558a290cd",
+        "diagrams": 0,
+        "full_page_reviewed": true,
+        "viewport_screenshots": 3
+      },
+      {
+        "path": "modus/knowledge/domain/contact-import/references/api.md",
+        "reviewed_sha256": "07b1abf5f7bfdb2d5875f2cd28213725bc363e28eae0d41ccbc301891e148153",
+        "canonical_sha256": "07b1abf5f7bfdb2d5875f2cd28213725bc363e28eae0d41ccbc301891e148153",
+        "diagrams": 0,
+        "full_page_reviewed": true,
+        "viewport_screenshots": 10
+      },
+      {
+        "path": "modus/knowledge/domain/contact-import/references/downstream.md",
+        "reviewed_sha256": "52aa9e780166383c7a28ec2b662da5cbc4536d5c7d662330932d0a2f05d0010e",
+        "canonical_sha256": "52aa9e780166383c7a28ec2b662da5cbc4536d5c7d662330932d0a2f05d0010e",
+        "diagrams": 1,
+        "full_page_reviewed": true,
+        "viewport_screenshots": 5
+      },
+      {
+        "path": "modus/knowledge/domain/contact-import/references/infrastructure.md",
+        "reviewed_sha256": "c65f46113775f8990be578703c9ac97b926dcd814905145d45f697d1ed423c12",
+        "canonical_sha256": "c65f46113775f8990be578703c9ac97b926dcd814905145d45f697d1ed423c12",
+        "diagrams": 0,
+        "full_page_reviewed": true,
+        "viewport_screenshots": 4
+      },
+      {
+        "path": "modus/knowledge/domain/contact-import/references/modules/execution-recovery.md",
+        "reviewed_sha256": "516b7fae99b65448fc4ab26728c8db0c54a99e9e5daf0649992a8766906f8236",
+        "canonical_sha256": "516b7fae99b65448fc4ab26728c8db0c54a99e9e5daf0649992a8766906f8236",
+        "diagrams": 1,
+        "full_page_reviewed": true,
+        "viewport_screenshots": 6
+      },
+      {
+        "path": "modus/knowledge/domain/contact-import/references/modules/submission-query.md",
+        "reviewed_sha256": "e47409192222a58e3e908f8994a86a0e54760bc0d1bc6ab71d52ff8adb1a878e",
+        "canonical_sha256": "e47409192222a58e3e908f8994a86a0e54760bc0d1bc6ab71d52ff8adb1a878e",
+        "diagrams": 1,
+        "full_page_reviewed": true,
+        "viewport_screenshots": 7
+      },
+      {
+        "path": "modus/knowledge/domain/contact-import/references/rule.md",
+        "reviewed_sha256": "3e9e4ca0645ebe6d3d5e5cb2ac4c7114d6019b39954d645c796af6fc8ac7ead7",
+        "canonical_sha256": "3e9e4ca0645ebe6d3d5e5cb2ac4c7114d6019b39954d645c796af6fc8ac7ead7",
+        "diagrams": 0,
+        "full_page_reviewed": true,
+        "viewport_screenshots": 5
+      },
+      {
+        "path": "modus/knowledge/domain/contact-import/references/state_machine.md",
+        "reviewed_sha256": "fae6d20e03b93d3aa8c9f7a744f2c7ef8285706669cded2f5b8bbb4f7cd14ec2",
+        "canonical_sha256": "fae6d20e03b93d3aa8c9f7a744f2c7ef8285706669cded2f5b8bbb4f7cd14ec2",
+        "diagrams": 1,
+        "full_page_reviewed": true,
+        "viewport_screenshots": 5
+      }
     ]
   }
 }

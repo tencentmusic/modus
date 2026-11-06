@@ -24,6 +24,7 @@ revises the document through a knowledge-maintenance workflow.
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import re
 from pathlib import Path
@@ -43,17 +44,121 @@ _MAX_SOURCE_BYTES = 8 * 1024 * 1024
 
 def _identifier_stem(symbol: str) -> str:
     """The searchable identifier inside an authored anchor symbol."""
-    cleaned = symbol.strip().strip("()").lstrip(".")
+    cleaned = symbol.replace("::", ".").strip().strip("()").lstrip(".")
     cleaned = cleaned.split("(", 1)[0]
     return cleaned.rsplit(".", 1)[-1].rsplit("#", 1)[-1].strip()
 
 
-# 按标识符边界收集全部命中，多个结果必须交给作者判断而非任选。
-def _symbol_lines(source_lines: list[str], stem: str) -> list[int]:
-    if not stem:
-        return []
-    pattern = re.compile(rf"(?<![\w]){re.escape(stem)}(?![\w])")
-    return [index for index, line in enumerate(source_lines, start=1) if pattern.search(line)]
+# 声明索引来自当前语法树，不把注释和引用当作定义。
+def _source_declarations(relative: str, lines: list[str]) -> list[dict[str, Any]] | None:
+    """每个当前文件解析一次声明；注释、调用和字符串不进入锚点候选。"""
+    content = "\n".join(lines)
+    if Path(relative).suffix == ".py":
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            return None
+        declarations: list[dict[str, Any]] = []
+
+        def visit(node: ast.AST, owners: tuple[str, ...] = (), scope_kind: str = "module") -> None:
+            if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                owners = (*owners, node.name)
+                scope_kind = "class" if isinstance(node, ast.ClassDef) else "function"
+                declarations.append(
+                    {
+                        "name": node.name,
+                        "qualified_name": ".".join(owners),
+                        "kind": "class" if isinstance(node, ast.ClassDef) else "function",
+                        "line": node.lineno,
+                        "endLine": node.end_lineno,
+                        "signature": f"{node.name}({ast.unparse(node.args)})"
+                        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                        else node.name,
+                    }
+                )
+            elif scope_kind in {"module", "class"} and isinstance(
+                node, (ast.Assign, ast.AnnAssign)
+            ):
+                # 模块常量和类字段是合法锚点；不把属性写入、局部变量或调用当声明。
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                for target in targets:
+                    if not isinstance(target, (ast.Name, ast.Tuple, ast.List)):
+                        continue
+                    for name in ast.walk(target):
+                        if isinstance(name, ast.Name) and isinstance(name.ctx, ast.Store):
+                            declarations.append(
+                                {
+                                    "name": name.id,
+                                    "qualified_name": ".".join((*owners, name.id)),
+                                    "kind": "field",
+                                    "line": node.lineno,
+                                    "endLine": node.end_lineno,
+                                }
+                            )
+            for child in ast.iter_child_nodes(node):
+                visit(child, owners, scope_kind)
+
+        visit(tree)
+        return declarations
+    try:
+        from ..machine.corpus.source_snapshot import SourceSnapshot
+        from ..machine.facts.native_parser import parse_file
+
+        facts = parse_file(SourceSnapshot(Path(relative).resolve(), content))
+        if facts.get("diagnostics"):
+            return None
+        package = str(facts.get("package") or "")
+        return [
+            {
+                **row,
+                "qualified_name": ".".join(filter(None, (package, row.get("qualified_name", "")))),
+            }
+            for row in facts.get("declarations", [])
+        ]
+    except (ImportError, KeyError, ValueError):
+        return None
+
+
+def _declaration_matches(
+    declarations: list[dict[str, Any]], location: SourceLocation
+) -> list[tuple[int, int]]:
+    requested = location.symbol.split("(", 1)[0].replace("::", ".").replace("#", ".").strip(".")
+    stem = _identifier_stem(location.symbol)
+    matches = []
+    for row in declarations:
+        if "(" in location.symbol and row.get("kind") not in {"function", "method", "constructor"}:
+            continue
+        qualified = str(row.get("qualified_name") or row.get("name") or "").replace("::", ".")
+        qualified_names = (qualified, Path(location.path).stem + "." + qualified)
+        if not any(name == requested or name.endswith("." + requested) for name in qualified_names):
+            continue
+        if "(" in location.symbol and not location.symbol.endswith("()"):
+            expected = location.symbol.split("(", 1)[1].rsplit(")", 1)[0]
+            types = row.get("parameterTypes")
+            if types is None:
+                signature = re.search(
+                    rf"\b{re.escape(stem)}\s*\(([^)]*)\)", str(row.get("signature", ""))
+                )
+                if signature is None:
+                    continue
+                types = []
+                for parameter in signature[1].split(","):
+                    parameter = parameter.split("=", 1)[0].strip()
+                    annotation = re.search(r"(?<!:):(?!:)", parameter)
+                    type_name = (
+                        parameter[annotation.end() :] if annotation else parameter.rsplit(" ", 1)[0]
+                    )
+                    types.append(type_name)
+            if re.sub(r"\s+", "", ",".join(types)) != re.sub(r"\s+", "", expected):
+                continue
+        start, name_line = int(row["line"]), int(row.get("name_line") or row["line"])
+        matches.append(
+            (
+                location.start_line if location.start_line in {start, name_line} else name_line,
+                int(row.get("endLine") or row.get("source_end_line") or name_line),
+            )
+        )
+    return sorted(set(matches))
 
 
 # 读取当前工作树并限制文件大小，验证结果不依赖历史分析缓存。
@@ -80,15 +185,11 @@ def _in_domain(paths: ModusPaths, path: Path, domain: str | None) -> bool:
 
 # 锚点是可选元数据；结构非法时逐项记录，避免一个坏条目遮蔽全部结果。
 def _document_locations(
-    paths: ModusPaths, path: Path
+    paths: ModusPaths, path: Path, text: str
 ) -> tuple[list[SourceLocation], list[dict[str, Any]]]:
     """Read optional ``anchors.locations`` without assuming a document type."""
 
     document = paths.relative(path)
-    try:
-        text = read_bound_regular_text(paths.root, path, max_bytes=2 * 1024 * 1024)
-    except (BoundKnowledgeReadError, OSError, ValueError):
-        return [], []
     frontmatter, _body = split_frontmatter(text)
     anchors = frontmatter.get("anchors")
     if anchors is None:
@@ -140,11 +241,16 @@ def _verify_structured_anchors(
 
     findings: list[dict[str, Any]] = []
     fixed_documents: list[str] = []
+    declaration_cache: dict[str, list[dict[str, Any]] | None] = {}
     for path in markdown_files(paths, "project"):
         if not _in_domain(paths, path, domain):
             continue
         document = paths.relative(path)
-        locations, metadata_findings = _document_locations(paths, path)
+        try:
+            original_text = read_bound_regular_text(paths.root, path, max_bytes=2 * 1024 * 1024)
+        except (BoundKnowledgeReadError, OSError, ValueError):
+            continue
+        locations, metadata_findings = _document_locations(paths, path, original_text)
         findings.extend(metadata_findings)
         repairs: dict[tuple[str, str, int], int] = {}
         for location in locations:
@@ -160,14 +266,52 @@ def _verify_structured_anchors(
             if source_lines is None:
                 findings.append({**base, "finding": "symbol_missing", "detail": "文件缺失"})
                 continue
-            stem = _identifier_stem(location.symbol)
-            matches = _symbol_lines(source_lines, stem)
+            if location.path not in declaration_cache:
+                declaration_cache[location.path] = _source_declarations(location.path, source_lines)
+            declarations = declaration_cache[location.path]
+            if declarations is None:
+                findings.append(
+                    {
+                        **base,
+                        "finding": "anchor_verification_unavailable",
+                        "detail": "当前语言或文件无法建立可靠声明索引，需人工核对",
+                    }
+                )
+                continue
+            declarations_at = _declaration_matches(declarations, location)
+            matches = sorted({start for start, _ in declarations_at})
             if not matches:
                 findings.append({**base, "finding": "symbol_missing", "detail": "文件中未找到符号"})
                 continue
             if location.start_line in matches:
+                if location.end_line is not None and all(
+                    location.end_line > end
+                    for start, end in declarations_at
+                    if start == location.start_line
+                ):
+                    findings.append(
+                        {
+                            **base,
+                            "finding": "range_drift",
+                            "detail": "结束行超出当前声明范围，需回读确认",
+                        }
+                    )
                 continue
             if len(matches) == 1:
+                end = next(end for start, end in declarations_at if start == matches[0])
+                if (
+                    location.end_line is not None
+                    and location.end_line + matches[0] - location.start_line > end
+                ):
+                    findings.append(
+                        {
+                            **base,
+                            "finding": "range_drift",
+                            "actualLine": matches[0],
+                            "detail": "声明位置与范围均已变化，需回读确认",
+                        }
+                    )
+                    continue
                 findings.append(
                     {
                         **base,
@@ -187,7 +331,7 @@ def _verify_structured_anchors(
                     }
                 )
         if fix and repairs:
-            if _repair_document(paths, document, repairs):
+            if _repair_document(paths, document, repairs, original_text):
                 fixed_documents.append(document)
                 for finding in findings:
                     key = (
@@ -197,20 +341,24 @@ def _verify_structured_anchors(
                     )
                     if finding.get("document") == document and key in repairs:
                         finding["fixed"] = True
+            else:
+                findings.append(
+                    {
+                        "document": document,
+                        "finding": "anchor_write_conflict",
+                        "detail": "未写入修复；保留原读时版本，核对并发变化或写入失败",
+                    }
+                )
     return findings, fixed_documents
 
 
 # 机械修复仅更新可唯一定位的行号，写入依赖原始内容摘要检测并发编辑。
 def _repair_document(
-    paths: ModusPaths, document: str, repairs: dict[tuple[str, str, int], int]
+    paths: ModusPaths, document: str, repairs: dict[tuple[str, str, int], int], text: str
 ) -> bool:
     """Rewrite only the drifted startLine values, under the shared CAS writer."""
     from ..knowledge_write_session import write_document
 
-    try:
-        text = read_bound_regular_text(paths.root, paths.root / document)
-    except (BoundKnowledgeReadError, OSError, ValueError):
-        return False
     frontmatter, body = split_frontmatter(text)
     anchors = frontmatter.get("anchors")
     if not isinstance(anchors, dict):

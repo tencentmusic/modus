@@ -201,3 +201,39 @@ def test_signal_outside_or_between_ambiguous_declarations_stays_unbound() -> Non
     )
     assert len(rows) == 3
     assert all("entryId" not in row and "symbol" not in row for row in rows)
+
+
+def test_signals_bind_corresponding_declarations_but_preserve_context_ambiguity() -> None:
+    from modus.config import AuthoringRule, RuleEmit, RuleMatch
+    from modus.machine.facts.rule_signals import project_authoring_records
+
+    syntax = {
+        "entryId": "syntax-entry",
+        "graphNodeId": "syntax",
+        "symbol": "Service.save",
+        "location": {"startLine": 1, "endLine": 1},
+    }
+    semantic = {
+        **syntax,
+        "entryId": "compiler-entry",
+        "graphNodeId": "compiler",
+        "analysisContextId": "main",
+        "symbolId": "Service#save()",
+        "correspondences": [{"role": "declaration", "syntaxGraphNodeId": "syntax"}],
+    }
+    rules = (
+        AuthoringRule("test.write", RuleMatch("save"), RuleEmit("effect", "authoritative-write")),
+    )
+
+    def signals(entries):
+        return project_authoring_records("Service.java", "save()", rules, entries=entries)
+
+    assert signals([syntax, semantic])[0]["entryId"] == "syntax-entry"
+    assert signals([semantic, syntax])[0]["entryId"] == "syntax-entry"
+    # 同声明的不同构建上下文、重载冲突、未确认对应不能随意挑一项。
+    for extra in (
+        {**semantic, "entryId": "other", "analysisContextId": "test"},
+        {**semantic, "entryId": "other", "symbolId": "Service#save(int)"},
+        {**semantic, "entryId": "other", "correspondences": []},
+    ):
+        assert "entryId" not in signals([syntax, semantic, extra])[0]

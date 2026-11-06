@@ -181,16 +181,15 @@ def _matched_value(match: re.Match[str]) -> str:
 # 正则信号服务于知识创作，不能替代编译器语义。
 # 普通规则始终标注启发式等级，并保留规则 ID 与源码行号。
 # 每条规则在单文件内限制命中数，控制产物规模。
-def project_authoring_records(
-    relative: str,
-    content: str,
-    rules: tuple[AuthoringRule, ...],
-    *,
-    entries: list[dict[str, Any]] | None = None,
+def bind_authoring_records(
+    records: list[dict[str, Any]],
+    entries: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Return bounded, source-anchored signals without composing business prose."""
+    """N3 只协调已观察的信号与声明，不再次扫描源码规则。"""
+    from modus.machine.facts.entry_observation import declaration_aliases
 
-    result: list[dict[str, Any]] = []
+    aliases = declaration_aliases(entries or [])
+    by_id = {str(row["entryId"]): row for row in entries or []}
     # 先建立入口区间表，随后所有规则共享同一归属选择。
     owners: list[tuple[int, int, dict[str, Any]]] = []
     for entry in entries or []:
@@ -211,6 +210,24 @@ def project_authoring_records(
         if not isinstance(first, int) or not isinstance(last, int):
             return
         containing = [item for item in owners if item[0] <= first <= last <= item[1]]
+        if declaration_line is None:
+            # 同一行可能有类型和多个成员；按字节列排除并未包含命中的声明。
+            containing = [
+                item
+                for item in containing
+                if (
+                    item[0] < first
+                    or not item[2]["location"].get("startColumn")
+                    or not location.get("startColumn")
+                    or item[2]["location"]["startColumn"] <= location["startColumn"]
+                )
+                and (
+                    item[1] > last
+                    or not item[2]["location"].get("endColumn")
+                    or not location.get("endColumn")
+                    or item[2]["location"]["endColumn"] >= location["endColumn"]
+                )
+            ]
         if declaration_line is not None:
             containing = [
                 item for item in containing if item[2].get("declarationName") == record["symbol"]
@@ -219,13 +236,33 @@ def project_authoring_records(
             return
         span = min(end - start for start, end, _entry in containing)
         smallest = [entry for start, end, entry in containing if end - start == span]
-        if len(smallest) != 1:
+        groups = {aliases.get(str(row["entryId"]), str(row["entryId"])) for row in smallest}
+        if len(groups) != 1:
             return
-        owner = smallest[0]
+        owner = by_id[next(iter(groups))]
         record["entryId"] = str(owner["entryId"])
         record["symbol"] = str(owner.get("symbol") or owner.get("displayName") or "")
         if owner.get("signature"):
             record["signature"] = str(owner["signature"])
+            if owner.get("signatureOmittedCharacters"):
+                record["signatureOmittedCharacters"] = owner["signatureOmittedCharacters"]
+
+    result = [dict(row) for row in records]
+    for record in result:
+        bind_owner(record, record.pop("declarationLine", None))
+    return result
+
+
+def project_authoring_records(
+    relative: str,
+    content: str,
+    rules: tuple[AuthoringRule, ...],
+    *,
+    entries: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Return bounded, source-anchored signals without composing business prose."""
+
+    result: list[dict[str, Any]] = []
 
     # 专用 OpenAPI 注解保留方法、路由和显示名的组合契约。
     for match in _OPENAPI_ENTRY.finditer(content):
@@ -255,7 +292,7 @@ def project_authoring_records(
             "resolution": "exact",
             "sourceLayer": "cst",
         }
-        bind_owner(record, content.count("\n", 0, match.start("method")) + 1)
+        record["declarationLine"] = content.count("\n", 0, match.start("method")) + 1
         result.append(record)
     # 后缀限制按大小写无关形式比较，保持规则包跨平台一致。
     suffix = Path(relative).suffix.casefold()
@@ -283,14 +320,21 @@ def project_authoring_records(
                 "location": {
                     "path": relative,
                     "startLine": start_line,
-                    "endLine": start_line,
+                    "startColumn": len(
+                        content[content.rfind("\n", 0, match.start()) + 1 : match.start()].encode()
+                    )
+                    + 1,
+                    "endLine": content.count("\n", 0, match.end()) + 1,
+                    "endColumn": len(
+                        content[content.rfind("\n", 0, match.end()) + 1 : match.end()].encode()
+                    )
+                    + 1,
                 },
                 "resolution": "heuristic",
                 "sourceLayer": "cst",
             }
-            bind_owner(record)
             result.append(record)
-    return result
+    return bind_authoring_records(result, entries) if entries is not None else result
 
 
 __all__ = [

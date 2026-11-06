@@ -31,11 +31,24 @@ class _UnsafeFrontmatter(ValueError):
 class _BoundedSafeLoader(yaml.SafeLoader):
     """SafeLoader with construction-time depth, node, and cycle limits."""
 
-    def __init__(self, stream: str) -> None:
+    def __init__(self, stream: str, *, reject_duplicates: bool = False) -> None:
         super().__init__(stream)
+        self._modus_reject_duplicates = reject_duplicates
         self._modus_nodes = 0
         self._modus_depth = 0
         self._modus_active_anchors: set[str] = set()
+
+    def construct_mapping(self, node, deep=False):
+        if self._modus_reject_duplicates:
+            seen: set[str] = set()
+            for key, _value in node.value:
+                if isinstance(key, yaml.ScalarNode) and key.tag != "tag:yaml.org,2002:merge":
+                    if key.value in seen:
+                        raise _UnsafeFrontmatter(
+                            f"frontmatter 第 {key.start_mark.line + 2} 行存在重复字段：{str(key.value)[:80]!r}"
+                        )
+                    seen.add(key.value)
+        return super().construct_mapping(node, deep=deep)
 
     def compose_node(self, parent, index):
         event = self.peek_event()
@@ -113,7 +126,7 @@ def _validate_loaded_yaml_graph(value: object) -> None:
         stack.extend((True, child, depth + 1) for child in reversed(children))
 
 
-def split_frontmatter(text: str) -> tuple[dict[str, Any], str]:
+def split_frontmatter(text: str, *, strict: bool = False) -> tuple[dict[str, Any], str]:
     """Split ``text`` into ``(frontmatter_dict, body)``.
 
     Returns ``({}, text)`` when there is no leading ``---`` frontmatter block or
@@ -128,13 +141,25 @@ def split_frontmatter(text: str) -> tuple[dict[str, Any], str]:
             raise _UnsafeFrontmatter("frontmatter 字符数超过预算")
         # Construct through SafeLoader directly so its resource bounds remain in
         # force; safe_load() alone would discard our depth and alias guards.
-        loader = _BoundedSafeLoader(source)
+        loader = _BoundedSafeLoader(source, reject_duplicates=strict)
         try:
             data = loader.get_single_data()
         finally:
             loader.dispose()
         _validate_loaded_yaml_graph(data)
-    except (yaml.YAMLError, RecursionError, _UnsafeFrontmatter):
+    except (yaml.YAMLError, RecursionError, _UnsafeFrontmatter) as exc:
+        if strict:
+            mark = getattr(exc, "problem_mark", None)
+            detail = (
+                str(exc)
+                if isinstance(exc, _UnsafeFrontmatter)
+                else (
+                    f"frontmatter 第 {mark.line + 2} 行 YAML 无效"
+                    if mark
+                    else "frontmatter 无效或超过解析预算"
+                )
+            )
+            raise ValueError(detail) from exc
         return {}, text
     if not isinstance(data, dict):
         return {}, m.group(2)

@@ -19,6 +19,8 @@ from modus.machine import (
 from modus.machine.errors import ProviderError
 from modus.machine.facts.build_context import BuildContextResolver
 from modus.machine.facts.compiler.cpp import _run_cpp
+from modus.machine.facts.compiler.go import _run_go
+from modus.machine.facts.compiler.java import _run_java
 from modus.machine.facts.extension_registry import (
     ExtensionRegistry,
     RegisteredImplementation,
@@ -27,6 +29,7 @@ from modus.machine.facts.extension_registry import (
 from modus.machine.facts.semantic_ir import SemanticFacts
 from modus.machine.facts.semantic_providers import run_compiler_analysis
 from modus.machine.facts.structural import extract
+from modus.machine.runtime.toolchains import java_executable
 from modus.paths import ModusPaths
 
 
@@ -35,6 +38,52 @@ def _write(path: Path, content: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8", newline="")
     return path
+
+
+def test_java_packaged_openapi_declarations_bind_once_with_compiler(tmp_path: Path) -> None:
+    if not java_executable("javac"):
+        pytest.skip("javac is unavailable")
+    from modus.machine.capability import compose
+    from modus.machine.corpus import freeze
+    from modus.machine.facts import observe
+    from modus.machine.resolution import resolve
+
+    _write(
+        tmp_path / "acme/ContractApi.java",
+        """package acme;
+@interface OpenApiPostMapping { String apiUrl(); String apiName(); }
+interface ContractApi {
+    @OpenApiPostMapping(apiUrl="/contracts", apiName="创建合同")
+    Boolean save(String request);
+    @OpenApiPostMapping(apiUrl="/contracts/by-id", apiName="按编号保存")
+    Boolean save(int request);
+}
+""",
+    )
+    corpus = freeze(tmp_path, compiler_mode="auto")
+    with corpus.activate():
+        resolved = resolve(observe(corpus))
+        packet = next(iter(resolved.source_evidence.packets.values()))
+        signals = [
+            row for row in packet["authoringRecords"] if row["ruleId"] == "builtin.openapi-entry"
+        ]
+        assert len(signals) == 2
+        assert len({row["entryId"] for row in signals}) == 2
+        assert all(
+            sum(
+                entry["location"]["startLine"] == row["location"]["startLine"]
+                for entry in packet["entries"]
+                if entry["kind"] == "method"
+            )
+            == 2
+            for row in signals
+        )
+        model = compose(resolved).model
+    assert {row.entry_signature for row in model.slices} == {
+        "POST /contracts",
+        "POST /contracts/by-id",
+    }
+    assert model.seed_count == 2
 
 
 # 最小多语言仓库同时提供源码与构建描述，验证单元发现而非目录猜测。
@@ -103,6 +152,48 @@ def test_cpp_provider_observes_declarations_and_calls(tmp_path: Path) -> None:
     assert any("compute" in name for name in names)
     # 真实提供者必须产生关系证据，仅识别名称不足以满足调用分析契约。
     assert any(edge.relation == "calls" for edge in facts.edges)
+
+
+@pytest.mark.parametrize("language", ["java", "go"])
+def test_compiler_keeps_nested_and_same_start_chained_calls(tmp_path: Path, language: str) -> None:
+    if language == "java":
+        if not java_executable("javac"):
+            pytest.skip("javac is unavailable")
+        _write(tmp_path / "pom.xml", "<project><modelVersion>4.0.0</modelVersion></project>\n")
+        _write(
+            tmp_path / "Chain.java",
+            """class Chain {
+ Chain next() { return this; }
+ Chain accept(Chain other) { return this; }
+ void run() { next().next().next(); accept(accept(this)); }
+}
+""",
+        )
+        provider = _run_java
+    else:
+        if not shutil.which("go"):
+            pytest.skip("go is unavailable")
+        _write(tmp_path / "go.mod", "module example.test/chain\ngo 1.21\n")
+        _write(
+            tmp_path / "chain.go",
+            """package chain
+type Chain struct{}
+func (c Chain) Next() Chain { return c }
+func (c Chain) Accept(other Chain) Chain { return c }
+func (c Chain) Run() { c.Next().Next().Next(); c.Accept(c.Accept(c)) }
+""",
+        )
+        provider = _run_go
+    paths, config = ModusPaths.for_root(tmp_path), ModusConfig()
+    context = BuildContextResolver(paths, config, materialize=False).resolve()
+    unit = next(unit for unit in context.units if unit.language == language)
+    facts = provider(paths, config, unit)
+    calls = [edge for edge in facts.edges if edge.operation.casefold() in {"next", "accept"}]
+    assert len(calls) == len({edge.id for edge in calls}) == 5
+    chain = [edge.call_site for edge in calls if edge.operation.casefold() == "next"]
+    assert len({(anchor.line, anchor.column) for anchor in chain if anchor}) == 1
+    assert len({(anchor.end_line, anchor.end_column) for anchor in chain if anchor}) == 3
+    assert not [item for item in facts.dispositions if item.status in {"conflict", "rejected"}]
 
 
 # 只替换 Python 提供者，其余注册项复用内置集合。

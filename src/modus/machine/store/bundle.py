@@ -483,7 +483,9 @@ def _verify_directory(
             progress.advance(verified_pages, unit="pages", force=True)
         record_ids: set[str] = set()
         for _key, value in records:
-            if name == "snapshot":
+            if name == "snapshot" and value.get("kind") == "coverageGap":
+                parse_record(value)
+            elif name == "snapshot":
                 record_type = value.get("recordType")
                 if record_type not in {"source", "buildUnit", "buildUnitSource"}:
                     raise IntegrityError("machine.store.snapshot-record-kind")

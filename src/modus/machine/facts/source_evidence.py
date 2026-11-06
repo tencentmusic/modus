@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from modus.config import AuthoringRule
 from modus.paths import ModusPaths
 
 from ..corpus.input_snapshot import InputSnapshot
@@ -25,7 +24,7 @@ from ..store.contracts import SCHEMA_VERSION
 from .compiler.models import CompilerSemanticResult
 from .entry_observation import entry_identity, normalize_extraction, source_location
 from .language_capabilities import capability_for
-from .rule_signals import project_authoring_records
+from .rule_signals import bind_authoring_records
 
 _RESOLUTIONS = frozenset({"exact", "candidate", "heuristic", "unresolved"})
 
@@ -137,7 +136,8 @@ def observe_source_evidence(
     compiler: CompilerSemanticResult,
     *,
     baseline_digest: str,
-    authoring_rules: tuple[AuthoringRule, ...] = (),
+    rule_observations: Mapping[str, list[dict[str, Any]]],
+    materials: Mapping[str, list[dict[str, Any]]] | None = None,
 ) -> SourceEvidence:
     """Observe source-backed entries and resolved relations exactly once."""
     files: defaultdict[str, dict[str, list[dict[str, Any]]]] = defaultdict(
@@ -192,12 +192,16 @@ def observe_source_evidence(
     for relative, frozen in sorted(snapshot.files.items()):
         capability = capability_for(Path(relative))
         # 文档由知识通道处理，不混入源码语义观察。
-        if capability.role == "document":
+        if capability.role == "document" and relative not in (materials or {}):
             continue
         roles[relative] = source_role(relative)
         try:
             content = frozen.read_text()
-            evidence = normalize_extraction(relative, content, files[relative])
+            evidence = (
+                {"entries": [], "relations": [], "gaps": []}
+                if relative in (materials or {})
+                else normalize_extraction(relative, content, files[relative])
+            )
             evidence_tier, degradation_reason = _observed_tier(compiler, relative)
             entries = []
             for entry in evidence.get("entries", []):
@@ -236,16 +240,16 @@ def observe_source_evidence(
                 relations.append(row)
             # 复制缺口记录，避免后续增加文件路径时修改提取器结果。
             packet_gaps = [dict(item) for item in evidence.get("gaps", [])]
-            packet = {
+            packet: dict[str, Any] = {
                 "schemaVersion": SCHEMA_VERSION,
                 "path": relative,
                 "sourceDigest": frozen.digest,
                 "baselineDigest": baseline_digest,
                 "entries": entries,
                 "relations": relations,
-                "authoringRecords": project_authoring_records(
-                    relative, content, authoring_rules, entries=entries
-                ),
+                "authoringRecords": [dict(row) for row in materials[relative]]
+                if materials and relative in materials
+                else bind_authoring_records(rule_observations.get(relative, []), entries),
                 "coverageGaps": packet_gaps,
             }
             # 包键基于路径摘要，文件内容变化由独立的源码摘要表达。
@@ -285,6 +289,25 @@ def observe_source_evidence(
                     "summary": type(exc).__name__,
                 }
             )
+    # 只关联材料中明确写出的标识；同名声明保留全部候选，不写入代码社区图。
+    declarations: defaultdict[str, set[str]] = defaultdict(set)
+    for packet in packets.values():
+        for entry in packet["entries"]:
+            for name in (entry.get("symbol"), entry.get("declarationName")):
+                if name:
+                    declarations[str(name)].add(str(entry["entryId"]))
+    for packet in packets.values():
+        for row in packet["authoringRecords"]:
+            if row.get("materialType"):
+                row["associations"] = [
+                    {
+                        "mention": name,
+                        "entryIds": sorted(declarations[name]),
+                        "basis": "explicit-identifier",
+                    }
+                    for name in row.get("mentions", [])
+                    if name in declarations
+                ]
     # 索引与包共享基线摘要，使读取方可拒绝混用不同分析批次。
     index = {
         "schemaVersion": SCHEMA_VERSION,

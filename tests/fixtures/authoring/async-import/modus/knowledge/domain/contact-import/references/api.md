@@ -73,9 +73,18 @@ accepted = importer.submit("tenant-demo-a", "batch-a", [
 首次创建的示例响应如下。这里展示完整的空结果响应，执行后的逐行形状见[对象专题](object.md)。
 
 ```json
-{"job_id":"import-1","status":"queued","total":3,"processed":0,
- "written":0,"rejected":0,"attempts":0,"retryable":false,
- "error":null,"results":[]}
+{
+  "job_id": "import-1",
+  "status": "queued",
+  "total": 3,
+  "processed": 0,
+  "written": 0,
+  "rejected": 0,
+  "attempts": 0,
+  "retryable": false,
+  "error": null,
+  "results": []
+}
 ```
 
 同租户、同键且原始载荷相同，返回原任务的**当前**快照，不新增任务、不再次入队。若任务已经部分成功，重复提交会直接返回 `partial`，不会重新执行。对象键的排列不影响指纹，但行顺序、空格和邮箱大小写会影响；不能用执行时邮箱归一化来推导提交幂等。
@@ -115,13 +124,37 @@ observed = importer.query("tenant-demo-a", accepted["job_id"])
 完整查询响应如下；`written=2` 包括一次创建、一次更新，不表示新增两个人。
 
 ```json
-{"job_id":"import-1","status":"partial","total":3,"processed":3,
- "written":2,"rejected":1,"attempts":1,"retryable":false,"error":null,
- "results":[
-   {"row_index":0,"email":"alpha@example.test","outcome":"created","reason":null},
-   {"row_index":1,"email":"bad-address","outcome":"rejected","reason":"invalid_email"},
-   {"row_index":2,"email":"alpha@example.test","outcome":"updated","reason":null}
- ]}
+{
+  "job_id": "import-1",
+  "status": "partial",
+  "total": 3,
+  "processed": 3,
+  "written": 2,
+  "rejected": 1,
+  "attempts": 1,
+  "retryable": false,
+  "error": null,
+  "results": [
+    {
+      "row_index": 0,
+      "email": "alpha@example.test",
+      "outcome": "created",
+      "reason": null
+    },
+    {
+      "row_index": 1,
+      "email": "bad-address",
+      "outcome": "rejected",
+      "reason": "invalid_email"
+    },
+    {
+      "row_index": 2,
+      "email": "alpha@example.test",
+      "outcome": "updated",
+      "reason": null
+    }
+  ]
+}
 ```
 
 用 `tenant-demo-b` 查询这个任务会抛出 `JobNotFound`，与查询不存在的 `import-999` 相同；两种失败都不改变任务、队列或联系人。服务没有通过该异常区分“别人的任务”和“根本不存在”。
@@ -168,11 +201,25 @@ finished = recovery.run_next()
 这个独立实例的任务号也是 `import-1`，不与前一实例共享身份。`queued` 的完整响应如下，最后一次 `run_next` 才真正继续执行：
 
 ```json
-{"job_id":"import-1","status":"queued","total":2,"processed":1,
- "written":1,"rejected":0,"attempts":1,"retryable":false,"error":null,
- "results":[
-   {"row_index":0,"email":"gamma@example.test","outcome":"created","reason":null}
- ]}
+{
+  "job_id": "import-1",
+  "status": "queued",
+  "total": 2,
+  "processed": 1,
+  "written": 1,
+  "rejected": 0,
+  "attempts": 1,
+  "retryable": false,
+  "error": null,
+  "results": [
+    {
+      "row_index": 0,
+      "email": "gamma@example.test",
+      "outcome": "created",
+      "reason": null
+    }
+  ]
+}
 ```
 
 继续执行成功后，状态为 `succeeded`，处理数和写入数均为 2，次数为 2，两条结果都是 `created`。第一条结果没有重做为更新。重新排队后的错误虽然清空，但完成必须以这次执行或之后的查询为准。

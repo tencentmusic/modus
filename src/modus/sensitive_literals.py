@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Mapping, Sequence, Set
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Final
 
 
@@ -144,6 +145,17 @@ def sensitive_literal_findings(
 
     if limit < 1:
         return ()
+
+    # 同次发布中的协议键和短文本大量重复；缓存只复用字符串匹配，
+    # 每个出现位置仍遍历并报告。长源码不驻留，缓存随本次检查释放。
+    @lru_cache(maxsize=2048)
+    def short_text_kinds(text: str) -> tuple[str, ...]:
+        return tuple(rule.kind for rule in _RULES if rule.pattern.search(text))
+
+    @lru_cache(maxsize=256)
+    def short_key_segment(text: str) -> str:
+        return _pointer_segment(text)
+
     pending: list[tuple[str, object]] = [("", value)]
     visited: set[int] = set()
     findings: list[SensitiveLiteralFinding] = []
@@ -154,11 +166,15 @@ def sensitive_literal_findings(
         if on_progress is not None and inspected % _PROGRESS_STRIDE == 0:
             on_progress(inspected)
         if isinstance(current, str):
-            for rule in _RULES:
-                if rule.pattern.search(current):
-                    findings.append(SensitiveLiteralFinding(rule.kind, pointer or "/"))
-                    if len(findings) >= limit:
-                        break
+            kinds = (
+                short_text_kinds(current)
+                if len(current) <= 4096
+                else tuple(rule.kind for rule in _RULES if rule.pattern.search(current))
+            )
+            for kind in kinds:
+                findings.append(SensitiveLiteralFinding(kind, pointer or "/"))
+                if len(findings) >= limit:
+                    break
             continue
         identity = id(current)
         if identity in visited:
@@ -166,7 +182,8 @@ def sensitive_literal_findings(
         if isinstance(current, Mapping):
             visited.add(identity)
             for key, item in reversed(tuple(current.items())):
-                segment = _pointer_segment(key)
+                text = str(key)
+                segment = short_key_segment(text) if len(text) <= 80 else _pointer_segment(text)
                 pending.append((f"{pointer}/{segment}", item))
                 pending.append((f"{pointer}/<key>", key))
         elif isinstance(current, (Sequence, Set)) and not isinstance(

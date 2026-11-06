@@ -109,8 +109,26 @@ def project(
             "reasonCode": "machine.projection.community-unavailable",
             "summary": safe_error_summary(exc),
         }
-    evidence_index = resolved.source_evidence.index
-    evidence_packets = resolved.source_evidence.packets
+    # N5 添加归属和预算说明，不能反写 N3 的冻结观察。
+    evidence_index = {
+        **resolved.source_evidence.index,
+        "files": [
+            dict(row)
+            for row in resolved.source_evidence.index.get("files", [])
+            if isinstance(row, Mapping)
+        ],
+    }
+    evidence_packets = {
+        key: {
+            **packet,
+            **{
+                name: [dict(row) for row in packet.get(name, []) if isinstance(row, Mapping)]
+                for name in ("entries", "relations", "authoringRecords", "coverageGaps")
+            },
+        }
+        for key, packet in resolved.source_evidence.packets.items()
+    }
+    seed_inventory = {row["entryId"]: row for row in capabilities.model.seed_inventory}
     evidence_gaps = [dict(item) for item in resolved.source_evidence.coverage_gaps]
     evidence_gaps.extend(
         dict(item)
@@ -178,6 +196,8 @@ def project(
             for row in packet.get(kind, []):
                 identity = str(row.get("source" if kind == "relations" else "entryId") or "")
                 binding = by_entry.get(identity, EntryMembership())
+                if kind == "entries" and identity in seed_inventory:
+                    row["capabilitySeed"] = dict(seed_inventory[identity])
                 row["candidateIds"] = list(binding.candidate_ids)
                 row["capabilityIds"] = list(binding.capability_ids)
                 if not binding.candidate_ids:

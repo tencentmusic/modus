@@ -71,7 +71,10 @@ def load_authoring_plan(
                 f"发布需要唯一执行卡： {exc.kind}",
             )
         ]
-    frontmatter, _body = split_frontmatter(text)
+    try:
+        frontmatter, _body = split_frontmatter(text, strict=True)
+    except ValueError as exc:
+        return None, [finding(CARD_DOCUMENT, "authoring-card-invalid", str(exc))]
     modus = string_mapping(frontmatter.get("modus"))
     authoring = string_mapping(modus.get("authoring") if modus is not None else None)
     if authoring is None:
@@ -276,7 +279,8 @@ def verify_module_execution(
             finding(
                 CARD_DOCUMENT,
                 "authoring-module-evidence-reason-missing",
-                f"Module {domain}/{module} 的证据模式 {mode!r} needs a reason",
+                f"Module {domain}/{module} 的证据模式 {mode!r} 需要回退原因",
+                field=f"modus.authoring.domains.{domain}.modules.{module}.evidence.reason",
             )
         )
     return status if isinstance(status, str) else None, findings

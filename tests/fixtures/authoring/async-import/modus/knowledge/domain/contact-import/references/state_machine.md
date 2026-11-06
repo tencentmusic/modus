@@ -32,12 +32,12 @@ stateDiagram-v2
     [*] --> queued: 新批次通过结构与幂等检查
     queued --> running: 显式执行队列最早任务
     running --> succeeded: 所有行有效
-    running --> partial: 全部处理且有有效行和拒绝行
-    running --> failed: 全部拒绝或发生模拟存储故障
-    failed --> queued: 存储故障且仍有恢复次数，显式重排
+    running --> partial: 全部处理<br/>有效与拒绝并存
+    running --> failed: 全部拒绝<br/>或模拟存储故障
+    failed --> queued: 可恢复存储故障<br/>显式重排
     succeeded --> [*]
     partial --> [*]
-    failed --> [*]: 数据全拒绝或存储故障耗尽次数
+    failed --> [*]: 全拒绝或次数耗尽
 ```
 
 图中 `failed` 有两种不同性质。全行拒绝表示业务检查已经结束；存储故障表示执行被打断。只有后一种且 `retryable=true` 才能回到等待状态。查询、同键同载荷重复提交、非法恢复请求都不会产生状态转换，因此没有画成新的箭头。

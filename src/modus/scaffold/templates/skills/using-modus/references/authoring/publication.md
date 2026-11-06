@@ -102,6 +102,8 @@ init/reinit 中工具不可用、只完成部分预览或用户明确将视觉�
 
 ## 机械核验与发布承诺
 
+写作中尚未落地的计划目标保留在原卡及下一动作；终稿前补齐、修正或有依据地移除所有悬空引用，不能用计划内缺项解释最终断链。源码锚点按当前文件的真实声明、所属对象、签名与范围核验；注释、字符串和调用处不是声明，重载歧义不得自动选首项。
+
 普通 `modus knowledge verify --json` 只检查机械完整性：Markdown 可读与 fence 闭合、canonical 知识路径、相对链接和锚点、仓库相对源码引用、锚点漂移、本机绝对路径、高置信敏感值、路径/符号链接安全，以及声明过的 Module metadata 能否解析且不与物理身份冲突。需要局部反馈时可以运行 `--domain <slug>`。
 
 init/reinit 终稿在删除执行卡之前运行一次 `modus knowledge verify --publication --json`；工作区从根目录为每个已确认创作成员传入 `--member <member-id>`。发布模式读取唯一执行卡中的相应计划，并额外核对：确认的 Domain/Module 是否全部落地并 reviewed；每个 Module 是否记录精确 requestedScope、selector 与 ready evidence；每个 Domain 是否完成源码 coverage；outcome 是否终结；四个 Domain Business 索引是否位于 canonical 路径；implemented Module 是否有至少一个 frontmatter `anchors.locations`；机器生成正文是否没有源码路径；每项图表决定是否记录 readerQuestion/mechanism 并按 visual id 落地或带理由豁免。

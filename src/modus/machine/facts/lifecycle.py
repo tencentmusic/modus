@@ -14,7 +14,8 @@ from ..languages import validate_language_registry
 from ..states import Completeness, ExecutionStatus
 from .compiler.models import CompilerSemanticResult
 from .extension_registry import builtin_extensions
-from .rule_signals import LoadedAuthoringRules, load_authoring_rules
+from .materials import observe_material
+from .rule_signals import LoadedAuthoringRules, load_authoring_rules, project_authoring_records
 from .semantic_providers import run_compiler_analysis
 from .structural import extract
 
@@ -31,6 +32,8 @@ class ObservedProgramFacts:
     compiler_snapshot: dict[str, Any]
     authoring_rules: LoadedAuthoringRules
     stage_summary: dict[str, dict[str, Any]]
+    materials: dict[str, list[dict[str, Any]]]
+    rule_observations: dict[str, list[dict[str, Any]]]
 
 
 # 先验证配置身份，再运行彼此独立的结构、编译与规则生产者。
@@ -43,6 +46,16 @@ def observe(corpus: FrozenCorpus) -> ObservedProgramFacts:
     corpus.verify_configuration()
     authoring_rules = load_authoring_rules(corpus.paths, corpus.config)
     files = [item.path for item in corpus.snapshot.files.values()]
+    materials = {
+        path: observe_material(path, frozen.read_text())
+        for path, frozen in corpus.snapshot.files.items()
+        if frozen.path.suffix.casefold() in {".md", ".markdown", ".txt"}
+    }
+    rule_observations = {
+        path: project_authoring_records(path, frozen.read_text(), authoring_rules.rules)
+        for path, frozen in corpus.snapshot.files.items()
+        if path not in materials
+    }
     extraction = (
         extract(files, cache_root=corpus.paths.root)
         if files
@@ -103,6 +116,8 @@ def observe(corpus: FrozenCorpus) -> ObservedProgramFacts:
         compiler_snapshot,
         authoring_rules,
         stages,
+        materials,
+        rule_observations,
     )
 
 

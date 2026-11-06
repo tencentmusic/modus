@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from modus.machine.errors import BudgetError, ContractError, IntegrityError
 from modus.machine.store import bundle as bundle_store
 from modus.machine.store import catalog
+from modus.machine.store.bundle_catalogs import service_catalog
 from modus.machine.store.catalog import CatalogRecord
 from modus.machine.store.contracts import (
     CATALOG_MAX_BYTES,
@@ -47,6 +48,95 @@ def _record_document() -> dict[str, Any]:
         "recordCount": 1,
         "value": {},
     }
+
+
+def test_service_catalog_preserves_diagnostic_identity_and_real_sources(tmp_path: Path) -> None:
+    diagnostics = [
+        {
+            "code": "machine.facts.unresolved",
+            "provider": "java",
+            "buildUnitId": f"unit-{index}",
+            "subject": f"symbol-{index}",
+        }
+        for index in range(140)
+    ]
+    reference = service_catalog(
+        tmp_path,
+        {
+            "nodes": [
+                {"id": "unknown", "kind": "repository", "qualifiedName": "acme.Project"},
+                {
+                    "id": "declared",
+                    "kind": "component",
+                    "qualifiedName": "acme.Service",
+                    "displayName": "合同服务",
+                    "sourceAnchors": [{"file": "Service.java", "line": 3}],
+                },
+                {
+                    "id": "dynamic",
+                    "kind": "table",
+                    "qualifiedName": "dynamic-table",
+                    "sourceAnchors": [{"file": "Service.java", "line": 7}],
+                    "attributes": {"dynamic": True, "sourceBasis": "relation"},
+                },
+                {
+                    "id": "configured",
+                    "kind": "service",
+                    "qualifiedName": "declared-service",
+                    "sourceAnchors": [{"file": "service.yaml", "line": 2}],
+                },
+            ],
+            "edges": [
+                {
+                    "id": "derived",
+                    "from": "declared",
+                    "to": "dynamic",
+                    "relation": "writes",
+                    "callSite": {"file": "Service.java", "line": 7},
+                },
+            ],
+            "coverageGaps": [*diagnostics, diagnostics[0]],
+        },
+        {
+            "sources": [
+                {"path": ".cursorrules", "sha256": "a" * 64},
+                {"path": "Service.java", "sha256": "b" * 64},
+                {"path": "service.yaml", "sha256": "c" * 64, "role": "configuration"},
+            ]
+        },
+    )
+    records, _ = catalog.walk_catalog(
+        tmp_path,
+        root_path=reference.path,
+        root_digest=reference.digest,
+        expected_catalog="services",
+    )
+    values = [cast(dict[str, Any], value) for _, value in records]
+    gaps = [value for value in values if value.get("reasonCode") == "machine.facts.unresolved"]
+    assert len(gaps) == len({value["recordId"] for value in gaps}) == 140
+    assert {value["details"]["buildUnitId"] for value in gaps} == {f"unit-{i}" for i in range(140)}
+    boundaries = {
+        value["details"].get("boundaryId"): value
+        for value in values
+        if value["details"].get("recordType") == "serviceBoundary"
+    }
+    assert boundaries["unknown"]["witness"] is None
+    assert boundaries["unknown"]["kind"] == "coverageGap"
+    assert boundaries["declared"]["details"]["name"] == "acme.Service"
+    assert boundaries["declared"]["details"]["displayName"] == "合同服务"
+    assert boundaries["dynamic"]["details"]["resourceNature"] == "dynamic-reference"
+    assert boundaries["dynamic"]["details"]["sourceBasis"] == "relation"
+    assert boundaries["configured"]["details"]["sourceBasis"] == "configuration"
+    assert boundaries["configured"]["witness"]["path"] == "service.yaml"
+    assert all(
+        value["witness"]["path"] in {"Service.java", "service.yaml"}
+        for value in values
+        if value["witness"]
+    )
+    relation = next(
+        value for value in values if value["details"].get("recordType") == "serviceRelation"
+    )
+    assert relation["witness"]["startLine"] == 7
 
 
 # 两条有序记录同时提供非空键范围和计数，便于单点篡改。
@@ -210,7 +300,7 @@ def test_catalog_write_walk_and_disjoint_range_reads(tmp_path: Path) -> None:
 
 
 # 逐记录存储与打包页共享相同目录语义，两条路径都需覆盖。
-# 重复键会破坏确定性寻址，应在写目录时拒绝。
+# 完全重复观察可幂等写入，同键异内容必须拒绝。
 # 越界、缺失、坏 JSON 和摘要失配是不同失败原因。
 # 坏 JSON 使用其真实摘要，确保失败进入解析校验而非先被摘要拦截。
 # 错误分类帮助维护者分辨损坏、漂移与无效请求。
@@ -233,13 +323,20 @@ def test_unpacked_catalog_and_load_failures_are_explicit(tmp_path: Path) -> None
     )
     assert [key for key, _value in walked] == ["a", "b"]
 
+    repeated = catalog.write_catalog(
+        tmp_path,
+        catalog="scope",
+        index_path="repeated/index.json",
+        records=(records[0], records[0]),
+    )
+    assert repeated.record_count == 1
     _assert_integrity(
         "machine.store.catalog-duplicate-key",
         catalog.write_catalog,
         tmp_path,
         catalog="scope",
         index_path="duplicate/index.json",
-        records=(records[0], records[0]),
+        records=(records[0], CatalogRecord("a", {"value": 2}, "records/a.json")),
     )
     _assert_integrity(
         "machine.store.catalog-path",
@@ -433,3 +530,81 @@ def test_open_bundle_authenticates_the_composed_bundle_digest(
         ModusPaths.for_root(tmp_path),
         identity,
     )
+
+
+def test_projection_preserves_full_occurrence_and_context_identity() -> None:
+    from modus.machine.store.bundle_catalogs import _evidence_record
+
+    raw: dict[str, Any] = {
+        "source": "caller",
+        "target": "callee",
+        "relation": "calls",
+        "contextId": "main",
+        "location": {
+            "path": "a.java",
+            "startLine": 2,
+            "startColumn": 1,
+            "endLine": 2,
+            "endColumn": 12,
+        },
+    }
+
+    def project(row):
+        return _evidence_record(
+            raw=row, path="a.java", source_digest="a" * 64, candidate_ids=(), kind="relation"
+        )
+
+    first = project(raw)
+    longer = project({**raw, "location": {**raw["location"], "endColumn": 20}})
+    other_context = project({**raw, "contextId": "test"})
+    assert len({first["recordId"], longer["recordId"], other_context["recordId"]}) == 3
+    assert project(raw) == first
+
+
+def test_material_candidate_fanout_is_bounded_without_mutating_observations() -> None:
+    from modus.machine.store.bundle import canonical_bytes
+    from modus.machine.store.bundle_catalogs import _evidence_record
+
+    identities = [f"entry:{index:032x}" for index in range(10_000)]
+    raw: dict[str, Any] = {
+        "materialType": "text",
+        "content": "调用 `save`。",
+        "associations": [
+            {"mention": "save", "entryIds": identities, "basis": "explicit-identifier"}
+        ],
+        "location": {"startLine": 1, "endLine": 1},
+    }
+    record = _evidence_record(
+        raw=raw, path="guide.md", source_digest="a" * 64, candidate_ids=(), kind="resource"
+    )
+    association = cast(dict[str, Any], record["details"])["associations"][0]
+    assert association["entryIds"] == identities[:32]
+    assert association["entryIdsOmittedCount"] == len(identities) - 32
+    assert len(canonical_bytes(record)) < EvidenceBudget().max_bytes
+    assert raw["associations"][0]["entryIds"] == identities
+
+
+def test_gap_identity_preserves_nested_source_ranges() -> None:
+    from modus.machine.store.bundle_catalogs import _coverage_gap
+    from modus.machine.store.evidence_records import gap_record
+
+    witnesses = [Witness("a.java", "a" * 64, "caller", 3, end) for end in (3, 8)]
+    records = [gap_record("machine.facts.unresolved", witness=w) for w in witnesses]
+    assert records[0].record_id != records[1].record_id
+    assert gap_record("machine.facts.unresolved", witness=witnesses[0]) == records[0]
+    locations = [
+        {"startLine": 3, "startColumn": 1, "endLine": 3, "endColumn": column} for column in (12, 20)
+    ]
+    projected = [
+        _coverage_gap(
+            {"reasonCode": "machine.facts.unresolved", "location": location},
+            path="a.java",
+            source_digest="a" * 64,
+            candidate_ids=(),
+        )
+        for location in locations
+    ]
+    assert projected[0]["recordId"] != projected[1]["recordId"]
+    details = projected[1]["details"]
+    assert isinstance(details, dict)
+    assert details["location"] == locations[1]

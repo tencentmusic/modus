@@ -114,11 +114,12 @@ def build_unit_memberships(
 ) -> dict[str, tuple[tuple[str, ...], str]]:
     """Return all memberships and one stable primary unit per source path."""
 
-    prepared: list[tuple[str, str, tuple[str, ...]]] = []
+    # 每个源文件都要核对构建归属；只构造一次集合，避免反复线性扫描单元文件表。
+    prepared: list[tuple[str, str, frozenset[str]]] = []
     for raw in units:
         unit_id = str(raw.get("id") or "")
         root = str(raw.get("root") or ".").strip("/")
-        files = tuple(
+        files = frozenset(
             str(value) for value in raw.get("files", ()) if isinstance(value, str) and value
         )
         if unit_id:

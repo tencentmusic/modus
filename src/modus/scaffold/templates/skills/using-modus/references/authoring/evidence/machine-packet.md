@@ -72,6 +72,8 @@ K5 按“工程主题 → 机制源码范围 → 机器请求/同源记录 → �
 - 同一种信号在不同 intent 中的位置不同：`module-authoring` 优先放在 `proposals[].authoringSignals[].details`，未绑定候选的放在 `ambiguities[].signal.details`；`constraint-extraction` 和 `coverage-audit` 按 kind 将扁平 `authoringSignal` 分别放在 `proposals`（entry）、`terminalEffects`（effect）、`authoritativeObjects`（resource）。不能只读 `evidence` 或只读候选摘要而漏掉这些材料。按 `recordId` 识别同源记录，结合 `recordType`、`evidenceKind`、来源和精度解释，不能仅凭所在数组把资源线索认作权威实体、把写入线索认作最终完成。
 - `evidence` 保留完整记录身份、kind、resolution、sourceLayer、witness 和 details。scopeSummary/sourceFile 是库存导航；sourceEntry/sourceRelation/serviceRelation 是待核对的声明或关系，均不自动证明业务结论。
 - `coverageGaps` 汇总主查询、信号、库存和路径查询缺口；源码漂移、不可读或只有缺口时不能成为 complete。与当前结论有关的缺口即使已有其他正向证据仍需处理。
+- 大量连续缺口可以汇总为 `machine.packet.coverage-gap-summary`；`totalCount`、原因计数和代表项只说明范围，不表示详情已读。需要详情时按其中 `expansionQuery` 从头查询 `recordTypes: ["coverageGap"]`，再用该查询自己的游标分页。缺口专用页可以只有 `coverageGaps`；普通页有正向证据也不能消除相关缺口。
+- 服务边界的限定名、显示名和稳定 ID 分别使用。调用推导的资源引用、动态名称和已声明资源不等于已部署资源；无来源记录会成为具名缺口，需回到对应配置或调用补证，不能引用无关文件填充来源。
 - `coverageReceipt` 描述**本包交付**，counts 对应最终裁剪后的内容；候选内的上游 receipt/精度还要单独阅读。complete 不证明源码完整、所有入口已归属或正文已消费。`representativePaths` 计数按整条路径，`navigationSteps` 按步骤；步骤具有 stepIndex，按 capabilityId/pathIndex 分组，不能把不同路径拼接成一条。
 - `omittedCounts` 包含未交付记录、路径或仍有后续页的查询数，后者不是精确剩余记录数。预算内只交付连续且有终点的代表路径；未交付路径、被裁剪缺口仍可通过保留的 `expansionQueries` 定向查看。
 - `expansionHandles` 的 boundary 用 `--boundary-id` 定向读取 services；candidate/capability/path/symbol 各用对应参数。`expansionQueries` 是可选取证入口，不是要求耗尽全部游标的任务清单。
@@ -96,3 +98,11 @@ context 无匹配证据、source-changed、partial 或 budget-exhausted 时，�
 同一 Domain 内先从执行卡核对 Module 到精确 selector 的映射，再执行不重复的 context 请求；相同 selector 和双摘要不得因写不同专题而重跑，互不依赖的精确请求可并发取得。汇总 packet 给出的 source anchor、path 和 symbol，去重后分批读取当前源码，一次场景调查同时服务六专题与 Module。结论改变、证据缺口或上下文压缩后原证据已不可用时，按[逐域加载与恢复](scope-modeling.md#逐域加载与恢复)定向重新请求或回读所需证据；恢复不重跑 build、不读取 bundle 内部文件，也不触发全仓重扫。原证据仍在当前上下文且身份与范围一致时复用，避免逐文件、逐章节反复 `sed`/搜索。同一 Domain 只能有一个正文所有者；用户明确授权时，不同完整 Domain 可以按[并行撰写协议](../parallel-domain-authoring.md)由不同作者处理。
 
 边界过滤仅适用于 `service-boundary` intent 或 `select --view services`；其他组合明确拒绝，不能把回显的 boundaryIds 当成已执行过滤。文件相关信号若没有声明归属，会保留为 unbound 歧义及展开线索，不属于提案的已绑定证据；代表路径以外的已观察关联仍可交付，但不证明遍历完整。
+
+### 对象与入口库存
+
+`sourceEntry.objectFacts` 表达声明类型、显式初始化、注解依据、可选成员和明确序列化名；枚举实参仍是声明事实，不自动等于线上的编码。`hasInitializer: false` 不代表值为 false；Java `Boolean` 与 `boolean`、省略与 null、字段初始化与反序列化/业务赋值分别核对。解释深度按[对象合同](../framework/deliverables/object.md)，需要运行结论时继续回读构造、映射和使用者。
+
+公开记录的细节也有长度边界：`<字段名>OmittedCount` 表示列表省略项数，材料关联的 `entryIdsOmittedCount` 表示同名候选未展示数量；需要补证时按材料原文与符号查询定位，不能把展示候选认作全部。`signatureOmittedCharacters` 合计上游观察和公开投影的已知签名截断量，`initializerOmittedCharacters` 表示初始化表达式省略字符数。它们不是完整声明；若省略部分影响类型、默认或行为判断，按见证位置回读当前源码，不能把展示前缀当作完整值。
+
+`sourceEntry.capabilitySeed` 保留有效入口摘要与 `expanded / not-expanded` 及原因；深度展开预算不删除入口。按真实入口集合逐项对账，区分未展开、未解析和确实不存在；查询不重新执行 N4。

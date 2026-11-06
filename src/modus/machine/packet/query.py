@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+from collections import Counter
+from collections.abc import Iterable, Iterator
+from itertools import groupby
 
 from modus.knowledge_reader import read_bound_regular_bytes
 from modus.machine.errors import BudgetError, InvariantError
@@ -112,7 +115,7 @@ def _record_kind_match(
     record: EvidenceRecord, record_types: set[str], evidence_kinds: set[str]
 ) -> bool:
     # 缺口属于所选源码范围，不因只取某一正向记录类别而消失。
-    if isinstance(record, CoverageGap):
+    if isinstance(record, CoverageGap) or record_types == {"coverageGap"}:
         return True
     details = record.details
     return (not record_types or str(details.get("recordType") or "") in record_types) and (
@@ -429,6 +432,7 @@ def _selection_records(
             else [load_catalog_range(bundle, "evidence", start_key=after_key)]
         )
         parsed = _parse_unique(evidence_ranges)
+        parsed.extend(_parse_unique([_prefix_records(bundle, "snapshot", "selection:")]))
         selected = [
             (key, record)
             for key, record in parsed
@@ -507,6 +511,47 @@ def _make_selection(
     )
 
 
+def _summarize_gap_runs(
+    records: Iterable[tuple[str, EvidenceRecord]],
+    request: EvidenceQuery,
+) -> Iterator[tuple[str, EvidenceRecord]]:
+    """默认页保留有界缺口摘要；完整记录通过同范围的 coverageGap 查询读取。"""
+    for is_gap, rows in groupby(records, key=lambda item: isinstance(item[1], CoverageGap)):
+        if not is_gap:
+            yield from rows
+            continue
+        run = list(rows)
+        if (
+            len(run) <= 8
+            and sum(len(canonical_bytes(row.to_dict())) for _, row in run)
+            <= request.budget.max_bytes // 4
+        ):
+            yield from run
+            continue
+        reasons = Counter(row.reason_code for _, row in run if isinstance(row, CoverageGap))
+        counted = reasons.most_common(8)
+        summary = gap_record(
+            "machine.packet.coverage-gap-summary",
+            details={
+                "totalCount": len(run),
+                "reasonCounts": dict(counted),
+                "otherReasonCount": sum(reasons.values()) - sum(count for _, count in counted),
+                "representativeRecordIds": [row.record_id for _, row in run[:3]],
+                "expansionQuery": {
+                    "view": request.view,
+                    "candidateIds": list(request.candidate_ids),
+                    "capabilityIds": list(request.capability_ids),
+                    "boundaryIds": list(request.boundary_ids),
+                    "paths": list(request.paths),
+                    "symbols": list(request.symbols),
+                    "recordTypes": ["coverageGap"],
+                },
+            },
+        )
+        # 摘要覆盖这个连续区间，游标只越过已计数的缺口；不越过正向证据。
+        yield run[-1][0], summary
+
+
 # 游标先验证查询归属，再从其后开始交付，避免跨筛选条件续读。
 # 数量预算只计算正向证据，缺口仍受完整响应字节预算限制。
 # 每次尝试加入条目都计算包含游标的最终封套大小。
@@ -529,16 +574,25 @@ def query_evidence(bundle: AnalysisBundle, query: EvidenceQuery) -> EvidencePage
         for key, record in _selection_records(bundle, request, after_key=after_key)
         if key > after_key
     ]
+    gaps_only = set(request.record_types) == {"coverageGap"}
     page: list[tuple[str, EvidenceRecord]] = []
     positive_count = 0
     # 源码核验缓存限定在一次查询中，下次读取仍可发现新漂移。
     # None 表示本轮已尝试但不可读，不能与未检查混淆。
     source_digest_cache: dict[str, str | None] = {}
-    for index, (key, record) in enumerate(matching):
-        if positive_count >= request.budget.max_items:
-            break
-        item = (key, _current_record(bundle, record, source_digest_cache))
-        has_more = index < len(matching) - 1
+    # 当前源码漂移产生的缺口也参与摘要；惰性读取只核验本页经过的文件。
+    current = (
+        (key, _current_record(bundle, record, source_digest_cache)) for key, record in matching
+    )
+    selected = current if gaps_only else _summarize_gap_runs(current, request)
+    last_consumed = ""
+    has_more = False
+    for key, record in selected:
+        item = (key, record)
+        if gaps_only and not isinstance(item[1], CoverageGap):
+            last_consumed = key
+            continue
+        has_more = key != matching[-1][0]
         cursor = encode_cursor(bundle, request, after_key=item[0]) if has_more else None
         proposed = _make_selection(bundle, request, [*page, item], next_cursor=cursor)
         if len(canonical_bytes(proposed.to_dict())) > request.budget.max_bytes:
@@ -548,15 +602,17 @@ def query_evidence(bundle: AnalysisBundle, query: EvidenceQuery) -> EvidencePage
                 raise BudgetError("machine.packet.selection-gap-prefix-exceeds-budget")
             break
         page.append(item)
-        if not isinstance(item[1], CoverageGap):
+        last_consumed = key
+        if gaps_only or not isinstance(item[1], CoverageGap):
             positive_count += 1
+        if positive_count >= request.budget.max_items:
+            break
     # 游标推进到最后实际交付的键，不能跳过因预算未加入的记录。
     # 缺口同样是已消费记录，下一页无需重复报告。
     # 真正耗尽时不再返回游标，区别于预算截断。
-    consumed = len(page)
     next_cursor = (
-        encode_cursor(bundle, request, after_key=page[-1][0])
-        if page and consumed < len(matching)
+        encode_cursor(bundle, request, after_key=last_consumed)
+        if last_consumed and last_consumed != matching[-1][0]
         else None
     )
     result = _make_selection(bundle, request, page, next_cursor=next_cursor)

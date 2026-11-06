@@ -45,7 +45,19 @@ def compose_capabilities(
     )
     selected_ids = {seed.entry_id for seed in selected}
     uncovered = tuple(seed.entry_id for seed in seeds if seed.entry_id not in selected_ids)
-    return CapabilityModel(slices, len(seeds), uncovered)
+    inventory = tuple(
+        {
+            "entryId": seed.entry_id,
+            "signature": seed.signature,
+            "trigger": dict(seed.trigger),
+            "expansionStatus": "expanded" if seed.entry_id in selected_ids else "not-expanded",
+            "reasonCode": ""
+            if seed.entry_id in selected_ids
+            else "machine.capability.slice-budget",
+        }
+        for seed in seeds
+    )
+    return CapabilityModel(slices, len(seeds), uncovered, seed_inventory=inventory)
 
 
 __all__ = ["compose_capabilities"]

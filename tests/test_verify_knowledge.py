@@ -17,6 +17,203 @@ from modus.paths import ModusPaths
 runner = CliRunner()
 
 
+def test_anchor_declarations_ignore_mentions_and_preserve_concurrent_edits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from modus.commands import verify_anchors
+    from modus.skillmd import render
+
+    paths = _clean_project(tmp_path)
+    source = tmp_path / "src/app.py"
+    source.write_text(
+        '# run() is obsolete\nmessage = "run"\nclass A:\n    def run(self):\n        pass\nclass B:\n    def run(self):\n        pass\n',
+        encoding="utf-8",
+    )
+    module = paths.module("core", "runner")
+
+    def anchor(symbol, line, end=None):
+        location = {"path": "src/app.py", "symbol": symbol, "startLine": line}
+        if end is not None:
+            location["endLine"] = end
+        module.write_text(
+            render({"anchors": {"locations": [location]}}, "# 正文\n"), encoding="utf-8"
+        )
+
+    anchor("run", 1)
+    assert verify_anchors.run_verify_anchors(str(tmp_path))["counts"] == {"ambiguous": 1}
+    anchor("A.run", 1)
+    result = verify_anchors.run_verify_anchors(str(tmp_path))
+    assert result["findings"][0]["actualLine"] == 4
+    anchor("A.run", 4, 8)
+    assert verify_anchors.run_verify_anchors(str(tmp_path))["counts"] == {"range_drift": 1}
+    anchor("A.run", 1)
+    original = verify_anchors._read_source
+
+    def concurrent(paths, relative):
+        module.write_text(module.read_text(encoding="utf-8") + "\n人工新增说明\n", encoding="utf-8")
+        return original(paths, relative)
+
+    monkeypatch.setattr(verify_anchors, "_read_source", concurrent)
+    result = verify_anchors.run_verify_anchors(str(tmp_path), fix=True)
+    assert "anchor_write_conflict" in result["counts"] and not result["fixedDocuments"]
+    assert "人工新增说明" in module.read_text(encoding="utf-8")
+    assert "startLine: 1" in module.read_text(encoding="utf-8")
+
+
+def test_java_anchor_signature_separates_overloads(tmp_path: Path) -> None:
+    from modus.commands.verify_anchors import _declaration_matches, _source_declarations
+    from modus.scope_models import SourceLocation
+
+    code = ["class A {", " void run(String value) {}", " void run(int value) {}", "}"]
+    declarations = _source_declarations("A.java", code)
+    assert declarations is not None
+    assert _declaration_matches(declarations, SourceLocation("A.java", "A.run(String)", 1)) == [
+        (2, 2)
+    ]
+    assert _declaration_matches(declarations, SourceLocation("A.java", "A.run(int)", 1)) == [(3, 3)]
+    fields = _source_declarations("A.java", ["class A { int run; }"])
+    assert fields is not None
+    assert _declaration_matches(fields, SourceLocation("A.java", "A.run()", 1)) == []
+
+
+def test_python_constant_anchors_preserve_kind_owner_and_range() -> None:
+    from modus.commands.verify_anchors import _declaration_matches, _source_declarations
+    from modus.scope_models import SourceLocation
+
+    declarations = _source_declarations(
+        "settings.py",
+        [
+            "# MAX_ROWS = 99 is only a comment",
+            "MAX_ROWS: int = 100",
+            "LEFT, RIGHT = (1, 2)",
+            "class Settings:",
+            "    LIMIT = (",
+            "        2",
+            "    )",
+            "    def run(self):",
+            "        MAX_ROWS = 9",
+            "        self.limit = 1",
+        ],
+    )
+    assert declarations is not None
+    assert _declaration_matches(declarations, SourceLocation("settings.py", "MAX_ROWS", 1)) == [
+        (2, 2)
+    ]
+    assert _declaration_matches(declarations, SourceLocation("settings.py", "RIGHT", 1)) == [(3, 3)]
+    assert _declaration_matches(
+        declarations, SourceLocation("settings.py", "Settings.LIMIT", 1)
+    ) == [(5, 7)]
+    assert _declaration_matches(declarations, SourceLocation("settings.py", "MAX_ROWS()", 2)) == []
+    assert _declaration_matches(declarations, SourceLocation("settings.py", "limit", 10)) == []
+
+
+def test_java_multiline_anchor_keeps_range_and_syntax_parameter_types(tmp_path: Path) -> None:
+    from modus.commands.verify_anchors import run_verify_anchors
+    from modus.skillmd import render
+
+    source = (
+        "class A {\n"
+        " void run(final String value, @Deprecated java.util.Map<String, Integer> data, "
+        "int array[], String... rest) {\n"
+        "  System.out.println(value);\n"
+        " }\n"
+        "}\n"
+    )
+    (tmp_path / "A.java").write_text(source, encoding="utf-8")
+    document = tmp_path / "modus/knowledge/domain/core/SKILL.md"
+    document.parent.mkdir(parents=True)
+    document.write_text(
+        render(
+            {
+                "anchors": {
+                    "locations": [
+                        {
+                            "path": "A.java",
+                            "symbol": "A.run(String,java.util.Map<String,Integer>,int[],String...)",
+                            "startLine": 2,
+                            "endLine": 4,
+                        }
+                    ]
+                }
+            },
+            "# 任务\n",
+        ),
+        encoding="utf-8",
+    )
+    assert run_verify_anchors(str(tmp_path))["counts"] == {}
+    (tmp_path / "A.java").write_text("\n" + source, encoding="utf-8")
+    result = run_verify_anchors(str(tmp_path), fix=True)
+    assert result["counts"] == {"line_drift": 1}
+    assert "endLine: 5" in document.read_text(encoding="utf-8")
+    assert run_verify_anchors(str(tmp_path))["counts"] == {}
+
+
+def test_cpp_anchor_preserves_namespace_owner_and_parameter_qualification() -> None:
+    from modus.commands.verify_anchors import _declaration_matches, _source_declarations
+    from modus.scope_models import SourceLocation
+
+    declarations = _source_declarations(
+        "service.cpp",
+        [
+            "namespace First {",
+            " void run(const std::string& value) {",
+            " }",
+            "}",
+            "namespace Second { void run(const std::string& value) {} }",
+        ],
+    )
+    assert declarations is not None
+    assert _declaration_matches(
+        declarations, SourceLocation("service.cpp", "First::run(const std::string&)", 1)
+    ) == [(2, 3)]
+    assert _declaration_matches(
+        declarations, SourceLocation("service.cpp", "Second::run(const std::string&)", 1)
+    ) == [(5, 5)]
+
+
+def test_card_rejects_duplicate_frontmatter_and_ignores_body_tables(tmp_path: Path) -> None:
+    from modus.knowledge_verification.authoring_card import (
+        load_authoring_plan,
+        verify_module_execution,
+    )
+
+    paths = _clean_project(tmp_path)
+    _write_publication_card(paths)
+    original = paths.scope_confirmation_path.read_text(encoding="utf-8")
+    paths.scope_confirmation_path.write_text(
+        original + "\n| status | reviewed |\n| mode | source-fallback |\n", encoding="utf-8"
+    )
+    plan, findings = load_authoring_plan(paths)
+    assert plan and not findings
+    paths.scope_confirmation_path.write_text(
+        original.replace(
+            "executionMode: serial", "executionMode: serial\n    executionMode: domain-parallel"
+        ),
+        encoding="utf-8",
+    )
+    plan, findings = load_authoring_plan(paths)
+    assert plan is None and findings[0].code == "authoring-card-invalid"
+    assert "executionMode" in findings[0].detail and "行" in findings[0].detail
+    _, findings = verify_module_execution(
+        "core",
+        "runner",
+        {
+            "status": "reviewed",
+            "evidence": {
+                "status": "ready",
+                "mode": "source-fallback",
+                "requestedScope": "module:core/runner",
+                "selector": "src/app.py",
+            },
+        },
+    )
+    assert any(
+        finding.context.get("field")
+        == "modus.authoring.domains.core.modules.runner.evidence.reason"
+        for finding in findings
+    )
+
+
 # 所有夹具使用 UTF-8，与知识读取契约一致。
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -233,6 +233,7 @@ class FrozenCorpus:
             "repository": repository.to_dict(),
             "analysisConfig": analysis_config,
             "sources": sources,
+            "sourceDispositions": list(self.snapshot.dispositions),
             "analysisInputs": inputs_summary,
             "buildContext": build_context,
             "providerContext": {

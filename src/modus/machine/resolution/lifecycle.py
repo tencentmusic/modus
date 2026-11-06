@@ -149,7 +149,8 @@ def resolve(
         corpus.snapshot,
         observed.compiler,
         baseline_digest=baseline_digest,
-        authoring_rules=observed.authoring_rules.rules,
+        rule_observations=observed.rule_observations,
+        materials=observed.materials,
     )
     # 构建归属由捕获的编译上下文推导，不重新探测磁盘。
     # 一个文件可能属于多个构建单元，因此保留完整归属集合。

@@ -59,6 +59,19 @@ def test_sensitive_scan_progress_exposes_counts_but_never_values() -> None:
     assert all(isinstance(value, int) for value in inspected)
 
 
+def test_repeated_text_is_reported_at_every_location_and_mutations_are_rechecked() -> None:
+    payload = [{"value": SYNTHETIC_JWT}, {"value": SYNTHETIC_JWT}]
+    findings = sensitive_literal_findings(payload)
+    assert [(item.kind, item.pointer) for item in findings] == [
+        ("jwt", "/0/value"),
+        ("jwt", "/1/value"),
+    ]
+    payload[0]["value"] = "safe"
+    assert [item.pointer for item in sensitive_literal_findings(payload)] == ["/1/value"]
+    # 超过短文本缓存边界仍完整检查，不能因长度而跳过秘密。
+    assert sensitive_literal_findings("x" * 5000 + " " + SYNTHETIC_JWT)[0].kind == "jwt"
+
+
 # 人工构造的 JWT 形状用于触发规则；它没有真实签名或账户。
 # 异常应指出定位坐标，同时隐藏原始值。
 def test_publication_failure_reports_only_safe_coordinates(tmp_path: Path) -> None:
