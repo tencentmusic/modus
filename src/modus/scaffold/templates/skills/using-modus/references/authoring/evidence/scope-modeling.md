@@ -27,7 +27,7 @@ update/sync 的局部结构确认遵循[增量结构确认](../incremental.md#�
 普通项目 init/reinit 需要用户确认 Domain/Module 结构时，确认轮次的最终回复必须依次包含：
 
 1. 完整确认卡 `modus/.cache/knowledge-authoring/scope-confirmation.md` 的可点击文件链接。
-2. 完整中文总览表；每个正式 Domain 一行，表头固定为 `业务域名称 | 简介 | 功能模块个数 | 列举功能模块中文名`。功能模块使用中文能力名，不得只列 slug、数量或部分示例代替完整表格。
+2. 完整目标语言总览表；每个正式 Domain 一行，列的含义为 `业务域名称 | 简介 | 功能模块个数 | 列举功能模块名称`，列名按目标语言表达。功能模块使用目标语言能力名，不得只列 slug、数量或部分示例代替完整表格。
 3. 明确说明正式正文尚未写入或本轮结构变化尚未发布。宿主支持 subagent 且至少有两个边界清楚的 Domain 时，提供四个同级选项，不能把并行授权藏在三个选项后的附注：
    1. **确认业务域及功能模块，并串行撰写（推荐）**
    2. **确认业务域及功能模块，并按 Domain 使用 subagent 并行撰写**
@@ -54,7 +54,7 @@ update/sync 的局部结构确认遵循[增量结构确认](../incremental.md#�
 
 正文记录必须足以接续具体工作：入口族下列实际接口身份及详情落点；对象下列完整成员及字典落点，共享成员引用一次；每个 Module 的复杂场景列选图理由和 visual 落点。条目较多时按契约族或对象分组，用短列表展开，不塞入七列长表。每完成一组就保存剩余接口/字段/分支、当前页与下一动作；不以“已完成若干文件”代替内容覆盖。逐篇记录方式遵循[发布合同](../publication.md#逐篇验收与事实对账)，正文记录是既有状态的依据，不建立独立状态机。
 
-frontmatter 使用以下 `schemaVersion: 2` 机器结构；Domain、Module 与 visual id 都使用稳定 slug。Module 的 `evidence` 记录精确 requested scope、selector 与取证模式，Domain 的 `coverage` 记录域级源码覆盖审计。Scope 阶段两者先置 `pending`，不能在批量写文件后补造为已完成。
+frontmatter 使用以下机器结构；工作区在同一结构中按下述 `members` 字段隔离成员计划。Domain、Module 与 visual id 都使用稳定 slug。Module 的 `evidence` 记录精确 requested scope、selector 与取证模式，Domain 的 `coverage` 记录域级源码覆盖审计。Scope 阶段两者先置 `pending`，不能在批量写文件后补造为已完成。
 
 Scope 阶段的 `visuals` 只记录候选决定：每项同时记录它回答的 `readerQuestion` 和触发它的真实 `mechanism`。已知需要图表时使用 `mermaid` 或 `table` 并先置 `planned`；当前没有候选时使用 `kind: none`、`status: waived` 和具体理由，不能靠空列表表示“评估过”。这不是最终视觉计划；按[图文合同](../framework/visual-expression.md#证据与唯一主图)，每个工作单元证据闭合后、写相应正文前重新评估并原位更新同一领域计划。
 
@@ -120,6 +120,12 @@ modus:
 | --- | --- | --- | --- | --- | --- | --- |
 | 稳定 ID | 可多选 | 可多项 | candidate/capability/path/symbol | 专题、Module 与唯一主图 | 四阶段之一 | changed/unchanged，或非完成态 blocked 与具体原因 |
 
+## 工作区合并卡
+
+工作区沿用唯一根卡，根级字段与上述结构一致，将 `domains` 放在 `members.<member-id>` 下；`members` 以 `.modus/config.yaml` 中已配置的成员 ID 为键。每项包含与配置完全一致的 `path` 和该成员的 `domains`，其中 Domain、Module、evidence、coverage 与 visuals 复用上述定义。所有 selector、源码位置和 visual target 均相对该成员根；不得把同名 Domain 或其他成员证据合并。
+
+根卡只记录本轮已确认创作成员，未授权成员不因此获得写入权限。成员核验从工作区根运行 `modus knowledge verify --publication --member <member-id> --json`，可加 `--domain <slug>`；单仓继续使用原命令。核验器检查成员 ID/path 与工作区配置是否一致；成员归属缺失或不一致时报告实际缺项，不猜测归属、不从产物补造完成状态。
+
 ## 逐域加载与恢复
 
-每次进入、切换或恢复 Domain，都执行[上下文保存与恢复](../context-continuity.md)的完整流程。该文件统一拥有压缩前检查点、压缩摘要保留项、四步恢复、意外中断和作者交接规则；不能用当前卡片状态或会话摘要替代实际读取。
+进入、切换或恢复 Domain 时，按当前上下文完整性与证据有效性选择[上下文保存与恢复](../context-continuity.md)的加载或复用规则。该文件统一拥有压缩前检查点、压缩摘要保留项、四步恢复、意外中断和作者交接规则；不能用当前卡片状态或会话摘要替代实际读取。

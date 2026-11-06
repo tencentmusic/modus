@@ -14,7 +14,7 @@
 3. **完成共享导航。** 每个新增 Domain 使用一次 `modus knowledge seed-business --domain <slug> --json` 创建缺失索引，不手写种子；已有人工材料保持原位。结构迁移先建立并回读新落点、修复入链和导航，再按原哈希删除已证明退役的生成文件。
 4. **全局语义验收。** 从已确认范围反查全部目标与材料处置，按[证据消费记录](../evidence/machine-packet.md#六阶段消费与可恢复记录)双向核对“记录/源码 → 事实 → 主定义/图/案例”。核对六专题及分片、全部模块、路由、规范和概览；不能从现有文件反推较小范围。跨域方向、规则条件、术语、状态、统计和完成/恢复口径须一致。按发布合同校准最薄、最新和最复杂的域，修复简略条目、套话和矛盾后回读。
 5. **内容与视觉复查。** 核对内部链接、源码引用、表格、元数据与逐图结果。整页预览覆盖本轮新写/实质修订内容，包含本阶段概览；未实际渲染不得标通过。记录环境、未预览章节和图、影响及下一动作。
-6. **机械核验与落盘回读。** 实际运行 `modus knowledge verify --publication --json`，核对原 `schemaVersion: 2` 执行卡的逐 Module evidence/status、Domain coverage/outcome、锚点与 visual 承诺。处理 CAS 冲突、跳过未变文件并回读实际内容，修复后重验。clean 不证明语义或视觉合格；冲突只回受影响目标，不刷新哈希盲目覆盖，不承诺整批回滚。
+6. **机械核验与落盘回读。** 单仓实际运行 `modus knowledge verify --publication --json`；工作区成员从工作区根运行 `modus knowledge verify --publication --member <member-id> --json`。核对执行卡中当前项目或所选成员的逐 Module evidence/status、Domain coverage/outcome、锚点与 visual 承诺。处理 CAS 冲突、跳过未变文件并回读实际内容，修复后重验。clean 不证明语义或视觉合格；冲突只回受影响目标，不刷新哈希盲目覆盖，不承诺整批回滚。
 7. **发布收尾。** 全部确认目标终结、共享产物已验收、publication 和发布后回读通过，且整页/逐图验收无待修或待验项时，才删除原执行卡并仅清理空目录。卡片丢失不得按输出补造全 reviewed 卡；有待验或 blocked 项保留原卡。
 
 ## 产出与出口

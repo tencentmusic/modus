@@ -145,6 +145,9 @@ class CapabilitySlice:
     resolution: Resolution = Resolution.UNRESOLVED
     receipts: tuple[CoverageReceipt, ...] = ()
     expansion_handles: tuple[dict[str, Any], ...] = ()
+    # N4 到 N5 的内部关联见证，保留代表路径采样前实际访问的声明。
+    # 不作为穷举覆盖证明，也不增加公开能力切片的线协议字段。
+    observed_entries: tuple[PathStep, ...] = ()
 
     def resolution_is_consistent(self) -> bool:
         """Check the monotone-degradation invariant for this slice."""

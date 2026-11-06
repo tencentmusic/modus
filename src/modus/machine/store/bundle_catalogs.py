@@ -278,6 +278,7 @@ def _evidence_record(
     detail_names: tuple[str, ...]
     if raw.get("ruleId") or raw.get("evidenceKind"):
         detail_names = (
+            "entryId",
             "evidenceKind",
             "ruleId",
             "value",
@@ -321,6 +322,10 @@ def _evidence_record(
     # 空值不进入细节；读取者以记录种类解释字段缺省。
     # 列表裁剪只影响公开细节，不改变原始证据包。
     keep: JsonObject = {"recordType": record_type}
+    # 关联身份不能按展示列表上限裁剪，否则合法范围查询会丢失共享消费者。
+    for name in ("capabilityIds", "relatedCandidateIds"):
+        if name in raw:
+            keep[name] = list(_as_strings(raw[name]))
     for name in detail_names:
         value = raw.get(name)
         if value in (None, "", [], {}):
@@ -330,7 +335,10 @@ def _evidence_record(
         keep[name] = cast(Any, value)
     identity: tuple[object, ...] = (
         path,
-        raw.get("entryId") or raw.get("id") or raw.get("source"),
+        # 声明身份用于归属，加入它不能改变已有规则信号的稳定记录身份。
+        (raw.get("entryId") if record_type != "authoringSignal" else None)
+        or raw.get("id")
+        or raw.get("source"),
         raw.get("target"),
         raw.get("kind") or raw.get("relation"),
         location.get("startLine") or witness_raw.get("startLine"),
@@ -467,7 +475,7 @@ def evidence_catalog(
                 raw=row,
                 path=path,
                 source_digest=source_digest,
-                candidate_ids=candidate_ids,
+                candidate_ids=_as_strings(row.get("candidateIds")),
                 kind="entry",
             )
             for row in _as_objects(packet.get("entries"))
@@ -477,7 +485,7 @@ def evidence_catalog(
                 raw=row,
                 path=path,
                 source_digest=source_digest,
-                candidate_ids=candidate_ids,
+                candidate_ids=_as_strings(row.get("candidateIds")),
                 kind="relation",
             )
             for row in _as_objects(packet.get("relations"))
@@ -487,7 +495,7 @@ def evidence_catalog(
                 raw=row,
                 path=path,
                 source_digest=source_digest,
-                candidate_ids=candidate_ids,
+                candidate_ids=_as_strings(row.get("candidateIds")),
                 kind=str(row.get("kind") or "effect"),
             )
             for row in _as_objects(packet.get("authoringRecords"))

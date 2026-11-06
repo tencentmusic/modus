@@ -134,3 +134,12 @@ test('business exit codes cannot leak into tools that do not declare them', asyn
   await assert.rejects(h.call('modus_status'), /exit 4/u)
   await assert.rejects(h.call('modus_knowledge_impact', { changedFiles: [], validation: 'passed' }), /exit 4/u)
 })
+
+
+test('member publication forwards explicit identity without shell option injection', async t => {
+  const h = await createHarness(t)
+  await h.call('modus_verify_knowledge', { root: '../workspace', member: '-orders', publication: true })
+  assert.ok(h.calls.at(-1).command.includes("'--member=-orders'"))
+  assert.ok(h.calls.at(-1).command.includes("'--publication'"))
+  assert.ok(h.calls.at(-1).command.includes("'../workspace'"))
+})

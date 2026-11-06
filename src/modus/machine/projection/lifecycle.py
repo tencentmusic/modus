@@ -18,6 +18,7 @@ from ..resolution.lifecycle import ResolvedProgram
 from ..states import Completeness, ExecutionStatus
 from .community_signal import GraphEngine
 from .contracts import AuthoringProjection
+from .memberships import EntryMembership, entry_memberships
 from .proposals import build_proposals, capability_first_scope, capability_navigation
 from .publication import sanitize_publication
 from .scope_candidates import project_scope_candidates
@@ -168,6 +169,20 @@ def project(
         resolved.source_evidence.source_digests,
     )
     memberships = _attach_candidate_memberships(scope, evidence_index)
+    by_entry = entry_memberships(scope["candidates"], capabilities.model)
+    # 文件库存保留文件级关联；细节使用声明/关系来源的精确身份。
+    # 无归属记录保留文件相关提示，不能挂进某个提案的已绑定信号。
+    for packet in evidence_packets.values():
+        related = sorted(memberships.get(str(packet.get("path") or ""), []))
+        for kind in ("entries", "relations", "authoringRecords"):
+            for row in packet.get(kind, []):
+                identity = str(row.get("source" if kind == "relations" else "entryId") or "")
+                binding = by_entry.get(identity, EntryMembership())
+                row["candidateIds"] = list(binding.candidate_ids)
+                row["capabilityIds"] = list(binding.capability_ids)
+                if not binding.candidate_ids:
+                    row["relatedCandidateIds"] = related
+
     services = project_services(
         resolved.topology,
         baseline_digest=baseline_digest,

@@ -286,7 +286,7 @@ def test_publication_fails_closed_on_unfulfilled_authoring_commitments(
 # 先建立合法图表豁免，再分别破坏卡版本、覆盖证据和执行模式。
 # 每种失败应对应稳定诊断，避免升级要求被普通未完成状态掩盖。
 # 豁免说明来自读者需要，不强制每个模块都画图。
-def test_publication_requires_v2_execution_evidence_and_coverage(tmp_path: Path) -> None:
+def test_publication_requires_supported_execution_evidence_and_coverage(tmp_path: Path) -> None:
     paths = _clean_project(tmp_path)
     # 补齐业务种子，避免其他缺口干扰执行卡协议的独立验证。
     seed_domain_business(tmp_path, ["core"])
@@ -299,6 +299,8 @@ def test_publication_requires_v2_execution_evidence_and_coverage(tmp_path: Path)
     # 每次变异同一执行卡，使结果不能由多份竞争性承诺解释。
     card = paths.scope_confirmation_path
     text = card.read_text(encoding="utf-8")
+    assert run_verify_knowledge(str(tmp_path), publication=True)["status"] == "clean"
+    assert card.read_text(encoding="utf-8") == text
     card.write_text(text.replace("schemaVersion: 2", "schemaVersion: 1"), encoding="utf-8")
 
     assert "authoring-card-upgrade-required" in _codes(
@@ -388,3 +390,132 @@ def test_publication_accepts_explicit_queries_and_source_fallback() -> None:
             },
         },
     )[1]
+
+
+def test_retrieval_and_verifier_share_real_markdown_targets(tmp_path: Path) -> None:
+    from modus.knowledge_verification.markdown_integrity import verify_links
+    from modus.retrieval.stages.documents import scan_documents
+
+    target = tmp_path / "modus/knowledge/domain/core/references/rule.md"
+    _write(
+        target,
+        "# 恢复\n## 失败恢复\n第一处。\n## 失败恢复\n第二处。\n"
+        '```md\n<a id="fake"></a>\n{{item:example}}\n## 失败恢复\n```\n'
+        '<a id="real"></a>\n{{item:actual}}\n',
+    )
+    source = target.with_name("index.md")
+    _write(
+        source,
+        "[第二处](rule.md#失败恢复-1)\n[真实](rule.md#real)\n"
+        "[条目](rule.md#item-actual)\n[示例](rule.md#fake)\n"
+        "[示例条目](rule.md#item-example)\n",
+    )
+    paths = ModusPaths.for_root(tmp_path)
+    findings = verify_links(paths, (source,))
+    assert {item.context["link"] for item in findings} == {"rule.md#fake", "rule.md#item-example"}
+    sections = scan_documents(paths, [target]).sections
+    anchors = {anchor for section in sections for anchor in section["anchors"]}
+    assert {"失败恢复", "失败恢复-1", "real", "item-actual"} <= anchors
+    assert not {"失败恢复-2", "fake", "item-example"} & anchors
+
+
+def test_workspace_publication_uses_root_card_and_isolates_same_named_domains(
+    tmp_path: Path,
+) -> None:
+    import subprocess
+
+    import yaml
+
+    from modus.config import ModusConfig
+    from modus.skillmd import split_frontmatter
+    from modus.workspace import normalize_members
+
+    plans = {}
+    for name in ("orders", "payments"):
+        root = tmp_path / name
+        paths = _clean_project(root)
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        seed_domain_business(root, ["core"])
+        _write_publication_card(
+            paths, visual_status="waived", visual_kind="none", visual_reason="No visual needed."
+        )
+        meta, _ = split_frontmatter(paths.scope_confirmation_path.read_text())
+        plans[name] = {"path": name, "domains": meta["modus"]["authoring"]["domains"]}
+        paths.scope_confirmation_path.unlink()
+    plans["payments"]["domains"]["core"]["modules"]["runner"]["status"] = "pending"
+    outer = ModusPaths.for_root(tmp_path)
+    ModusConfig(
+        kind="workspace", workspace={"members": normalize_members(tmp_path, ["orders", "payments"])}
+    ).write(outer)
+
+    def save_card() -> None:
+        _write(
+            outer.scope_confirmation_path,
+            "---\n"
+            + yaml.safe_dump(
+                {
+                    "modus": {
+                        "authoring": {
+                            "schemaVersion": 2,
+                            "executionMode": "serial",
+                            "members": plans,
+                        }
+                    }
+                },
+                allow_unicode=True,
+            )
+            + "---\n",
+        )
+
+    save_card()
+    assert "authoring-member-required" in _codes(
+        run_verify_knowledge(str(tmp_path), publication=True)
+    )
+    before = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    run = runner.invoke(
+        app,
+        [
+            "knowledge",
+            "verify",
+            "--root",
+            str(tmp_path),
+            "--member",
+            "orders",
+            "--publication",
+            "--json",
+        ],
+    )
+    assert run.exit_code == 0, run.output
+    assert json.loads(run.output)["scope"] == {
+        "domain": None,
+        "member": "orders",
+        "memberPath": "orders",
+    }
+    payment = run_verify_knowledge(str(tmp_path), publication=True, member="payments")
+    assert "authoring-module-incomplete" in _codes(payment)
+    assert "authoring-card-unavailable" not in _codes(payment)
+    assert {
+        p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()
+    } == before
+    with pytest.raises(ValueError, match="未配置"):
+        run_verify_knowledge(str(tmp_path), publication=True, member="../orders")
+    with pytest.raises(ValueError, match="仅用于"):
+        run_verify_knowledge(str(tmp_path), member="orders")
+    # 旧根卡未记录成员归属时，报告真实缺项，不能把单仓计划套到所选成员。
+    _write_publication_card(
+        outer, visual_status="waived", visual_kind="none", visual_reason="No visual needed."
+    )
+    codes = _codes(run_verify_knowledge(str(tmp_path), publication=True, member="orders"))
+    assert "authoring-member-invalid" in codes
+    assert "authoring-card-upgrade-required" not in codes
+    plans["orders"]["path"] = "payments"
+    save_card()
+    assert "authoring-member-invalid" in _codes(
+        run_verify_knowledge(str(tmp_path), publication=True, member="orders")
+    )
+    plans["orders"]["path"] = "orders"
+    save_card()
+    (tmp_path / "orders").rename(tmp_path / "old-orders")
+    (tmp_path / "orders").symlink_to(tmp_path / "old-orders", target_is_directory=True)
+    with pytest.raises(ValueError, match="符号链接"):
+        run_verify_knowledge(str(tmp_path), publication=True, member="orders")

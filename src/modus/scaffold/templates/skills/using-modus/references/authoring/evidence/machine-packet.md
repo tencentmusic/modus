@@ -94,3 +94,5 @@ K5 按“工程主题 → 机制源码范围 → 机器请求/同源记录 → �
 context 无匹配证据、source-changed、partial 或 budget-exhausted 时，把具体缺口写入执行卡并直接读取当前源码。不要扩大为无 selector 的 `module-authoring`，不要重新 build，也不要把缺口改写成“能力不存在”。
 
 同一 Domain 内先从执行卡核对 Module 到精确 selector 的映射，再执行不重复的 context 请求；相同 selector 和双摘要不得因写不同专题而重跑，互不依赖的精确请求可并发取得。汇总 packet 给出的 source anchor、path 和 symbol，去重后分批读取当前源码，一次场景调查同时服务六专题与 Module。结论改变、证据缺口或上下文压缩后原证据已不可用时，按[逐域加载与恢复](scope-modeling.md#逐域加载与恢复)定向重新请求或回读所需证据；恢复不重跑 build、不读取 bundle 内部文件，也不触发全仓重扫。原证据仍在当前上下文且身份与范围一致时复用，避免逐文件、逐章节反复 `sed`/搜索。同一 Domain 只能有一个正文所有者；用户明确授权时，不同完整 Domain 可以按[并行撰写协议](../parallel-domain-authoring.md)由不同作者处理。
+
+边界过滤仅适用于 `service-boundary` intent 或 `select --view services`；其他组合明确拒绝，不能把回显的 boundaryIds 当成已执行过滤。文件相关信号若没有声明归属，会保留为 unbound 歧义及展开线索，不属于提案的已绑定证据；代表路径以外的已观察关联仍可交付，但不证明遍历完整。

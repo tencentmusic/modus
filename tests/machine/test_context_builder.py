@@ -553,3 +553,65 @@ def test_service_context_keeps_outgoing_incoming_and_projection_gaps(
         bundle, ContextRequest(TaskIntent.SERVICE_BOUNDARY, PacketScope(boundary_ids=("stock",)))
     )
     assert stale.coverage_gaps and not stale.evidence
+
+
+@pytest.mark.parametrize(
+    "intent", [item for item in TaskIntent if item is not TaskIntent.SERVICE_BOUNDARY]
+)
+def test_boundary_filter_rejects_unsupported_intents(intent: TaskIntent) -> None:
+    with pytest.raises(ContractError, match="machine.packet.unsupported-boundary-filter"):
+        ContextRequest(intent, PacketScope(paths=("orders.py",), boundary_ids=("missing",)))
+
+
+@pytest.mark.parametrize("view", ["scope", "evidence"])
+def test_boundary_filter_rejects_unsupported_views(view: str) -> None:
+    with pytest.raises(ContractError, match="machine.packet.unsupported-boundary-filter"):
+        EvidenceQuery(view=view, boundary_ids=("missing",))  # type: ignore[arg-type]
+
+
+def test_same_file_capabilities_keep_their_own_signals_and_unsampled_branches(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "OrderController.java"
+    source.write_text(
+        """class OrderController {
+ @OpenApiPostMapping(apiName = "Create", apiUrl = "/create")
+ public void create() { a(); b(); c(); d(); e(); }
+ @OpenApiDeleteMapping(apiName = "Delete", apiUrl = "/delete")
+ public void remove() { repository.delete(item); }
+ private void a() { repository.save(a); }
+ private void b() { repository.save(b); }
+ private void c() { repository.save(c); }
+ private void d() { repository.save(d); }
+ private void e() { repository.save(e); }
+}
+""",
+        encoding="utf-8",
+    )
+    receipt = analyze_repository(tmp_path, AnalysisOptions(compiler_mode="off"))
+    bundle = open_analysis(tmp_path, receipt.identity)
+    discovery = build_authoring_context(bundle, ContextRequest(TaskIntent.SCOPE_DISCOVERY))
+    for name, allowed, forbidden in (
+        ("OrderController.create", {"/create", "save"}, {"/delete", "delete"}),
+        ("OrderController.remove", {"/delete", "delete"}, {"/create", "save"}),
+    ):
+        proposal = next(
+            row
+            for row in discovery.proposals
+            if any(entry["symbol"] == name for entry in row["representativeEntries"])
+        )
+        packet = build_authoring_context(
+            bundle,
+            ContextRequest(
+                TaskIntent.MODULE_AUTHORING,
+                PacketScope(capability_ids=tuple(proposal["capabilityIds"])),
+            ),
+        )
+        signals = [signal for row in packet.proposals for signal in row["authoringSignals"]]
+        values = " ".join(str(signal["details"].get("value", "")) for signal in signals)
+        assert all(value in values for value in allowed)
+        assert all(value not in values for value in forbidden)
+        if name.endswith("create"):
+            symbols = {signal["witness"]["symbol"] for signal in signals}
+            assert {f"OrderController.{method}" for method in "abcde"} <= symbols
+        _validate(packet.to_dict())

@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
 from _support.markdown import assert_local_markdown_links_resolve
-from modus.commands.init_project import InitConflictError, run_init
+from modus import __version__
+from modus.cli import app
+from modus.commands.init_project import InitConflictError, run_init, run_workspace_init
 from modus.commands.uninstall import (
     UninstallPlanChangedError,
     apply_uninstall,
@@ -50,13 +55,31 @@ def test_update_preserves_user_edits_and_untracked_collision(tmp_path: Path) -> 
     assert edited.read_text(encoding="utf-8") == "my instructions"
 
 
+@pytest.mark.parametrize("kind", ["project", "workspace"])
+@pytest.mark.parametrize("installed_version", [__version__, "0.0.4"])
 def test_update_delivers_workflow_changes_to_every_host_and_retains_user_edits(
-    tmp_path: Path,
+    tmp_path: Path, kind: str, installed_version: str
 ) -> None:
-    """同版本升级也应传播命令、技能和新增参考；知识与宿主自定义保持原样。"""
-    run_init(tmp_path, list(available_platforms()))
+    """旧安装与同版本更新均传播全部宿主资产，保留人工内容和成员仓库。"""
+    members = [tmp_path / name for name in ("orders", "payments")]
+    if kind == "workspace":
+        for member in members:
+            member.mkdir()
+            subprocess.run(["git", "init", "-q", str(member)], check=True)
+            (member / "source.txt").write_bytes(b"member-owned\n")
+        run_workspace_init(tmp_path, list(available_platforms()), ["orders", "payments"])
+    else:
+        run_init(tmp_path, list(available_platforms()))
+    member_before = {
+        p.relative_to(tmp_path): p.read_bytes()
+        for member in members
+        for p in member.rglob("*")
+        if p.is_file()
+    }
     paths = ModusPaths.for_root(tmp_path)
+    config_before = paths.config_path.read_bytes() if paths.config_path.exists() else None
     manifest = Manifest.read(paths)
+    manifest.framework_version = installed_version
     workflow_files = [
         entry for entry in manifest.files if entry.template.startswith(("skills/", "commands/"))
     ]
@@ -80,12 +103,23 @@ def test_update_delivers_workflow_changes_to_every_host_and_retains_user_edits(
 
     edited = ".agents/skills/modus-reinit/SKILL.md"
     (tmp_path / edited).write_bytes(b"# User-owned workflow\n")
+    paths.constraint_dir.mkdir(parents=True, exist_ok=True)
     paths.team_standard.write_bytes(b"# Human team policy\n")
     topic = paths.constraint_dir / "team-standard/concurrency.md"
     topic.parent.mkdir()
     topic.write_bytes(b"# Human task policy\n")
+    card = paths.scope_confirmation_path
+    card.parent.mkdir(parents=True, exist_ok=True)
+    card_content = (
+        b"---\nmodus:\n  authoring:\n    schemaVersion: 2\n    executionMode: serial\n"
+        b"    domains:\n      orders:\n        status: pending\n---\n"
+        b"# Unfinished scope\nPreserve authorization, progress, and unresolved questions.\n"
+    )
+    card.write_bytes(card_content)
 
-    result = run_update(tmp_path)
+    run = CliRunner().invoke(app, ["-C", str(tmp_path), "update", "--project", "--yes", "--json"])
+    assert run.exit_code == 0, run.output
+    result = json.loads(run.stdout)
 
     assert result["status"] == "partial"
     assert result["userEditedFiles"] == [edited]
@@ -96,11 +130,21 @@ def test_update_delivers_workflow_changes_to_every_host_and_retains_user_edits(
         assert_local_markdown_links_resolve(tmp_path / relative, root=tmp_path)
     assert paths.team_standard.read_bytes() == b"# Human team policy\n"
     assert topic.read_bytes() == b"# Human task policy\n"
+    assert card.read_bytes() == card_content
+    config_after = paths.config_path.read_bytes() if paths.config_path.exists() else None
+    assert config_after == config_before
+    assert {
+        p.relative_to(tmp_path): p.read_bytes()
+        for member in members
+        for p in member.rglob("*")
+        if p.is_file()
+    } == member_before
 
     retry = run_update(tmp_path)
     assert retry["status"] == "partial"
     assert retry["userEditedFiles"] == [edited]
     assert retry["appliedFiles"] == retry["addedFiles"] == []
+    assert card.read_bytes() == card_content
 
 
 # 首次安装同样遵守所有权边界，不能将空文件视为可用路径。

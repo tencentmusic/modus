@@ -90,6 +90,9 @@ def knowledge_seed_business_cmd(
     rich_help_panel=command_panel("knowledge verify"),
 )
 def knowledge_verify_cmd(
+    member: str | None = typer.Option(
+        None, "--member", help="工作区已配置的成员 ID，仅用于 --publication；--root 指向工作区根。"
+    ),
     domain: str | None = typer.Option(None, "--domain", help="仅核验指定领域标识。"),
     publication: bool = typer.Option(
         False,
@@ -103,7 +106,7 @@ def knowledge_verify_cmd(
     from ..commands.verify_knowledge import run_verify_knowledge
 
     try:
-        result = run_verify_knowledge(root, domain=domain, publication=publication)
+        result = run_verify_knowledge(root, domain=domain, publication=publication, member=member)
     except (CorruptArtifactError, OSError, RuntimeError, ValueError) as exc:
         public_error(str(exc), json_output=json_output)
         raise typer.Exit(3) from exc

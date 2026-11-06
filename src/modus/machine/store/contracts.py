@@ -304,6 +304,11 @@ class EvidenceQuery:
     def __post_init__(self) -> None:
         for value in self.paths:
             _canonical_relative(value, field_name="paths")
+        if self.boundary_ids and self.view != "services":
+            raise ContractError(
+                "machine.packet.unsupported-boundary-filter",
+                "boundary selectors require services view",
+            )
         for name, values in (
             ("candidate_ids", self.candidate_ids),
             ("capability_ids", self.capability_ids),

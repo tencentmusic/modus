@@ -19,7 +19,6 @@ from modus.machine.facts.language_capabilities import (
     structural_extractors,
 )
 
-EVIDENCE_SCHEMA_VERSION = 1
 _DECLARATION_RELATIONS = {"contains", "method", "defines", "declares", "function", "exports"}
 _NON_ENTRY_KINDS = {
     "file",

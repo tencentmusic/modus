@@ -204,6 +204,7 @@ CLI_COMMANDS: Final[tuple[CliCommand, ...]] = (
             "modus knowledge verify",
             "modus knowledge verify --domain order --json",
             "modus knowledge verify --publication --json",
+            "modus knowledge verify --publication --member backend --json",
         ),
     ),
     CliCommand(

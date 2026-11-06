@@ -286,3 +286,23 @@ def test_broad_document_navigation_does_not_hide_precise_answer(tmp_path: Path) 
         str(tmp_path), "订单 内存清理时机", scope="project-read", explicit_paths=["orders.py"]
     )
     assert any("查询不会触发清理" in row["excerpt"] for row in result["evidence"])
+
+
+@pytest.mark.parametrize("heading", ["例外", "例外场景", "Exception scenarios"])
+@pytest.mark.parametrize("marker", ['<a id="item-bounded"></a>', "{{item:bounded}}"])
+def test_nested_exception_keeps_explicit_rule_conditions(
+    tmp_path: Path, heading: str, marker: str
+) -> None:
+    _write(
+        tmp_path,
+        TOPIC,
+        f"# 并发\n## 有界执行\n{marker}\n性质: 通用建议\n适用: Java 8 服务端。\n"
+        f"### {heading}\n#### 共享池\nreserveOrders 不得关闭借用的线程池。\n"
+        "## 浏览器\n只适用于页面。\n",
+    )
+    result = resolve(str(tmp_path), "reserveOrders", scope="project-read", purpose="change")
+    ref = next(row for row in result["evidence"] if row["path"] == TOPIC)
+    assert "通用建议" in ref["excerpt"] and "Java 8" in ref["excerpt"]
+    assert "不得关闭" in ref["excerpt"] and "只适用于页面" not in ref["excerpt"]
+    assert ref["readTarget"] == {"path": TOPIC, "lineStart": 2, "lineEnd": 8}
+    assert not ref["truncated"]

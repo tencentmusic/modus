@@ -65,12 +65,14 @@ export function registerTools(ctx: Context, run: ModusRunner): void {
     parameters: {
       root: rootParameter,
       domain: { type: 'string', description: '可选的领域标识。' },
+      member: { type: 'string', description: '已配置的工作区成员 ID；需 publication，root 指向工作区根。' },
       publication: { type: 'boolean', description: '是否执行更严格的发布核验。' },
     },
     output: reportOutput,
     async execute(args, exec) {
       const argv = ['knowledge', 'verify', '--json']
       if (args.domain !== undefined) argv.push(`--domain=${args.domain}`)
+      if (args.member !== undefined) argv.push(`--member=${args.member}`)
       if (args.publication) argv.push('--publication')
       return run(exec, { root: args.root ?? '.', args: argv, reportExitCodes: [0, 4] })
     },

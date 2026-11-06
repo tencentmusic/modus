@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { createCliProject, snapshot } from './support/cli.mjs'
@@ -85,4 +85,34 @@ test('published tools retrieve CAS updates and preserve rejected writes', requir
 
   const changed = Object.keys(afterWrite).filter(path => afterWrite[path] !== knowledgeBefore[path])
   assert.deepEqual(changed, [document.slice('modus/knowledge/'.length)])
+})
+
+
+test('member publication reads the workspace card through the real CLI', requiresCli, async t => {
+  const { execFileSync } = await import('node:child_process')
+  const { root, cli, call } = await createCliProject(t, 'simple_service/')
+  const members = ['orders', 'payments'].map(id => ({ id, path: id }))
+  for (const member of members) {
+    await mkdir(join(root, member.path))
+    execFileSync('git', ['init', '-q', join(root, member.path)])
+  }
+  await writeFile(join(root, '.modus/config.yaml'), JSON.stringify({ kind: 'workspace', workspace: { members } }))
+  await mkdir(join(root, 'modus/.cache/knowledge-authoring'), { recursive: true })
+  const card = { modus: { authoring: { schemaVersion: 2, executionMode: 'serial', members: {
+    orders: { path: 'orders', domains: { core: { status: 'pending' } } },
+  } } } }
+  await writeFile(join(root, 'modus/.cache/knowledge-authoring/scope-confirmation.md'), `---\n${JSON.stringify(card)}\n---\n`)
+  const before = await snapshot(root)
+  const result = await call('modus_verify_knowledge', { member: 'orders', publication: true })
+  assert.equal(result.exitCode, 4)
+  assert.deepEqual(result.result.scope, { domain: null, member: 'orders', memberPath: 'orders' })
+  assert.ok(result.result.counts['authoring-domain-incomplete'])
+  assert.equal(result.result.counts['authoring-card-unavailable'], undefined)
+  // 未声明 member 的原生工具可直接走 Skill 的 CLI 入口，保留相同报告与退出码。
+  await assert.rejects(cli('knowledge', 'verify', '--publication', '--member', 'orders', '--json'), error => {
+    assert.equal(error.code, result.exitCode)
+    assert.deepEqual(JSON.parse(error.stdout), result.result)
+    return true
+  })
+  assert.deepEqual(await snapshot(root), before)
 })

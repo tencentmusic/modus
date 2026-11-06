@@ -344,6 +344,8 @@ Incremental updates and automatic sync share the prose and publication rules. Th
 
 The workflow reuses task evidence without initialization bundles, execution cards, persistent task queues, or host-specific steps. Accurate prose is left unchanged, uncertain impacts receive targeted investigation, and resolvable conflicts are handled in the current task. When user decisions, external evidence, or tool recovery are required, the remaining knowledge work is reported explicitly. This does not guarantee discovery of untouched historical gaps or recovery independent of conversation context.
 
+For workspace member publication checks, use `modus knowledge verify --publication --member <member-id> --root <workspace-root> --json`. The verifier selects the configured member's plan from the single root card and checks it within that member's repository.
+
 ### Automatic knowledge capabilities
 
 - `using-modus` progressively loads knowledge only when a task needs project facts, then decides whether a modifying task caused durable knowledge impact.

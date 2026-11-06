@@ -59,29 +59,6 @@ def _observations(
     return entries, relations, signals
 
 
-# 符号同名时用路径缩小候选，再按起始行距离选择邻近声明。
-# 缺少路径的信号仍可参与匹配，因此结果属于观察关联而非新解析。
-# 无候选时返回空身份，由调用方明确跳过。
-def _entry_by_signal(signal: Mapping[str, Any], entries: Mapping[str, Mapping[str, Any]]) -> str:
-    symbol = str(signal.get("symbol") or "")
-    path = str((signal.get("location") or {}).get("path") or "")
-    candidates = [
-        (identity, row)
-        for identity, row in entries.items()
-        if str(row.get("symbol") or row.get("displayName") or "") == symbol
-        and (not path or str((row.get("location") or {}).get("path") or "") == path)
-    ]
-    if not candidates:
-        return ""
-    line = (signal.get("location") or {}).get("startLine")
-    return min(
-        candidates,
-        key=lambda item: abs(
-            int((item[1].get("location") or {}).get("startLine") or 0) - int(line or 0)
-        ),
-    )[0]
-
-
 # 终态效果的分类只解释已有证据，不通过名称推导任意副作用。
 # 发布类写入和普通数据写入分开，以便能力摘要描述外部影响。
 # 缓存读取不算写效果；状态、锁和事务保留为状态转换。
@@ -126,8 +103,8 @@ def collect_inputs(
     resources: defaultdict[str, list[str]] = defaultdict(list)
     transitions: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
     for signal in signals:
-        entry_id = _entry_by_signal(signal, entries)
-        if not entry_id or str(entries[entry_id].get("sourceRole") or "") != "runtime":
+        entry_id = str(signal.get("entryId") or "")
+        if entry_id not in entries or str(entries[entry_id].get("sourceRole") or "") != "runtime":
             continue
         evidence_kind = str(signal.get("evidenceKind") or "")
         if str(signal.get("kind") or "") == "entry" and evidence_kind in _ENTRY_SIGNAL_KINDS:

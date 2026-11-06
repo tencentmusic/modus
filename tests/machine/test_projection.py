@@ -117,6 +117,7 @@ def test_structural_signal_totals_are_not_smeared_onto_one_capability() -> None:
                     "kind": "entry",
                     "evidenceKind": "external-http",
                     "symbol": "OrdersController.create",
+                    "entryId": "entry-orders",
                 }
             ],
             "src/support.py": [
@@ -124,6 +125,7 @@ def test_structural_signal_totals_are_not_smeared_onto_one_capability() -> None:
                     "kind": "effect",
                     "evidenceKind": "authoritative-write",
                     "symbol": "Support.run",
+                    "entryId": "entry-support",
                 }
             ],
         },
@@ -160,3 +162,42 @@ def test_proposals_prioritize_explicit_triggers_over_public_exports() -> None:
     )
 
     assert projection.proposals[0].capability_ids == ("cap-endpoint",)
+
+
+def test_shared_declaration_keeps_both_capability_owners() -> None:
+    from modus.machine.capability.contracts import PathStep
+    from modus.machine.projection.memberships import entry_memberships
+
+    shared = PathStep("shared", "Shared.run", {"path": "shared.py"})
+    slices = tuple(
+        CapabilitySlice(f"cap-{name}", name, {}, {"entryId": name}, observed_entries=(shared,))
+        for name in ("orders", "payments")
+    )
+    model = CapabilityModel(slices)
+    projection = build_proposals(model, baseline_digest="a" * 64)
+    scope = capability_first_scope({"candidates": []}, model, projection)
+    memberships = entry_memberships(scope["candidates"], model)
+    assert memberships["shared"].capability_ids == ("cap-orders", "cap-payments")
+    assert len(memberships["shared"].candidate_ids) == 2
+
+
+def test_signal_outside_or_between_ambiguous_declarations_stays_unbound() -> None:
+    from modus.config import AuthoringRule, RuleEmit, RuleMatch
+    from modus.machine.facts.rule_signals import project_authoring_records
+
+    entries = [
+        {"entryId": name, "symbol": name, "location": {"startLine": 2, "endLine": 2}}
+        for name in ("first", "second")
+    ]
+    rows = project_authoring_records(
+        "sample.py",
+        "save()\nsave()\nsave()\n",
+        (
+            AuthoringRule(
+                "test.write", RuleMatch(r"save"), RuleEmit("effect", "authoritative-write")
+            ),
+        ),
+        entries=entries,
+    )
+    assert len(rows) == 3
+    assert all("entryId" not in row and "symbol" not in row for row in rows)

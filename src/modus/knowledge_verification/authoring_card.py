@@ -1,8 +1,8 @@
 """Typed validation boundary for the resumable knowledge-authoring card.
 
 The card is temporary orchestration state, not authored knowledge. Publication
-consumes only its stable ``schemaVersion: 2`` wire contract: exact Module
-evidence work, Domain coverage work, and terminal review state. Keeping that
+consumes one contract for single-project and member-scoped workspace plans: exact
+Module evidence work, Domain coverage work, and terminal review state. Keeping that
 parsing here prevents the publication composer from becoming a second, loosely
 typed card schema.
 """
@@ -10,6 +10,7 @@ typed card schema.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Final
 
@@ -29,6 +30,15 @@ _COVERAGE_MODES: Final = frozenset({"machine-context", "source-review"})
 _EXECUTION_MODES: Final = frozenset({"serial", "domain-parallel"})
 
 
+@dataclass(frozen=True, slots=True)
+class AuthoringPlanSource:
+    """卡片所有者与已验证的成员身份；成员路径不充当任意卡片读取入口。"""
+
+    paths: ModusPaths
+    member_id: str
+    member_path: str
+
+
 # 拒绝非字符串键，避免宽松 YAML 数据在后续协议序列化时改变身份。
 def string_mapping(value: object) -> dict[str, object] | None:
     """Return a plain string-keyed view of a mapping, or reject it."""
@@ -39,17 +49,19 @@ def string_mapping(value: object) -> dict[str, object] | None:
 
 
 # 只读取唯一执行卡，不在多个临时文件之间猜测最新计划。
-# 版本不匹配显式要求升级，不能按旧字段默认解释新协议。
+# 单仓与工作区复用同一协议，成员结构不改变已有单仓计划的解释。
+# 未知协议仍显式拒绝，不能猜测证据与完成状态。
 # 执行模式和领域映射分别检查，可同时收集可恢复的契约问题。
 # 读取受大小和路径边界约束，卡片不是任意文件读取入口。
 def load_authoring_plan(
-    paths: ModusPaths,
+    paths: ModusPaths, *, source: AuthoringPlanSource | None = None
 ) -> tuple[dict[str, object] | None, list[VerificationFinding]]:
-    """Load the unique schema-version-2 execution card and return its Domain plan."""
+    """读取单仓执行卡或工作区根卡中的成员 Domain 计划。"""
 
+    card_paths = source.paths if source is not None else paths
     try:
         text = read_bound_regular_text(
-            paths.root, paths.scope_confirmation_path, max_bytes=2 * 1024 * 1024
+            card_paths.root, card_paths.scope_confirmation_path, max_bytes=2 * 1024 * 1024
         )
     except BoundKnowledgeReadError as exc:
         return None, [
@@ -79,6 +91,14 @@ def load_authoring_plan(
                 f"发布需要创作 schemaVersion： {AUTHORING_SCHEMA_VERSION}; got {schema_version!r}",
             )
         ]
+    if "members" in authoring and source is None:
+        return None, [
+            finding(
+                CARD_DOCUMENT,
+                "authoring-member-required",
+                "工作区合并卡需从工作区根使用 --publication --member <member-id> 核验",
+            )
+        ]
     findings: list[VerificationFinding] = []
     execution_mode = authoring.get("executionMode")
     if execution_mode not in _EXECUTION_MODES:
@@ -89,13 +109,29 @@ def load_authoring_plan(
                 "executionMode 必须为 'serial' 或 'domain-parallel'",
             )
         )
-    domains = string_mapping(authoring.get("domains"))
+    domain_owner = authoring
+    if source is not None:
+        members = string_mapping(authoring.get("members"))
+        member = string_mapping(members.get(source.member_id)) if members is not None else None
+        if member is None or member.get("path") != source.member_path:
+            return None, [
+                finding(
+                    CARD_DOCUMENT,
+                    "authoring-member-invalid",
+                    "执行卡必须声明所选成员 ID 及与工作区配置一致的规范路径",
+                    member=source.member_id,
+                )
+            ]
+        if paths.root != source.paths.root / source.member_path:
+            raise ValueError("执行卡成员身份与核验根不一致")
+        domain_owner = member
+    domains = string_mapping(domain_owner.get("domains"))
     if domains is None or not domains:
         findings.append(
             finding(
                 CARD_DOCUMENT,
                 "authoring-card-invalid",
-                "modus.authoring.domains 必须为非空映射",
+                "所选创作范围的 domains 必须为非空映射",
             )
         )
         return None, findings
@@ -155,7 +191,7 @@ def _source_selector(value: object, *, machine: bool) -> bool:
 def verify_module_execution(
     domain: str, module: str, raw: object
 ) -> tuple[str | None, list[VerificationFinding]]:
-    """Validate one resumable Module work item from the schema-version-2 card."""
+    """Validate one resumable Module work item from the execution card."""
 
     plan = string_mapping(raw)
     if plan is None:

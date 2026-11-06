@@ -71,7 +71,7 @@ K1 完整范围 → K2 全局主定义与跨域依赖
 
 按[材料覆盖](../src/modus/scaffold/templates/skills/using-modus/references/authoring/evidence/index.md#材料覆盖)逐篇盘点已确认业务域、references、modules、关联知识及用户材料；指定文档集合递归读完范围内子目录/子文档，授权网页系统查阅当前账号在授权范围内可见的功能，记录读取位置、冲突和缺口影响。源码仍按场景定向读取，外部查阅不自动授权业务写操作或保存副本。
 
-每个公开入口族都需归属于正式领域/模块、跨领域平台能力、共享基础设施、有理由的排除项或明确缺口。记录稳定 ID、中文名称、结果、入口族、权威对象、运行形态、构建单元、语言、邻接关系和覆盖限制。
+每个公开入口族都需归属于正式领域/模块、跨领域平台能力、共享基础设施、有理由的排除项或明确缺口。记录稳定 ID、目标语言名称、结果、入口族、权威对象、运行形态、构建单元、语言、邻接关系和覆盖限制。
 
 | 完整性 | 含义 | 不要求 |
 | --- | --- | --- |
@@ -95,7 +95,7 @@ K1 完整范围 → K2 全局主定义与跨域依赖
 
 共享事实规划唯一去向：接口在 `api.md`，对象在 `object.md`，规则在 `rule.md`，生命周期在 `state_machine.md`，协作在 `downstream.md`，资源在 `infrastructure.md`。模块拥有完整场景叙述并链接共享定义。临时归属图写入执行卡，不新增长期知识产品。
 
-只保留一份 `schemaVersion: 2` 的 `scope-confirmation.md` 执行卡。按[机器消费合同](../src/modus/scaffold/templates/skills/using-modus/references/authoring/evidence/machine-packet.md#六阶段消费与可恢复记录)区分 Module 知识身份与实际机器 requestedScope，建立查询 → 记录/源码 → 已核验事实 → 正文主定义的映射，保留相关反证、限制、缺口和省略处置。保存本轮摘要或机器不可用原因、入口处置、稳定 ID、各模块选择器、精确请求范围、证据模式与缺口、以源码为范围的领域覆盖审查、主定义、图表决策、读取时哈希、计划写入/删除与进度。状态字段遵守[运行时范围契约](../src/modus/scaffold/templates/skills/using-modus/references/authoring/evidence/scope-modeling.md)。
+只保留一份 `scope-confirmation.md` 执行卡；单仓直接记录 Domain 计划，工作区在根卡中按已配置成员 ID/path 隔离同构的 Domain 计划，成员核验从工作区根传入 `--publication --member <member-id>`，不复制分仓卡。按[机器消费合同](../src/modus/scaffold/templates/skills/using-modus/references/authoring/evidence/machine-packet.md#六阶段消费与可恢复记录)区分 Module 知识身份与实际机器 requestedScope，建立查询 → 记录/源码 → 已核验事实 → 正文主定义的映射，保留相关反证、限制、缺口和省略处置。保存本轮摘要或机器不可用原因、入口处置、稳定 ID、各模块选择器、精确请求范围、证据模式与缺口、以源码为范围的领域覆盖审查、主定义、图表决策、读取时哈希、计划写入/删除与进度。状态字段遵守[运行时范围契约](../src/modus/scaffold/templates/skills/using-modus/references/authoring/evidence/scope-modeling.md)。
 
 状态只能根据实际证据与评审推进。工作者完成或核验 `clean` 不能直接把领域标记为 `reviewed`；主作者必须回读实际文件并验收覆盖审查。只有主作者写执行卡。续作时在领域边界保存状态，丢失原卡后不得根据已有输出重建一个缩小且全部已评审的卡。
 
@@ -108,6 +108,8 @@ K2 必须为全范围先建立[跨域协作基线](../src/modus/scaffold/templat
 写前在执行卡已有正文中安排每篇要回答的读者问题、事实主落点、叙述顺序，以及正文、步骤、表格、图和贯穿案例各自承担的解释任务。按[编辑规则](../src/modus/scaffold/templates/skills/using-modus/references/authoring/framework/editorial.md)组织表达，按需选择[对照样稿](../src/modus/scaffold/templates/skills/using-modus/references/authoring/framework/examples.md)校准；样稿不提供当前项目事实，也不要求复制其标题或篇幅。K3 补齐事实后原位调整安排，不新增卡片、schema、状态或平行验收 receipt。
 
 [初始化质量要求](../src/modus/scaffold/templates/skills/using-modus/references/authoring/framework/index.md#初始化质量要求)及用户明确的篇目、案例和最低图表要求记录在卡片已有正文与适用的 `visuals` 中，优先于通用的按需选图建议；不能用 `waived` 自动豁免用户要求。[执行策略](../src/modus/scaffold/templates/skills/using-modus/references/authoring/execution-strategy.md)只调整调查、撰写和回读的组织方式，不因模型、上下文或工具差异降低本契约。
+
+恢复与复用由[上下文合同](../src/modus/scaffold/templates/skills/using-modus/references/authoring/context-continuity.md)统一定义：上下文丢失或交接后实际读卡并恢复；同一作者仍持有完整有效证据时定向补读，工具错误本身不要求重载。未知写入和 CAS 冲突仍核对实际结果，不以连接存续推定模型持有证据。reinit 未授权补建缺失 Team Standard 时，以明确保持缺失并说明影响作为合规处置，不伪称已创作、不阻止其他已授权目标收尾。
 
 ### K3：按场景闭合证据
 
@@ -226,14 +228,14 @@ init/reinit 按[初始化质量要求](../src/modus/scaffold/templates/skills/us
 | 规则 | 要求 |
 | --- | --- |
 | 优先使用有证据的业务名称 | 业务缩写、内部代号、历史名称、状态码与枚举值依据项目注释、定义或文档解释，不凭拼写猜测。 |
-| 区分自然叙述与精确标识 | 已有中文定义的状态/枚举在业务叙述中使用中文，独立页面或场景首次出现附原码；精确接口、字段、配置、命令与代码示例保留原始拼写和真实协议值。 |
+| 区分自然叙述与精确标识 | 已有目标语言定义的状态/枚举在业务叙述中使用该名称，独立页面或场景首次出现附原码；精确接口、字段、配置、命令与代码示例保留原始拼写和真实协议值。 |
 | 解释行为，不只转述代码 | 方法说明用途，布尔值说明控制什么，状态说明进入与退出条件，返回值说明是否代表最终完成。 |
 | 保留条件、例外与不确定性 | 无可靠含义时保留原词；同名异义按范围解释；材料冲突说明差异，不在简化时抹去影响行为的条件。 |
 | 来源放入现有元数据 | 记录支撑解释的代表性文件或源码位置，正文保持连贯；不新增来源协议或强制术语清单。 |
 
 `qm/kg/kw` 只是一类缩写示例，不形成专用映射或验收词表。这些规则不要求所有专业术语翻译成中文，也不因目标语言变化而改写技术标识。
 
-对已有中文含义的术语，按[应用规则](../src/modus/scaffold/templates/skills/using-modus/references/authoring/framework/localization.md#已定义中文含义的应用)区分类型/字段、枚举成员、实际传输值与显示名称，核对构造绑定、注释、字典或国际化映射及当前使用。机器包缺少释义时定向回定义补证；不将符号保真扩大成自然叙述只能保留英文。映射在对象/状态专题定义一次，模块、规则、案例、图中可见标签和本轮获授权的说明性注释复用中文名称；不得只在字典完成解释。跨页回读从映射反查使用处，遗漏属于内容修复；JSON、SQL、命令、代码和原始引用中的真实值保持不变，不做全局字符串替换或增加中文正则门禁。含义不明或存在冲突时记录范围与差异，不凭英文拼写补造名称。
+目标为简体中文时，对已有中文含义的术语按[应用规则](../src/modus/scaffold/templates/skills/using-modus/references/authoring/framework/localization.md#已定义中文含义的应用)区分类型/字段、枚举成员、实际传输值与显示名称，核对构造绑定、注释、字典或国际化映射及当前使用。机器包缺少释义时定向回定义补证；不将符号保真扩大成自然叙述只能保留英文。映射在对象/状态专题定义一次，模块、规则、案例、图中可见标签和本轮获授权的说明性注释复用中文名称；不得只在字典完成解释。跨页回读从映射反查使用处，遗漏属于内容修复；JSON、SQL、命令、代码和原始引用中的真实值保持不变，不做全局字符串替换或增加中文正则门禁。含义不明或存在冲突时记录范围与差异，不凭英文拼写补造名称。
 
 <!--
 运行形态、实现语言与自然语言是不同适配轴，维护时避免相互替代。
@@ -256,7 +258,7 @@ init/reinit 按[初始化质量要求](../src/modus/scaffold/templates/skills/us
 
 [语言适配器](../src/modus/scaffold/templates/skills/using-modus/references/authoring/evidence/language-adapters/index.md)按构建单元回答八类证据问题：构建图、公开入口、类型/序列化、控制流与效果、并发/事务/资源、配置、验证工具链、解析器/编译器降级。核验代理事务、协程取消、浏览器/服务端边界、所有权/析构或状态后端等实际机制。适配器不能引入语言专有的知识目录或标题。
 
-正文、标题、表格与图表标签默认简体中文；用户明确指定其他语言时一致切换。不能随源码注释、材料或会话语言自动改变默认。路径、slug、协议字段、命令和源码标识保持原样；语言变化不改变身份与事实归属。reinit 在已确认范围内统一语言，局部维护不扩大写入授权。
+本轮目标语言统一传递到正文创作、图表与回读；中文专属用词规则只在目标为中文时适用，不新增语言配置或审批。正文、标题、表格与图表标签默认简体中文；用户明确指定其他语言时一致切换。不能随源码注释、材料或会话语言自动改变默认。路径、slug、协议字段、命令和源码标识保持原样；语言变化不改变身份与事实归属。reinit 在已确认范围内统一语言，局部维护不扩大写入授权。
 
 用正文解释原因与例外，用表格表达精确映射，用图解释难以线性阅读的机制。多参与方、受理/完成分离、持久状态、重试补偿、有序决策、跨领域交接、权威/投影差异或资源依赖都应评估图表；没有用户或专用交付要求的额外场景，简单同步操作无需为配额画图。init/reinit 每份状态、协作和模块文档按专用要求选择有依据的最小有用表达；没有持久状态可以解释真实阶段流程，不能伪造状态。模块可以用场景投影说明当前任务，完整机制主图仍只有一个主落点，不复制完整主图。
 

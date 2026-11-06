@@ -30,6 +30,16 @@ def _candidate_match(record: EvidenceRecord, candidate_ids: set[str]) -> bool:
     return not candidate_ids or bool(candidate_ids.intersection(record.candidate_ids))
 
 
+def _unbound_candidate_match(record: EvidenceRecord, candidate_ids: set[str]) -> bool:
+    """文件相关的未知归属只能作为未绑定线索交付。"""
+    related = record.details.get("relatedCandidateIds")
+    return (
+        not record.candidate_ids
+        and isinstance(related, list)
+        and bool(candidate_ids.intersection(str(value) for value in related))
+    )
+
+
 # 兼容单能力和多能力关联字段，空过滤条件不额外缩小结果集。
 def _capability_match(record: EvidenceRecord, capability_ids: set[str]) -> bool:
     if not capability_ids:
@@ -422,7 +432,18 @@ def _selection_records(
         selected = [
             (key, record)
             for key, record in parsed
-            if _candidate_match(record, candidates)
+            if (
+                _candidate_match(record, candidates) or _unbound_candidate_match(record, candidates)
+            )
+            and (
+                _capability_match(record, capabilities)
+                or not record.details.get("capabilityIds")
+                and (
+                    isinstance(record, CoverageGap)
+                    or record.details.get("recordType") == "sourceFile"
+                    or not record.candidate_ids
+                )
+            )
             and _path_match(record, paths)
             and _symbol_match(record, symbols)
         ]

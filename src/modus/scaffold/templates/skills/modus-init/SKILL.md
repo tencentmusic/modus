@@ -9,7 +9,7 @@ description: 基于当前源码与用户材料，初始化完整的项目知识�
 
 ## 先判断新任务或续作
 
-开始 status、build 或调查前，先检查唯一执行卡 `modus/.cache/knowledge-authoring/scope-confirmation.md`。存在未完成卡，或当前请求/宿主是在继续中断任务时，先实际读卡并执行[上下文保存与恢复](../using-modus/references/authoring/context-continuity.md)，再进入记录的阶段。压缩、容量/服务错误、工具中断、取消后继续都适用；不得凭摘要续写、重跑 build 或重做 Scope。原卡缺失/冲突按恢复合同处理，不从已有输出拼装缩小的完成卡。
+开始 status、build 或调查前，先检查唯一执行卡 `modus/.cache/knowledge-authoring/scope-confirmation.md`。接手未完成任务或上下文丢失时，先实际读卡并执行[上下文保存与恢复](../using-modus/references/authoring/context-continuity.md)，再进入记录的阶段。同一作者普通重试且上下文仍完整有效时，按该合同复用，只补缺失或变化的部分；不重跑 build 或重做 Scope。原卡缺失/冲突按恢复合同处理，不凭摘要或已有输出拼装缩小的完成卡。
 
 确属新一轮任务时，复用本轮已有的 `modus status --json` 结果；尚未盘点才只读执行一次。仅当根配置明确 `kind: workspace` 时转入[workspace 流程](references/workspace-init.md)；普通项目进入下表。已有可恢复的稳定 Domain/Module 身份时转 [modus-reinit](../modus-reinit/SKILL.md)，沿用本轮盘点；局部正文缺失不构成从零重建身份的理由。
 
@@ -24,7 +24,7 @@ description: 基于当前源码与用户材料，初始化完整的项目知识�
 | K5 | [项目约束](../using-modus/references/authoring/stages/k5-constraints.md) | 复用前序事实与机器线索，独立提炼并验收首次 Team Standard |
 | K6 | [系统概览与发布](../using-modus/references/authoring/stages/k6-publish.md) | 消费 K4/K5 编写概览、补共享导航、全局回读、publication 与原卡清理 |
 
-K1 后先做全局 K2，再按完整 Domain 循环 K2 → K3 ↔ K4，全部域完成后执行 K5/K6。进入阶段时完整读取入口列出的适用细则，不只读此表。默认串行，只有用户明确授权且边界可拆分时才按[并行协议](../using-modus/references/authoring/parallel-domain-authoring.md)委派；范围确认不自动授权 subagent。
+K1 后先做全局 K2，再按完整 Domain 循环 K2 → K3 ↔ K4，全部域完成后执行 K5/K6。进入阶段时确保已完整读取入口列出的适用细则，仍完整有效的内容按上下文合同复用，不只依据此表。默认串行，只有用户明确授权且边界可拆分时才按[并行协议](../using-modus/references/authoring/parallel-domain-authoring.md)委派；范围确认不自动授权 subagent。
 
 ## 不变量
 

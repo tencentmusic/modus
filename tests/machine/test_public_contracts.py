@@ -79,7 +79,7 @@ def test_analysis_receipt_matches_its_wire_schema() -> None:
 # 查询和上下文范围必须以同样方式解释这些参数。
 def test_capability_selectors_extend_existing_positional_scope_compatibly() -> None:
     query = machine.EvidenceQuery(
-        "evidence",
+        "services",
         ("candidate:orders",),
         ("boundary:orders",),
         ("orders.py",),

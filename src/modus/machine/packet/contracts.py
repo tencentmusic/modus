@@ -135,6 +135,11 @@ class ContextRequest:
     budget: PacketBudget = PacketBudget()
 
     def __post_init__(self) -> None:
+        if self.scope.boundary_ids and self.intent is not TaskIntent.SERVICE_BOUNDARY:
+            raise ContractError(
+                "machine.packet.unsupported-boundary-filter",
+                "boundary selectors require service-boundary intent",
+            )
         if self.intent is TaskIntent.MODULE_AUTHORING and not self.scope.has_module_selector:
             raise ContractError(
                 "machine.packet.module-scope-required",

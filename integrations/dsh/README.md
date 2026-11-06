@@ -129,7 +129,9 @@ profile 的 `cordis.patch.yml` 是 YAML 列表。按 `id` 更新本插件条目�
 
 以下 `modus` 使用配置中的同一个 CLI；源码安装时替换为其绝对路径。
 
-`modus update --project` 更新受管 Skills，并保留用户编辑。`modus uninstall --project` 按卸载计划移除受管投影和指引区块，保留用户自建 Skill、DSH profile 与长期知识。原生插件独立移除：
+`modus update` 更新 CLI 与项目受管资产；`modus update --project` 仅使用当前 CLI 更新受管 Skills，并保留用户编辑。profile 中的 npm 插件由 DSH 独立管理。原生工具尚未声明共享 Skill 所需参数时，通过宿主 Shell 使用配置中的同一 CLI 执行对应命令，无需为继续任务先升级插件。
+
+`modus uninstall --project` 按卸载计划移除受管投影和指引区块，保留用户自建 Skill、DSH profile 与长期知识。原生插件独立移除：
 
 ```bash
 dsh plugin --profile modus remove @modus-ai/modus

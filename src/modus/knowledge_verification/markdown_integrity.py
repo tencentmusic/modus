@@ -13,16 +13,14 @@ from urllib.parse import unquote
 
 from ..commands.verify_anchors import _REF_RE
 from ..knowledge_reader import BoundKnowledgeReadError, read_bound_regular_text
+from ..markdown import body_start, markdown_anchors, markdown_headings
+from ..markdown import markdown_slug as markdown_slug
+from ..markdown import strip_fenced_code as _strip_fenced_code
 from ..paths import ModusPaths
-from ..retrieval.stages.documents import body_start, markdown_headings
-from ..retrieval.stages.documents import markdown_slug as markdown_slug
-from ..retrieval.stages.documents import strip_fenced_code as _strip_fenced_code
 from .models import VerificationFinding, finding
 
 MAX_DOCUMENT_BYTES = 4 * 1024 * 1024
 LINK_RE = re.compile(r"!?\[([^\]]+)\]\(([^)]+)\)")
-_HTML_ANCHOR_RE = re.compile(r'<a\s+(?:name|id)=["\']([^"\']+)["\']', re.IGNORECASE)
-_ITEM_RE = re.compile(r"\{\{item:([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\}\}")
 _ABSOLUTE_LOCAL_RE = re.compile(
     r"(?:file://)?(?:/Users/[^\s)`]+|/home/[^\s)`]+|/root/[^\s)`]+|"
     r"/private/(?:tmp|var)/[^\s)`]+|/tmp/[^\s)`]+|/workspace/[^\s)`]+|"
@@ -130,11 +128,7 @@ def verify_markdown_basics(
 # 标题、显式 HTML 锚点与条目标记共同构成可链接目标。
 # 三类锚点统一大小写后匹配，不从普通正文推测锚点。
 def _anchors_for(text: str) -> set[str]:
-    return {
-        *(markdown_slug(heading) for _line, _level, heading in document_headings(text)),
-        *(match.casefold() for match in _HTML_ANCHOR_RE.findall(text)),
-        *(f"item-{item}".casefold() for item in _ITEM_RE.findall(text)),
-    }
+    return {anchor for anchors in markdown_anchors(text).values() for anchor in anchors}
 
 
 # 只核验仓库内的相对链接，不发起网络请求检查外部 URL。

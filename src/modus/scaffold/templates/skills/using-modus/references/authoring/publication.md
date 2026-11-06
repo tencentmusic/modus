@@ -29,7 +29,7 @@ init/reinit 执行完整的领域与全局验收，并使用原执行卡完成 p
 - 目标读者能否理解谁在什么条件下做什么、得到什么结果？
 - 能否区分正常流程、失败、例外和恢复方式？
 - 必要的技术标识是否解释清楚，并保留准确拼写；尚未证实的含义和适用范围是否明确？
-- 已有明确中文定义或枚举映射的术语，是否在业务段落、条件表、案例、图中标签和本轮说明性注释中实际采用，且原始协议值仍保持准确？
+- 已有明确目标语言定义或枚举映射的术语，是否在业务段落、条件表、案例、图中标签和本轮说明性注释中实际采用，且原始协议值仍保持准确？
 - 表述简化后，是否仍保留影响行为的关键条件？
 
 这些问题用于 Domain 成稿、全局发布和局部 update/sync 的受影响正文，不要求在产物中增加固定章节、术语表或检查回执。按[编辑规则](framework/editorial.md)核对段落、步骤、表格、图和案例的分工；按需参考[对照样稿](framework/examples.md)，不把样稿的标题、篇幅或示意事实当作当前项目合同。
@@ -73,7 +73,7 @@ K5 的逐条对账还核对规则性质、原始机制、使用者、反例与�
 每篇依次完成三类工作：
 
 1. **对范围。** 由证据清单找到每个接口详情、字段定义、规则、状态转换、协作交接、资源配置和场景；再由正文反查依据。共享定义必须实际读到对应成员，不能把链接存在当作内容存在。域级 coverage 另行执行，不能替代此项。按[机器消费记录](evidence/machine-packet.md#六阶段消费与可恢复记录)反查相关 evidence/signals/关系的事实主落点，以及未采用、歧义、反证和预算省略的处置；有锚点不代表该事实已写入。
-2. **对事实。** 对关键分支分别核对输入条件、选值方向、写入/副作用、返回与最终完成。将 API、Object、Rule、State、Module、图和案例中同一事实并排检查，尤其关注否定词、`0/1`、优先级、fallback 方向、重试资格与部分成功。从已核验的中文名称/枚举映射反查本轮各页的自然叙述和图中标签，确认同一类型/字段含义一致；字典有中文而模块仍仅用原码属于待修内容缺陷，不能因映射存在就通过。精确代码、载荷、原始日志不做中文替换；不能靠扫描英文词一律判错。存在冲突时回当前源码裁决，不能多数表述一致就认定正确。
+2. **对事实。** 对关键分支分别核对输入条件、选值方向、写入/副作用、返回与最终完成。将 API、Object、Rule、State、Module、图和案例中同一事实并排检查，尤其关注否定词、`0/1`、优先级、fallback 方向、重试资格与部分成功。按本轮目标语言，从已核验的业务名称/枚举映射反查本轮各页的自然叙述和图中标签，确认同一类型/字段含义一致；字典已有目标语言释义而模块仍仅用原码属于待修内容缺陷，不能因映射存在就通过。精确代码、载荷、原始日志不做语言替换；不能靠扫描英文词一律判错。存在冲突时回当前源码裁决，不能多数表述一致就认定正确。
 3. **对阅读。** 隐藏元数据连续阅读目标页，按编辑合同修正标题层次、长段落、宽表、空泛列表与跳转依赖；按图文合同核对选型和图前/图后说明，再做实际预览。修订后回查事实并重读受影响内容。
 
 只有逐篇记录覆盖全部本轮目标、逐项对账完成、[跨域交接](cross-domain.md)已与最新共享基线核对、已知事实/内容/排版问题已修复，且原有 evidence/coverage 条件满足时，才能由根作者推进相关 `reviewed`。目标阅读器不可用时可以保留明确的预览限制完成其余语义验收，但不得记作视觉通过；已观察到的渲染失败、裁切或无法阅读需先修复。`reviewed` 和 publication `clean` 都不能清除记录中的视觉待验项，预览未完成时按下述规则保留卡片与续作位置。
@@ -104,7 +104,7 @@ init/reinit 中工具不可用、只完成部分预览或用户明确将视觉�
 
 普通 `modus knowledge verify --json` 只检查机械完整性：Markdown 可读与 fence 闭合、canonical 知识路径、相对链接和锚点、仓库相对源码引用、锚点漂移、本机绝对路径、高置信敏感值、路径/符号链接安全，以及声明过的 Module metadata 能否解析且不与物理身份冲突。需要局部反馈时可以运行 `--domain <slug>`。
 
-init/reinit 终稿在删除执行卡之前运行一次 `modus knowledge verify --publication --json`。发布模式要求 `schemaVersion: 2` 执行卡，并额外核对：确认的 Domain/Module 是否全部落地并 reviewed；每个 Module 是否记录精确 requestedScope、selector 与 ready evidence；每个 Domain 是否完成源码 coverage；outcome 是否终结；四个 Domain Business 索引是否位于 canonical 路径；implemented Module 是否有至少一个 frontmatter `anchors.locations`；机器生成正文是否没有源码路径；每项图表决定是否记录 readerQuestion/mechanism 并按 visual id 落地或带理由豁免。
+init/reinit 终稿在删除执行卡之前运行一次 `modus knowledge verify --publication --json`；工作区从根目录为每个已确认创作成员传入 `--member <member-id>`。发布模式读取唯一执行卡中的相应计划，并额外核对：确认的 Domain/Module 是否全部落地并 reviewed；每个 Module 是否记录精确 requestedScope、selector 与 ready evidence；每个 Domain 是否完成源码 coverage；outcome 是否终结；四个 Domain Business 索引是否位于 canonical 路径；implemented Module 是否有至少一个 frontmatter `anchors.locations`；机器生成正文是否没有源码路径；每项图表决定是否记录 readerQuestion/mechanism 并按 visual id 落地或带理由豁免。
 
 验证器不得要求固定标题、章节顺序、H3/分片数量、topic 齐全、页首导航、business 固定字节、额外 coverage receipt、方法级证据预算、全局图数量、中文正则、固定缩写替换表或专业术语全部翻译。普通 `clean` 只表示机械完整；publication `clean` 只表示执行卡字段、selector 语法/源码边界、执行状态和可机械检查的文件承诺一致；不读取 bundle 重放查询，也不认证卡片正文中的证据消费记录。两者都不替代正文真实性、充分性、可读性和专业性的人工语义回读。
 
@@ -135,6 +135,6 @@ Team Standard 的两种写入方式互斥，默认均为 `false`：首次 init �
 3. 移动先写新落点、修复全部入站链接和导航，再按原读时哈希删除旧生成文件。
 4. 人工 constraint/business 默认不改不删；明确授权时仍使用 CAS。
 5. 冲突只重读受影响目标，禁止刷新哈希后盲目覆盖。
-6. 发布后回读实际正文；只有 `schemaVersion: 2` 执行卡中的全部已确认目标均为 `reviewed`、每个 Module evidence 为 `ready`、每个 Domain coverage 为 `audited`、每个 Domain 有 `changed / unchanged` 终态，根概览和 Team Standard 已完成，且本轮实际运行的 `modus knowledge verify --publication --json` 为 `clean` 时，才进入清理。再核对卡片正文中本轮约定的整页/逐图验收均完成，没有待修问题或待验位置，才删除执行卡并只清理空目录；存在 `blocked` 或视觉待验项时保留卡片供恢复。普通 verify 的 `clean` 不得替代 publication，机械检查也不能清除正文中的验收缺口。执行卡不得提前删除；删除后发现正文仍需补写，不能从输出反向拼装一张最小执行卡获取 `clean`，而应如实报告收尾顺序错误并从完整权威状态恢复。
+6. 发布后回读实际正文；只有唯一执行卡中的全部已确认创作目标均为 `reviewed`、每个 Module evidence 为 `ready`、每个 Domain coverage 为 `audited`、每个 Domain 有 `changed / unchanged` 终态，根概览完成，Team Standard 已按授权完成创作、保留核对或明确保持缺失的处置，且本轮实际运行的单仓 publication 或各已确认创作成员的 `--publication --member <member-id>` 核验为 `clean` 时，才进入清理。reinit 中规范缺失且未获补建授权时，在原卡正文说明缺失与影响，不伪称已创作、不生成悬空链接，也不因缺失阻止已授权工作的正常收尾。再核对卡片正文中本轮约定的整页/逐图验收均完成，没有待修问题或待验位置，才删除执行卡并只清理空目录；存在 `blocked` 或视觉待验项时保留卡片供恢复。普通 verify 的 `clean` 不得替代 publication，机械检查也不能清除正文中的验收缺口。执行卡不得提前删除；删除后发现正文仍需补写，不能从输出反向拼装一张最小执行卡获取 `clean`，而应如实报告收尾顺序错误并从完整权威状态恢复。
 
 最终报告真实写入、删除、未更新原因、机械结果、实际回读与预览范围，以及仍存在的事实缺口和未验证项；不得把自查描述为独立读者验收，或把未运行的检查描述为通过。
