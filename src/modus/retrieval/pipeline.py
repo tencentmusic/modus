@@ -156,6 +156,13 @@ def _entry_refs(index: dict, candidates: list[dict]) -> list[dict]:
             key=lambda section: section["lineStart"],
         )
         record = dict(candidate)
+        # 不同池或命中小节共享条目首段身份，避免残缺片段抢先去重或同条目重复占额。
+        if parts:
+            record.update(
+                id=parts[0]["id"],
+                heading=parts[0]["heading"],
+                headingPath=parts[0]["headingPath"],
+            )
         record.update(
             lineStart=key[1],
             lineEnd=key[2],
@@ -219,7 +226,7 @@ def _source_ref(paths: ModusPaths, relative: str, query: str, hits: list[dict]) 
         )
         start = max(1, match_index + 1 - 2)
     end = min(len(lines), start + 19)
-    excerpt = redact_secrets("\n".join(lines[start - 1 : end]))[:1200]
+    excerpt = redact_secrets("\n".join(lines[start - 1 : end]))
     identity = f"{relative}:{start}:{end}:{hashlib.sha256(raw.encode('utf-8')).hexdigest()}"
     return {
         "id": "ev-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:20],
@@ -236,7 +243,9 @@ def _source_ref(paths: ModusPaths, relative: str, query: str, hits: list[dict]) 
         "symbol": None,
         "digest": hashlib.sha256(raw.encode("utf-8")).hexdigest(),
         "scoreSignals": {"liveSource": 1.0},
-        "excerpt": excerpt,
+        "excerpt": excerpt[:1200],
+        "truncated": len(excerpt) > 1200,
+        "readTarget": {"path": relative, "lineStart": start, "lineEnd": end},
     }
 
 
@@ -289,14 +298,12 @@ def _applicable_constraints(
         else:
             continue
         overlap = len(query_terms & set(tokenize(f"{item['heading']}\n{item['text']}")))
+        overlap += int(item.get("navigationScore") or 0)
         explicit = any(
             item["path"] == p or item["path"].startswith(p.rstrip("/") + "/")
             for p in route.get("paths") or []
         )
-        uncertain = source_type == "project-constraint" and not (overlap or explicit)
-        if uncertain != candidates:
-            continue
-        tiers[tier].append((float(overlap) + float(item.get("score") or 0.0), item))
+        tiers[tier].append((float(overlap) + float(explicit), item))
 
     selected: list[dict] = []
     tier_limits = {"project": 2}
@@ -306,7 +313,24 @@ def _applicable_constraints(
             tiers[tier],
             key=lambda value: (-value[0], value[1]["path"], value[1]["lineStart"]),
         )
-        selected.extend(_knowledge_ref(item) for _score, item in ranked[:limit])
+
+        def entry_key(item: dict) -> tuple:
+            entry = item.get("entryRange") or item
+            return item["path"], entry["lineStart"], entry["lineEnd"]
+
+        # 在截断元数据前判断整个条目，长条目的末尾命中也不能丢失。
+        matched_entries = {entry_key(item) for score, item in ranked if score > 0}
+        chosen: list[dict] = []
+        seen: set[tuple] = set()
+        for _score, item in ranked:
+            key = entry_key(item)
+            uncertain = tier == "project" and key not in matched_entries
+            if uncertain == candidates and key not in seen:
+                chosen.append(item)
+                seen.add(key)
+                if len(chosen) == limit:
+                    break
+        selected.extend(_entry_refs(index, chosen))
     return selected
 
 
@@ -370,6 +394,7 @@ def _anchored_source_refs(
                 if not re.search(rf"(?<![\w$]){re.escape(name)}(?![\w$])", excerpt_text):
                     raise ValueError("声明的源码范围内缺少该符号")
                 digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+                excerpt = redact_secrets(excerpt_text)
                 result.append(
                     {
                         "id": "ev-"
@@ -388,7 +413,9 @@ def _anchored_source_refs(
                         "symbol": symbol,
                         "digest": digest,
                         "scoreSignals": {"sourceLocation": 1.0},
-                        "excerpt": redact_secrets(excerpt_text)[:1200],
+                        "excerpt": excerpt[:1200],
+                        "truncated": len(excerpt) > 1200,
+                        "readTarget": {"path": relative, "lineStart": start, "lineEnd": end},
                     }
                 )
                 if len(result) >= limit:
@@ -536,12 +563,16 @@ def finish_context(
     collector = EvidenceCollector(limit=body_limit + len(routing_evidence))
     for ref in routing_evidence:
         collector.add(ref)
+    rules = [
+        *applicable_constraints,
+        *[item for item in additional_evidence or [] if _need_matches("business-rule", item)],
+    ]
+    needs_rules = bool({"business-rule", "engineering-constraint"} & set(query["evidenceNeeds"]))
+    domain_pool = [*rules, *knowledge] if needs_rules else knowledge
     pools = [
         [*anchored, *live],
-        [
-            *applicable_constraints,
-            *[item for item in additional_evidence or [] if _need_matches("business-rule", item)],
-        ],
+        [item for item in rules if needs_rules and item.get("sourceType") == "project-constraint"],
+        [item for item in domain_pool if _need_matches("domain-knowledge", item)],
         [*knowledge, *module_routes],
         list(additional_evidence or []),
     ]
@@ -613,7 +644,7 @@ def finish_context(
         ),
         "readTargets": [
             item["readTarget"]
-            for item in knowledge
+            for item in [*knowledge, *applicable_constraints]
             if item.get("readTarget")
             and (item.get("truncated") or item["id"] not in {ref["id"] for ref in evidence})
         ],

@@ -22,6 +22,8 @@ skills/<workflow>/references/  按需读取的工作流细节
 
 命令只链接对应 Skill。init/reinit 共用[六阶段入口](skills/using-modus/references/authoring/index.md)，update/sync 共用[增量维护](skills/using-modus/references/authoring/incremental.md)；两条路线再引用同一套证据、正文与发布细则。新能力先落到所属细则，再检查哪些入口应该消费它。共享取证说明必须区分初始化包与当前源码，避免增量流程意外启动全量分析。
 
+日常知识使用由 [using-modus](skills/using-modus/SKILL.md) 按 C1～C6 组织；入口按阶段链接[衔接、停止与回跳说明](skills/using-modus/references/consumption.md)，定位与取证细则归[共享检索说明](skills/using-modus/references/router-details.md)，规则适用与验收归[约束使用说明](skills/using-modus/references/constraint-usage.md)，知识留存归入口检查点与既有同步流程。C 阶段不是新的 Skill 或全量创作流程；直接读文件与可选 CLI 取证共享上述边界。
+
 模板随 `modus update --project` 更新到 `.modus/` 和宿主副本，内容变化不依赖包版本号变化。未改动的受管文件随模板更新，用户修改保留并报告；知识正文不因模板升级自动重写。新增参考必须同时通过源码链接检查、各平台升级与已安装 wheel 验证。
 
 ## 编写原则

@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import time
+import unicodedata
 from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -33,6 +34,42 @@ _ITEM_ANCHOR_RE = re.compile(
     r'<a\s+id=["\']item-([A-Za-z0-9][A-Za-z0-9._:-]{0,127})["\']\s*></a>',
     re.IGNORECASE,
 )
+_HTML_ANCHOR_RE = re.compile(r'<a\s+(?:name|id)=["\']([^"\']+)["\']', re.IGNORECASE)
+
+
+def markdown_slug(value: str) -> str:
+    """标题与链接片段共享 Unicode 归一化，不依赖文档语言。"""
+    value = value.strip().casefold()
+    result = [
+        character
+        for character in value
+        if character in {"-", "_", " "} or unicodedata.category(character)[0] in {"L", "N", "M"}
+    ]
+    return re.sub(r"[ -]+", "-", "".join(result)).strip("-")
+
+
+def strip_fenced_code(text: str) -> str:
+    """示例内的链接不参与导航；保留空行以维持来源坐标。"""
+    output: list[str] = []
+    fence: tuple[str, int] | None = None
+    for line in text.splitlines():
+        match = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        if fence is None and match and not (match[1][0] == "`" and "`" in match[2]):
+            fence = (match[1][0], len(match[1]))
+            output.append("")
+            continue
+        if fence is not None:
+            if (
+                match
+                and match[1][0] == fence[0]
+                and len(match[1]) >= fence[1]
+                and not match[2].strip()
+            ):
+                fence = None
+            output.append("")
+            continue
+        output.append("" if line.startswith(("    ", "\t")) else line)
+    return "\n".join(output)
 
 
 # 扫描结果同时保存正文、链接、输入摘要与降级原因。
@@ -46,6 +83,7 @@ class DocumentScan:
     input_digests: dict[str, str]
     partial: bool
     issues: list[dict[str, Any]]
+    read_bytes: int = 0
 
     def as_legacy_tuple(
         self,
@@ -365,6 +403,29 @@ def is_rule_evidence(item: Mapping[str, Any]) -> bool:
     )
 
 
+def matches_knowledge_need(need: str, item: Mapping[str, Any]) -> bool:
+    """分开提示业务正文与工程约束到场，保留旧 business-rule 的宽泛兼容语义。"""
+    if need == "business-rule":
+        return is_rule_evidence(item)
+    if item.get("status") != "current" or item.get("loadLevel") == "L1":
+        return False
+    text = str(item.get("text") or item.get("excerpt") or "")
+    if not any(
+        line.strip() and not line.lstrip().startswith(("#", "<a ", "{{item:"))
+        for line in text.splitlines()
+    ):
+        return False
+    if need == "domain-knowledge":
+        return bool((item.get("scope") or {}).get("domain")) and item.get("sourceType") in {
+            "project-generated",
+            "project-module",
+            "project-business",
+        }
+    if need == "engineering-constraint":
+        return item.get("sourceType") == "project-constraint" and is_rule_evidence(item)
+    return False
+
+
 # 仅跳过有闭合边界的 frontmatter，损坏元数据不能吞掉整篇正文。
 # 前置元数据不作为正文证据，行号偏移仍需保留供定位。
 def body_start(lines: list[str]) -> int:
@@ -530,6 +591,7 @@ def scan_documents(
         # 标题栈保留父级角色、主题与状态，子章节可继承阅读上下文。
         # 子树终点单独计算，用于构造完整条目的继续阅读范围。
         heading_context: list[dict[str, Any]] = []
+        heading_counts: defaultdict[str, int] = defaultdict(int)
         subtree_ends = [len(lines)] * len(headings)
         open_headings: list[int] = []
         for ordinal, (line_index, level, _heading) in enumerate(headings):
@@ -557,9 +619,16 @@ def scan_documents(
                 if facet == "rule"
                 else infer_status(section_text, frontmatter, inherited_status)
             )
+            prose = strip_fenced_code(section_text)
             own_items = sorted(
-                set(_ITEM_ID_RE.findall(section_text)) | set(_ITEM_ANCHOR_RE.findall(section_text))
+                set(_ITEM_ID_RE.findall(prose)) | set(_ITEM_ANCHOR_RE.findall(prose))
             )
+            slug = markdown_slug(heading)
+            occurrence = heading_counts[slug]
+            heading_counts[slug] += 1
+            section_anchors = [slug if occurrence == 0 else f"{slug}-{occurrence}"]
+            section_anchors.extend(match.casefold() for match in _HTML_ANCHOR_RE.findall(prose))
+            section_anchors.extend(f"item-{item}".casefold() for item in own_items)
             parent = heading_context[-1] if heading_context else None
             normalized_heading = re.sub(
                 r"^\d+[.、．]\s*", "", heading.casefold().replace("_", " ").strip()
@@ -608,6 +677,7 @@ def scan_documents(
                     "path": relative,
                     "heading": heading,
                     "headingPath": heading_path,
+                    "anchors": list(dict.fromkeys(section_anchors)),
                     "entryRange": entry_range,
                     "_entryOrdinal": entry_ordinal,
                     "readTarget": {"path": relative, **entry_range},
@@ -665,6 +735,7 @@ def scan_documents(
         input_digests=inputs,
         partial=limited,
         issues=scan_issues,
+        read_bytes=total_bytes,
     )
 
 

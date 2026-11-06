@@ -5,9 +5,8 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
-from .documents import canonical_json
+from .documents import canonical_json, matches_knowledge_need
 from .lexical import BM25Query, tokenize
-from .sections import is_rule_evidence
 
 
 # 显式范围是过滤边界，推断领域和模块只影响排序。
@@ -80,6 +79,19 @@ def search_index(
         route_scope = record.get("scope") or {}
         route_bonus = 0
         if route:
+            locations = record.get("sourceLocations") or []
+            if isinstance(locations, list) and any(
+                isinstance(location, dict)
+                and isinstance(location.get("path"), str)
+                and any(
+                    location["path"] == prefix
+                    or location["path"].startswith(prefix.rstrip("/") + "/")
+                    for prefix in route.get("paths") or []
+                    if not prefix.startswith(("modus/", ".modus/"))
+                )
+                for location in locations
+            ):
+                route_bonus += 5
             if route_scope.get("memberId") in set(route.get("members") or []):
                 route_bonus += 3
             if route_scope.get("domain") in set(route.get("domains") or []):
@@ -110,6 +122,13 @@ def search_index(
             rrf[evidence_id] += contribution
             signals[evidence_id][channel] = round(contribution, 8)
     by_id = {item["id"]: item for item in records}
+    # 场景链接可连接不同词汇；片段精确命中保留独立信号，不升级规则权威。
+    for record in records:
+        if record.get("navigationScore"):
+            # 整篇文件链接只给弱提示，不能让无关小节压过精确正文命中。
+            contribution = 1.0 / 61 if record.get("navigationTargeted") else 0.002
+            rrf[record["id"]] += contribution
+            signals[record["id"]]["navigationLink"] = contribution
     need_types = {
         "relationship": {"workspace-generated", "project-generated", "project-module"},
         "contract": {"workspace-generated", "project-generated", "project-module"},
@@ -121,9 +140,8 @@ def search_index(
             1
             for need in evidence_needs or []
             if (
-                is_rule_evidence(record)
-                if need == "business-rule"
-                else record.get("sourceType") in need_types.get(need, set())
+                matches_knowledge_need(need, record)
+                or record.get("sourceType") in need_types.get(need, set())
             )
         )
         if matched_needs:

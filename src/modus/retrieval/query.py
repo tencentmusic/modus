@@ -95,8 +95,18 @@ def analyze_query(
             entities.append(normalized)
 
     evidence_needs = list(_EVIDENCE_NEEDS_BY_INTENT[intent])
-    if purpose == "change":
-        evidence_needs = list(dict.fromkeys([*evidence_needs, "business-rule", "current-source"]))
+    if purpose == "change" or intent == "change":
+        evidence_needs = list(
+            dict.fromkeys(
+                [
+                    *evidence_needs,
+                    "business-rule",
+                    "domain-knowledge",
+                    "engineering-constraint",
+                    "current-source",
+                ]
+            )
+        )
 
     return {
         "intent": intent,

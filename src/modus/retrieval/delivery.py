@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
-from .stages.sections import is_rule_evidence
+from .stages.documents import matches_knowledge_need
 
 _SOURCE_EVIDENCE_TYPES = frozenset(
     {"current-source", "test-source", "config-source", "contract-source"}
@@ -64,8 +64,8 @@ def evidence_matches_need(need: str, item: dict[str, Any]) -> bool:
     source_type = str(item.get("sourceType") or "")
     if need == "current-source":
         return source_type in _SOURCE_EVIDENCE_TYPES
-    if need == "business-rule":
-        return is_rule_evidence(item)
+    if need in {"business-rule", "domain-knowledge", "engineering-constraint"}:
+        return matches_knowledge_need(need, item)
     if need in {"relationship", "contract"}:
         return source_type in _RELATIONSHIP_EVIDENCE_TYPES
     if need == "routing":

@@ -6,7 +6,7 @@
 from typing import Final
 
 _PROJECT_EVIDENCE_ACTIVATION: Final = (
-    "当前任务需要本项目的源码或实现证据时（包括基于代码撰写文档或演示材料），"
+    "当前任务需要本项目的业务知识、工程规范或实现证据时（包括确有项目知识价值的问答、文档或演示材料），"
     "请按需读取 `.modus/skills/using-modus/SKILL.md` 或其平台接入副本。"
     "只加载相关知识；技能、知识、CLI 或缓存缺失不阻塞任务。"
     "与项目无关的任务（如查询股价、翻译给定文本）不加载 using-modus，"
@@ -17,7 +17,7 @@ _PROJECT_EVIDENCE_ACTIVATION: Final = (
 _KNOWLEDGE_RETENTION_CHECKPOINT: Final = (
     "使用 using-modus 进行项目实现、公开契约、运行配置或源码锚点的变更时，"
     "在实现与验证期间保留知识影响检查点。最终回复前，结合当前任务与实际差异，"
-    "判断长期知识语义或锚点是否发生变化。确认受影响时才加载 modus-sync-knowledge；"
+    "判断长期知识语义或锚点是否发生变化。受影响或影响尚未查明时加载 modus-sync-knowledge；"
     "无影响时静默完成检查。该检查是助手的语义判断，不要求额外命令、扫描、报告、"
     "审批或持久化状态。"
 )

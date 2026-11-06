@@ -4,6 +4,8 @@
 
 跨层生命周期以本文为准；K 侧细则见[创作契约](authoring-contract.md)，安装后的 `references/authoring/**` 是其按需加载的运行版本。这样保持 N6 → K1 的交接可审查，同时避免复制整套正文规则。
 
+正式知识的日常消费由 [using-modus 的 C1～C6](../src/modus/scaffold/templates/skills/using-modus/SKILL.md) 组织：任务定界、联合定位、证据收敛、产出决策、执行与验收、知识留存判断。它复用正式 Markdown、用户材料与当前源码，不进入 N/K 全量构建流程；助手直接读取与可选 CLI 检索遵守同一协议。阶段允许合并、跳过和回跳，没有新的执行卡或持久状态。[消费阶段说明](../src/modus/scaffold/templates/skills/using-modus/references/consumption.md)拥有阶段衔接、停止与回跳判断；定位取证由[共享检索说明](../src/modus/scaffold/templates/skills/using-modus/references/router-details.md)定义，规则适用与验收由[约束使用说明](../src/modus/scaffold/templates/skills/using-modus/references/constraint-usage.md)定义，知识留存由入口检查点与既有同步流程负责。
+
 <!--
 生命周期图与下方职责表共同维护；箭头表示明确交接，不能理解为自动写入。
 -->
