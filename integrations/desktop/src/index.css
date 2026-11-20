@@ -1,0 +1,167 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Light theme (default) */
+  :root {
+    --app-scale: 1;
+    --color-bg: #FAFAFA;
+    --color-bg-secondary: #F4F4F5;
+    --color-surface: #FFFFFF;
+    --color-surface-hover: #F4F4F5;
+    --color-surface-active: #E4E4E7;
+    --color-border: #D4D4D8;
+    --color-border-subtle: #E4E4E7;
+    --color-border-faint: #EEEEF0;
+    --shadow-card: 0 1px 2px rgba(24, 24, 27, 0.04);
+    --shadow-card-hover: 0 4px 12px rgba(24, 24, 27, 0.07);
+    --color-text-primary: #18181B;
+    --color-text-secondary: #27272A;
+    --color-text-tertiary: #52525B;
+    --color-text-muted: #71717A;
+    --color-text-faint: #8B8B94;
+    --color-accent: #059669;
+    --color-accent-light: #10B981;
+    --color-accent-dark: #047857;
+    --color-accent-bg: rgba(5,150,105,0.08);
+    --color-accent-border: rgba(5,150,105,0.25);
+    --color-danger: #DC2626;
+    --color-danger-bg: rgba(220,38,38,0.08);
+  }
+
+  /* Dark theme */
+  .dark {
+    --color-bg: #0C0C0F;
+    --color-bg-secondary: #0F0F13;
+    --color-surface: #131317;
+    --color-surface-hover: #17171E;
+    --color-surface-active: #1E1E28;
+    --color-border: #222229;
+    --color-border-subtle: #1C1C22;
+    --color-border-faint: #18181E;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-card-hover: 0 4px 14px rgba(0, 0, 0, 0.45);
+    --color-text-primary: #F4F4F5;
+    --color-text-secondary: #D4D4D8;
+    --color-text-tertiary: #A1A1AA;
+    --color-text-muted: #8E8E96;
+    --color-text-faint: #71717A;
+    --color-accent: #10B981;
+    --color-accent-light: #34D399;
+    --color-accent-dark: #059669;
+    --color-accent-bg: rgba(16,185,129,0.08);
+    --color-accent-border: rgba(16,185,129,0.25);
+    --color-danger: #EF4444;
+    --color-danger-bg: rgba(239,68,68,0.08);
+  }
+
+  /* System preference fallback (when no .dark class and user chose "system") */
+  @media (prefers-color-scheme: dark) {
+    :root:not(.dark) {
+      /* JS will add .dark class, but this is a brief fallback */
+    }
+  }
+
+  html,
+  body,
+  #root {
+    height: calc(100vh / var(--app-scale));
+    width: calc(100vw / var(--app-scale));
+  }
+
+  body {
+    @apply bg-background text-primary font-sans antialiased overflow-hidden;
+    letter-spacing: -0.005em;
+  }
+}
+
+@layer components {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .app-page {
+    @apply mx-auto flex min-h-full w-full max-w-[1200px] flex-col gap-6 pb-8;
+  }
+
+  .app-page-narrow {
+    @apply max-w-[1040px];
+  }
+
+  .app-page-header {
+    @apply border-b border-border-subtle pb-4;
+  }
+
+  .app-page-title {
+    @apply text-[17px] font-semibold tracking-tight text-primary;
+  }
+
+  .app-page-subtitle {
+    @apply mt-1.5 text-[13px] leading-5 text-muted;
+  }
+
+  .app-section-title {
+    @apply text-[12px] font-semibold uppercase tracking-[0.08em] text-muted;
+  }
+
+  .app-panel {
+    @apply rounded-xl border border-border-subtle bg-surface;
+  }
+
+  .app-panel-muted {
+    @apply rounded-xl border border-border-subtle bg-bg-secondary;
+  }
+
+  .app-toolbar {
+    @apply flex flex-wrap items-center justify-between gap-3;
+  }
+
+  .app-toolbar-segmented {
+    @apply h-10;
+  }
+
+  .app-toolbar-button {
+    @apply inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg text-[13px] font-medium transition-colors outline-none;
+  }
+
+  .app-toolbar-button-secondary {
+    @apply border border-border-subtle bg-surface px-2.5 text-muted hover:bg-surface-hover hover:text-secondary;
+  }
+
+  .app-toolbar-button-primary {
+    @apply border border-accent-border bg-accent-dark px-3 text-white hover:bg-accent;
+  }
+
+  .app-input {
+    @apply h-10 rounded-lg border border-border-subtle bg-surface px-3 text-[13px] text-secondary outline-none transition-colors placeholder:text-faint focus:border-border;
+  }
+
+  .app-segmented {
+    @apply flex rounded-lg border border-border-subtle bg-surface p-0.5;
+  }
+
+  .app-segmented-button {
+    @apply whitespace-nowrap rounded-md px-3 py-2 text-[13px] font-medium text-muted transition-colors outline-none hover:text-tertiary;
+  }
+
+  .app-segmented-button-active {
+    @apply bg-surface-active text-secondary;
+  }
+
+  .app-button-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-accent-border bg-accent-dark px-4 py-2.5 text-[13px] font-medium text-white transition-colors outline-none hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .app-button-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-border-subtle bg-surface px-4 py-2.5 text-[13px] font-medium text-secondary transition-colors outline-none hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .app-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-hover px-2.5 py-1 text-[12px] font-medium text-tertiary;
+  }
+}

@@ -61,7 +61,7 @@ def _tree_snapshot(root: Path) -> dict[str, bytes]:
 def test_cli_exposes_the_supported_entrypoints() -> None:
     help_result = runner.invoke(app, ["--help"])
     assert help_result.exit_code == 0
-    for command in ("help", "init", "status", "update", "uninstall"):
+    for command in ("help", "init", "status", "update", "uninstall", "dashboard"):
         assert command in help_result.output
 
     version_result = runner.invoke(app, ["--version"])

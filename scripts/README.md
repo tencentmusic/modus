@@ -14,6 +14,18 @@
 
 设置 `MODUS_KEEP_SMOKE_ARTIFACTS=1` 可保留临时构建产物，`UV_BIN` 可指定 uv 可执行文件。验证脚本不会发布安装包。
 
+## macOS 桌面发行包
+
+桌面源码位于同一仓库的 `integrations/desktop/`。在装有 Node.js 22.12 或更新的 22.x 版本、npm、稳定版 Rust 工具链、Xcode 命令行工具与 uv 的 Apple Silicon Mac 上，从 Modus 仓库根目录运行：
+
+```bash
+bash scripts/build-macos-wheel.sh
+```
+
+脚本按锁文件安装前端和 Rust 依赖，生成 `integrations/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/modus-manager.app` 和 `dist/openmodus-*-py3-none-macosx_11_0_arm64.whl`。本地构建默认采用临时签名。正式分发时可设置构建所需的 Apple 签名和公证凭据，也可将处理完成的 `.app` 路径作为脚本参数。
+
+发布时将桌面 wheel 与同版本通用 wheel 和源码包一起发布。兼容的 Mac 通过普通安装命令选中桌面 wheel。首次运行 `modus dashboard` 时直接使用随包应用。其他平台仍使用通用 Python 发行包。
+
 ## 模块责任
 
 `package_smoke.py` 保持为稳定的薄适配器，实现在 `release_smoke/` 中：

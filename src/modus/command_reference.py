@@ -67,7 +67,9 @@ HIDDEN_CLI_GROUPS: Final[frozenset[str]] = frozenset(
 
 HIDDEN_CLI_KEYS: Final[frozenset[str]] = frozenset()
 
-CORE_CLI_KEYS: Final[frozenset[str]] = frozenset({"init", "update", "help", "uninstall", "status"})
+CORE_CLI_KEYS: Final[frozenset[str]] = frozenset(
+    {"init", "update", "help", "uninstall", "status", "dashboard"}
+)
 MAINTENANCE_CLI_KEYS: Final[frozenset[str]] = frozenset()
 UTILITY_CLI_KEYS: Final[frozenset[str]] = frozenset()
 
@@ -167,7 +169,7 @@ CLI_COMMANDS: Final[tuple[CliCommand, ...]] = (
         key="help",
         short="查看命令帮助",
         role="命令参考",
-        purpose="查看五个公开命令、三个知识工作流和两项自动能力。",
+        purpose="查看公开命令、知识工作流和自动能力。",
         usage=("modus help", "modus help init"),
         tier="common",
     ),
@@ -186,6 +188,14 @@ CLI_COMMANDS: Final[tuple[CliCommand, ...]] = (
         role="只读状态",
         purpose="查看安装与知识状态，无需读取分析缓存。",
         usage=("modus status", "modus status --json"),
+        tier="common",
+    ),
+    CliCommand(
+        key="dashboard",
+        short="打开 Modus 桌面应用（macOS）",
+        role="桌面入口",
+        purpose="启动 Modus Manager，浏览项目知识与管理技能。",
+        usage=("modus dashboard",),
         tier="common",
     ),
     CliCommand(

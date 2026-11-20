@@ -378,6 +378,8 @@ Modus 自身也遵守它倡导的边界：入口层保持窄，应用编排与�
 
 公网 PyPI 发行包名是 `openmodus`，安装不需要私有软件源。也可以用 `pipx install openmodus`；如果本机自定义索引不代理公网 PyPI，可以运行 `uv tool install --default-index https://pypi.org/simple openmodus`。
 
+Apple Silicon Mac 安装含桌面应用的发行版本后，运行 `modus dashboard` 即可打开 Modus Manager。首次运行会把随包应用安装到 `~/Applications`，也可以复用已安装的应用。从同一份 Modus 源码可构建 CLI 和桌面应用。[桌面发行包构建方法](scripts/README.md#macos-桌面发行包)
+
 体验当前源码中的能力时，在 Modus 源码仓库根目录（包含 `pyproject.toml`）运行 `uv tool install .`。参与开发时可用 `uv tool install --editable .`，让源码修改直接生效。两种方式安装后的命令也都是 `modus`。
 
 `modus init` 在交互式终端中选择平台；脚本或非交互终端中可显式指定，例如 `modus init --platform codex`，需要多个平台时重复 `--platform`，或用 `modus init --all-platforms`。未指定平台的首次非交互运行会接入全部支持的平台。同一份中立 Skill 合同会投影到所选平台。
@@ -397,6 +399,7 @@ CLI 用于安装、维护和检查 Modus。运行 `modus help` 可以查看当�
 | `modus help` | 查看 CLI、主动知识工作流和自动知识能力。 |
 | `modus uninstall` | 默认展示计划，经交互确认后卸载当前项目资产与个人 CLI；正文知识默认保留。 |
 | `modus status` | 只读查看安装、版本与正文知识状态，不读取初始化分析缓存。 |
+| `modus dashboard` | 在 macOS 上打开已安装的 Modus Manager，浏览知识与管理技能。 |
 
 常用的只读检查与操作预览：
 

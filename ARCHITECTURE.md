@@ -4,7 +4,7 @@ Modus 将三个生命周期分开管理：**接入资产让工作流可用，初
 
 ## 从这里开始阅读
 
-1. [CLI 组合入口](src/modus/cli.py)：五个公开命令与供技能调用的内部适配器。
+1. [CLI 组合入口](src/modus/cli.py)包含公开命令与供技能调用的内部适配器。桌面入口将启动请求交给 macOS。
 2. [项目安装](src/modus/commands/init_project.py)：预检、计划写入、回滚与清单发布。
 3. [分析 API](src/modus/machine/api.py)：构建、验证后打开、证据筛选与创作上下文。
 4. [上下文解析](src/modus/orchestrator/context_resolver.py)：一个请求、一个共享预算、一份当前证据。
@@ -47,6 +47,8 @@ flowchart TB
 ## DSH 运行时接入
 
 DSH 集成跨越两个生命周期：Python 平台适配器管理项目内的 Skill 投影与受管指引；独立 npm 插件通过 DSH 服务调用 CLI。工具声明拥有参数与业务退出码，执行器拥有会话绑定和执行完整性，Modus CLI 继续拥有检索、核验和知识写入规则。项目 I/O 跟随 DSH 执行环境，四个原生工具只读，知识维护沿用共享 Skill 与 CAS 写入。
+
+`integrations/desktop/` 负责图形界面、本地知识浏览与技能管理。CLI 的 `modus dashboard` 负责安装并打开随包应用。桌面源码与 CLI 共用仓库，平台相关应用只随 Apple Silicon wheel 分发。[桌面构建说明](scripts/README.md#macos-桌面发行包)
 
 [DSH 集成设计](integrations/dsh/architecture.md) 给出调用路径、源码阅读顺序、失败语义与扩展入口。
 

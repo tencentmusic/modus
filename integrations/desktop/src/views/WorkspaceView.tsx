@@ -1,0 +1,1299 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useParams, useNavigate, Navigate } from "react-router-dom";
+import {
+  ChevronRight,
+  Download,
+  FileText,
+  Globe,
+  LayoutGrid,
+  List,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Search,
+  CircleSlash,
+  Square,
+  SquareCheck,
+  Trash2,
+  Unlink,
+  Upload,
+} from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import { cn, compactHomePath } from "../utils";
+import { useApp } from "../context/AppContext";
+import { useSkillViewMode } from "../hooks/useSkillViewMode";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { PresetBar } from "../components/PresetBar";
+import { AgentIcon } from "../components/AgentIcon";
+import { DetailSheet } from "../components/DetailSheet";
+import { SkillMarkdown } from "../components/SkillMarkdown";
+import { DocumentDiffViewer } from "../components/DocumentDiffViewer";
+import * as api from "../lib/tauri";
+import type { ManagedSkill, ProjectSkill } from "../lib/tauri";
+import { getErrorMessage } from "../lib/error";
+import { normalizeSkillSearch, skillSearchMatches } from "../lib/skillSearch";
+import { getTagActiveColor, getTagColor, pruneStaleTagFilters, UNTAGGED_FILTER } from "../lib/skillTags";
+import { AddSkillsSheet } from "../components/AddSkillsSheet";
+import { useMultiSelect } from "../hooks/useMultiSelect";
+import { MultiSelectToolbar } from "../components/MultiSelectToolbar";
+import type { WorkspaceConfig } from "./workspaceConfigs";
+
+interface WorkspaceSkillCardTag {
+  label: string;
+  className: string;
+}
+
+interface WorkspaceSkillCardStatus {
+  label: string;
+  className: string;
+}
+
+function WorkspaceSkillCard({
+  viewMode,
+  title,
+  description,
+  tags = [],
+  status,
+  fileCount = 0,
+  active = false,
+  actions,
+  actionsHover = false,
+  selectable = false,
+  selected = false,
+  onClick,
+}: {
+  viewMode: "grid" | "list";
+  title: string;
+  description?: string | null;
+  tags?: WorkspaceSkillCardTag[];
+  status: WorkspaceSkillCardStatus;
+  fileCount?: number;
+  active?: boolean;
+  actions?: ReactNode;
+  actionsHover?: boolean;
+  /** Multi-select mode: the leading slot becomes a checkbox and clicks select. */
+  selectable?: boolean;
+  selected?: boolean;
+  onClick: () => void;
+}) {
+  const leadingSlot = selectable
+    ? (selected
+        ? <SquareCheck className="h-3.5 w-3.5 text-accent" />
+        : <Square className="h-3.5 w-3.5 text-faint" />)
+    : (
+      <span
+        className={cn(
+          "h-2 w-2 rounded-full",
+          active
+            ? "bg-accent-light shadow-[0_0_0_3px_var(--color-accent-bg)]"
+            : "bg-surface-active"
+        )}
+      />
+    );
+  if (viewMode === "list") {
+    return (
+      <div
+        className={cn(
+          "app-panel group relative flex cursor-pointer items-center gap-3.5 rounded-xl border-transparent px-3.5 py-3 transition-all hover:border-border hover:bg-surface-hover",
+          selectable && selected && "ring-1 ring-accent border-accent/40"
+        )}
+        onClick={onClick}
+      >
+        <div className="flex h-4 w-4 shrink-0 items-center justify-center">
+          {leadingSlot}
+        </div>
+        <h3
+          className="w-[180px] shrink-0 truncate text-[14px] font-semibold text-secondary group-hover:text-primary"
+          title={title}
+        >
+          {title}
+        </h3>
+        <p className="min-w-0 flex-1 truncate text-[13px] text-muted">
+          {description || "-"}
+        </p>
+        {tags.length > 0 && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            {tags.map((tag) => (
+              <span
+                key={tag.label}
+                className={cn(
+                  "inline-flex items-center rounded-full px-1.5 py-0.5 text-[11px] font-medium",
+                  tag.className
+                )}
+              >
+                {tag.label}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="flex shrink-0 items-center gap-2.5">
+          <span className={cn("rounded-full px-2 py-0.5 text-[12px] font-medium", status.className)}>
+            {status.label}
+          </span>
+          {fileCount > 0 && (
+            <span className="flex items-center gap-1 text-[12px] text-faint">
+              <FileText className="h-3 w-3" />
+              {fileCount}
+            </span>
+          )}
+        </div>
+        {actions && (
+          <div
+            className={cn(
+              "flex shrink-0 items-center gap-1",
+              actionsHover && "opacity-0 transition-opacity group-hover:opacity-100"
+            )}
+          >
+            {actions}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "app-panel group relative flex h-full cursor-pointer flex-col overflow-hidden shadow-card transition-all hover:-translate-y-px hover:border-border hover:shadow-card-hover",
+        selectable && selected && "ring-1 ring-accent border-accent/40"
+      )}
+      onClick={onClick}
+    >
+      <div className="flex items-center gap-2.5 px-3.5 pt-3 pb-1.5">
+        <div className="flex h-4 w-4 shrink-0 items-center justify-center">
+          {leadingSlot}
+        </div>
+        <h3
+          className="flex-1 truncate text-[14px] font-semibold text-primary group-hover:text-accent-light"
+          title={title}
+        >
+          {title}
+        </h3>
+        {fileCount > 0 && (
+          <span className="flex shrink-0 items-center gap-1 text-[12px] text-faint">
+            <FileText className="h-3 w-3" />
+            {fileCount}
+          </span>
+        )}
+      </div>
+      <div className="px-3.5 pb-3">
+        <p className="truncate text-[13px] leading-[18px] text-muted">
+          {description || "-"}
+        </p>
+        {tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1">
+            {tags.map((tag) => (
+              <span
+                key={tag.label}
+                className={cn(
+                  "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
+                  tag.className
+                )}
+              >
+                {tag.label}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="mt-auto flex items-center justify-between gap-2 border-t border-border-faint px-3.5 py-2.5">
+        <span className={cn("rounded-full px-2 py-0.5 text-[12px] font-medium", status.className)}>
+          {status.label}
+        </span>
+        {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
+      </div>
+    </div>
+  );
+}
+
+function getLocalStatusMeta(t: (key: string) => string, status: ProjectSkill["sync_status"]) {
+  switch (status) {
+    case "in_sync":
+      return {
+        label: t("globalWorkspace.localSkills.status.inSync"),
+        className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+      };
+    case "project_newer":
+      return {
+        label: t("globalWorkspace.localSkills.status.localNewer"),
+        className: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+      };
+    case "center_newer":
+      return {
+        label: t("globalWorkspace.localSkills.status.centerNewer"),
+        className: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+      };
+    case "diverged":
+      return {
+        label: t("globalWorkspace.localSkills.status.diverged"),
+        className: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
+      };
+    default:
+      return {
+        label: t("globalWorkspace.localSkills.status.localOnly"),
+        className: "bg-surface-hover text-muted",
+      };
+  }
+}
+
+export function WorkspaceView({ config }: { config: WorkspaceConfig }) {
+  const { agentKey } = useParams<{ agentKey?: string }>();
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { tools, managedSkills, presets, refreshManagedSkills, refreshTools } = useApp();
+
+  const [viewMode, setViewMode] = useSkillViewMode();
+  const [search, setSearch] = useState("");
+  const [tagFilters, setTagFilters] = useState<Set<string>>(new Set());
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [removingLocalSkillId, setRemovingLocalSkillId] = useState<string | null>(null);
+  const [localSkills, setLocalSkills] = useState<ProjectSkill[]>([]);
+  const [localSkillsLoading, setLocalSkillsLoading] = useState(false);
+  const [localActionKey, setLocalActionKey] = useState<string | null>(null);
+  const [localDetailSkill, setLocalDetailSkill] = useState<ProjectSkill | null>(null);
+  const [localDocContent, setLocalDocContent] = useState<string | null>(null);
+  const [localCenterDocContent, setLocalCenterDocContent] = useState<string | null>(null);
+  const [localDocLoading, setLocalDocLoading] = useState(false);
+  const [localCenterDocLoading, setLocalCenterDocLoading] = useState(false);
+  const [localContentTab, setLocalContentTab] = useState<"local" | "diff" | "center">("local");
+  const [uploadConfirmSkill, setUploadConfirmSkill] = useState<ProjectSkill | null>(null);
+  const [pullConfirmSkill, setPullConfirmSkill] = useState<ProjectSkill | null>(null);
+  const [deleteLocalConfirmSkill, setDeleteLocalConfirmSkill] = useState<ProjectSkill | null>(null);
+  const [batchUnsyncConfirm, setBatchUnsyncConfirm] = useState(false);
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const localDetailRequestRef = useRef(0);
+
+  // Cross-category redirect: a deep link like /global-workspace/openclaw should
+  // land on /lobster-workspace/openclaw. Compute it before any filtering so a
+  // category mismatch doesn't briefly render "agent not found".
+  const requestedTool = useMemo(
+    () => (agentKey ? tools.find((t) => t.key === agentKey) ?? null : null),
+    [agentKey, tools]
+  );
+  const needsRedirect =
+    !!agentKey &&
+    !!requestedTool &&
+    requestedTool.category !== config.category;
+  const redirectTarget = needsRedirect && requestedTool
+    ? (requestedTool.category === "lobster"
+        ? `/lobster-workspace/${requestedTool.key}`
+        : `/global-workspace/${requestedTool.key}`)
+    : null;
+
+  const installedTools = useMemo(
+    () => tools.filter((t) => t.installed && t.enabled && t.category === config.category),
+    [tools, config.category]
+  );
+
+  const skillCountByAgent = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const tool of installedTools) {
+      map[tool.key] = managedSkills.filter((s) =>
+        s.targets.some((target) => target.tool === tool.key)
+      ).length;
+    }
+    return map;
+  }, [installedTools, managedSkills]);
+
+  // Overview cards should reflect each agent's ACTUAL on-disk skill count —
+  // including skills installed outside Skills Manager — to match the per-agent
+  // detail badge. The managed-only count above reads 0 for an agent whose
+  // skills all live on disk but were never imported (#287). We fill this from a
+  // per-agent scan and fall back to the managed count until it resolves.
+  const [localCountByAgent, setLocalCountByAgent] = useState<Record<string, number>>({});
+  const overviewCountsRef = useRef(0);
+
+  const currentTool = useMemo(
+    () => (agentKey ? installedTools.find((t) => t.key === agentKey) ?? null : null),
+    [agentKey, installedTools]
+  );
+
+  // Preset actions must target what is actually rendered: a single agent when
+  // `currentTool` resolves, otherwise every installed agent in this category.
+  // Falling back to the raw URL `agentKey` would let a stale deep link (a
+  // bookmarked route for a since-disabled or uninstalled agent) mutate the
+  // hidden agent while the overview is shown.
+  const presetBarAgentKeys = useMemo(
+    () => (currentTool ? [currentTool.key] : installedTools.map((t) => t.key)),
+    [currentTool, installedTools]
+  );
+  const currentToolKey = currentTool?.key ?? null;
+
+  const localSkillsRequestRef = useRef(0);
+  const loadLocalSkills = useCallback(async () => {
+    const requestId = ++localSkillsRequestRef.current;
+    if (!currentToolKey) {
+      setLocalSkills([]);
+      return;
+    }
+    setLocalSkillsLoading(true);
+    try {
+      const skills = await api.getGlobalLocalSkills(currentToolKey);
+      if (localSkillsRequestRef.current === requestId) setLocalSkills(skills);
+    } catch (error: unknown) {
+      if (localSkillsRequestRef.current === requestId) {
+        toast.error(getErrorMessage(error, t("common.error")));
+        setLocalSkills([]);
+      }
+    } finally {
+      if (localSkillsRequestRef.current === requestId) setLocalSkillsLoading(false);
+    }
+  }, [currentToolKey, t]);
+
+  const loadedAgentKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentToolKey) {
+      loadedAgentKeyRef.current = null;
+      setLocalSkills([]);
+      return;
+    }
+    if (loadedAgentKeyRef.current === currentToolKey) return;
+    loadedAgentKeyRef.current = currentToolKey;
+    void loadLocalSkills();
+    return () => {
+      localSkillsRequestRef.current += 1;
+      loadedAgentKeyRef.current = null;
+    };
+  }, [currentToolKey, loadLocalSkills]);
+
+  // Load real on-disk skill counts for every installed agent while the overview
+  // is shown (#287). Scoped to the overview (currentToolKey === null); the
+  // detail view derives its own count from `localSkills`.
+  useEffect(() => {
+    if (currentToolKey) return;
+    if (installedTools.length === 0) {
+      setLocalCountByAgent({});
+      return;
+    }
+    const requestId = ++overviewCountsRef.current;
+    void (async () => {
+      const entries = await Promise.all(
+        installedTools.map(async (tool) => {
+          try {
+            const skills = await api.getGlobalLocalSkills(tool.key);
+            return [tool.key, skills.length] as const;
+          } catch {
+            // Keep the managed-count fallback for an agent that fails to scan.
+            return [tool.key, null] as const;
+          }
+        })
+      );
+      if (overviewCountsRef.current !== requestId) return;
+      // Rebuild the map from this scan's results (don't merge into the previous
+      // map): agents whose scan failed are omitted so they fall back to the
+      // managed count rather than showing a stale value, and counts for agents
+      // no longer installed are dropped.
+      const next: Record<string, number> = {};
+      for (const [key, count] of entries) {
+        if (count !== null) next[key] = count;
+      }
+      setLocalCountByAgent(next);
+    })();
+    // Depend on the managedSkills array reference (not just its length): a
+    // target-only enable/disable or an externally added unmanaged skill changes
+    // on-disk presence without changing the managed count, but still produces a
+    // fresh array via refreshManagedSkills (the file watcher triggers it), so
+    // the overview counts re-scan and stay accurate (#287).
+  }, [currentToolKey, installedTools, managedSkills]);
+
+  useEffect(() => {
+    localDetailRequestRef.current += 1;
+    setLocalDetailSkill(null);
+    setUploadConfirmSkill(null);
+    setPullConfirmSkill(null);
+    setDeleteLocalConfirmSkill(null);
+    setTagFilters(new Set());
+  }, [currentTool?.key]);
+
+  const agentSkills = useMemo(
+    () =>
+      agentKey
+        ? managedSkills.filter((skill) =>
+            skill.targets.some((target) => target.tool === agentKey)
+          )
+        : [],
+    [agentKey, managedSkills]
+  );
+
+  const allLocalTags = useMemo(() => {
+    const tags = new Set<string>();
+    for (const skill of localSkills) {
+      for (const tag of skill.tags) {
+        if (tag.trim()) tags.add(tag);
+      }
+    }
+    return Array.from(tags).sort((a, b) => a.localeCompare(b));
+  }, [localSkills]);
+
+  // Prune tag filters whose pill disappeared (e.g. its last skill was deleted),
+  // otherwise a stale filter silently hides everything. An empty list is also
+  // what a failed load and the overview leave behind (`setLocalSkills([])`), and
+  // that says nothing about which tags are valid — wait for a real list.
+  useEffect(() => {
+    if (localSkills.length === 0) return;
+    const hasUntagged = localSkills.some((skill) => skill.tags.length === 0);
+    setTagFilters((prev) => pruneStaleTagFilters(prev, allLocalTags, hasUntagged));
+  }, [allLocalTags, localSkills]);
+
+  const visibleLocalSkills = useMemo(() => {
+    const q = normalizeSkillSearch(search);
+    return localSkills
+      .filter((skill) => {
+        if (!skillSearchMatches(q, [skill.name, skill.dir_name, skill.description])) return false;
+        if (tagFilters.size > 0) {
+          const wantUntagged = tagFilters.has(UNTAGGED_FILTER);
+          const matchUntagged = wantUntagged && skill.tags.length === 0;
+          const matchTag = skill.tags.some((tag) => tagFilters.has(tag));
+          if (!matchUntagged && !matchTag) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const priority: Record<ProjectSkill["sync_status"], number> = {
+          project_only: 0,
+          project_newer: 1,
+          diverged: 2,
+          center_newer: 3,
+          in_sync: 4,
+        };
+        return (
+          priority[a.sync_status] - priority[b.sync_status] ||
+          a.name.localeCompare(b.name)
+        );
+      });
+  }, [localSkills, search, tagFilters]);
+
+  const inSyncLocalCount = useMemo(
+    () => localSkills.filter((skill) => skill.sync_status === "in_sync").length,
+    [localSkills]
+  );
+
+  const installedIds = useMemo(() => new Set(agentSkills.map((s) => s.id)), [agentSkills]);
+
+  const managedLocalIds = useMemo(
+    () =>
+      new Set(
+        localSkills
+          .map((skill) => skill.center_skill_id)
+          .filter((id): id is string => !!id && installedIds.has(id))
+      ),
+    [installedIds, localSkills]
+  );
+
+  const managedLocalCount = useMemo(
+    () => localSkills.filter((skill) => !!skill.center_skill_id && managedLocalIds.has(skill.center_skill_id)).length,
+    [localSkills, managedLocalIds]
+  );
+
+  const localSkillKey = (skill: ProjectSkill) => `${skill.agent}:${skill.relative_path}`;
+
+  const {
+    isMultiSelect, setIsMultiSelect,
+    selectedIds,
+    toggleSelect,
+    isAllSelected,
+    handleSelectAll,
+    exitMultiSelect,
+  } = useMultiSelect({
+    items: localSkills,
+    filtered: visibleLocalSkills,
+    getKey: localSkillKey,
+    isItemActive: () => true,
+    filterSignal: JSON.stringify([search, [...tagFilters].sort()]),
+    scopeSignal: agentKey ?? "",
+    escapeEnabled: !batchUnsyncConfirm && !batchDeleteConfirm,
+  });
+
+  /**
+   * "Remove" means two different things here, so the toolbar never merges them:
+   * a managed skill is unsynced (the central copy survives), while a local-only
+   * skill is deleted from disk for good.
+   */
+  const selectedUnsyncable = useMemo(
+    () => visibleLocalSkills.filter((skill) =>
+      selectedIds.has(localSkillKey(skill))
+      && !!skill.center_skill_id
+      && managedLocalIds.has(skill.center_skill_id)
+    ),
+    [visibleLocalSkills, selectedIds, managedLocalIds]
+  );
+  const selectedDeletable = useMemo(
+    () => visibleLocalSkills.filter((skill) =>
+      selectedIds.has(localSkillKey(skill))
+      && !(skill.center_skill_id && managedLocalIds.has(skill.center_skill_id))
+      && skill.sync_status === "project_only"
+    ),
+    [visibleLocalSkills, selectedIds, managedLocalIds]
+  );
+
+  const handleBatchUnsync = async () => {
+    if (!agentKey) return;
+    setBatchRunning(true);
+    let removed = 0;
+    let failed = 0;
+    try {
+      for (const skill of selectedUnsyncable) {
+        if (!skill.center_skill_id) continue;
+        try {
+          await api.unsyncSkillFromTool(skill.center_skill_id, agentKey);
+          removed++;
+        } catch {
+          failed++;
+        }
+      }
+      if (removed > 0) toast.success(t("globalWorkspace.batchRemoved", { count: removed }));
+      if (failed > 0) toast.error(t("globalWorkspace.batchRemoveFailed", { count: failed }));
+      await Promise.all([refreshManagedSkills(), refreshTools(), loadLocalSkills()]);
+    } finally {
+      setBatchRunning(false);
+      setBatchUnsyncConfirm(false);
+      exitMultiSelect();
+    }
+  };
+
+  const handleBatchDeleteLocal = async () => {
+    if (!currentToolKey) return;
+    setBatchRunning(true);
+    let deleted = 0;
+    let failed = 0;
+    try {
+      for (const skill of selectedDeletable) {
+        try {
+          await api.deleteGlobalLocalSkill(currentToolKey, skill.relative_path);
+          deleted++;
+        } catch {
+          failed++;
+        }
+      }
+      if (deleted > 0) toast.success(t("globalWorkspace.localSkills.deletedLocalBatch", { count: deleted }));
+      if (failed > 0) toast.error(t("globalWorkspace.localSkills.deleteLocalBatchFailed", { count: failed }));
+      await Promise.all([refreshManagedSkills(), refreshTools(), loadLocalSkills()]);
+    } finally {
+      setBatchRunning(false);
+      setBatchDeleteConfirm(false);
+      exitMultiSelect();
+    }
+  };
+
+  const handleRemoveLocalManagedSkill = async (skill: ProjectSkill) => {
+    if (!agentKey || !skill.center_skill_id || !managedLocalIds.has(skill.center_skill_id)) return;
+    setRemovingLocalSkillId(skill.relative_path);
+    try {
+      await api.unsyncSkillFromTool(skill.center_skill_id, agentKey);
+      await Promise.all([refreshManagedSkills(), refreshTools(), loadLocalSkills()]);
+      toast.success(t("globalWorkspace.removedToast", { name: skill.name }));
+    } catch (e) {
+      toast.error(getErrorMessage(e, t("common.error")));
+    } finally {
+      setRemovingLocalSkillId(null);
+    }
+  };
+
+  const handleSheetInstalled = useCallback(async () => {
+    await Promise.all([refreshManagedSkills(), refreshTools(), loadLocalSkills()]);
+  }, [loadLocalSkills, refreshManagedSkills, refreshTools]);
+
+  const handleUploadLocalSkill = useCallback(
+    async (skill: ProjectSkill) => {
+      if (!currentTool) return;
+      const key = `upload:${skill.relative_path}`;
+      setLocalActionKey(key);
+      try {
+        await api.importGlobalLocalSkillToCenter(currentTool.key, skill.relative_path);
+        toast.success(t("globalWorkspace.localSkills.uploadedToast", { name: skill.name, agent: currentTool.display_name }));
+        await Promise.all([loadLocalSkills(), refreshManagedSkills()]);
+      } catch (error: unknown) {
+        toast.error(getErrorMessage(error, t("common.error")));
+      } finally {
+        setLocalActionKey(null);
+        setUploadConfirmSkill(null);
+      }
+    },
+    [currentTool, loadLocalSkills, refreshManagedSkills, t]
+  );
+
+  const handleDeleteLocalSkill = useCallback(
+    async (skill: ProjectSkill) => {
+      if (!currentTool) return;
+      const key = `delete:${skill.relative_path}`;
+      setLocalActionKey(key);
+      try {
+        await api.deleteGlobalLocalSkill(currentTool.key, skill.relative_path);
+        toast.success(t("globalWorkspace.localSkills.deletedLocalToast", { name: skill.name, agent: currentTool.display_name }));
+        await loadLocalSkills();
+      } catch (error: unknown) {
+        toast.error(getErrorMessage(error, t("common.error")));
+      } finally {
+        setLocalActionKey(null);
+        setDeleteLocalConfirmSkill(null);
+      }
+    },
+    [currentTool, loadLocalSkills, t]
+  );
+
+  const handlePullLocalSkill = useCallback(
+    async (skill: ProjectSkill) => {
+      if (!currentTool) return;
+      const key = `pull:${skill.relative_path}`;
+      setLocalActionKey(key);
+      try {
+        await api.updateGlobalLocalSkillFromCenter(currentTool.key, skill.relative_path);
+        toast.success(t("globalWorkspace.localSkills.pulledToast", { name: skill.name, agent: currentTool.display_name }));
+        await loadLocalSkills();
+      } catch (error: unknown) {
+        toast.error(getErrorMessage(error, t("common.error")));
+      } finally {
+        setLocalActionKey(null);
+        setPullConfirmSkill(null);
+      }
+    },
+    [currentTool, loadLocalSkills, t]
+  );
+
+  const openLocalDetail = useCallback(
+    async (skill: ProjectSkill) => {
+      if (!currentTool) return;
+      const requestId = localDetailRequestRef.current + 1;
+      localDetailRequestRef.current = requestId;
+      setLocalDetailSkill(skill);
+      setLocalContentTab("local");
+      setLocalDocContent(null);
+      setLocalCenterDocContent(null);
+      setLocalDocLoading(true);
+      setLocalCenterDocLoading(!!skill.center_skill_id);
+
+      api
+        .getGlobalLocalSkillDocument(currentTool.key, skill.relative_path)
+        .then((doc) => {
+          if (localDetailRequestRef.current === requestId) setLocalDocContent(doc.content);
+        })
+        .catch(() => {
+          if (localDetailRequestRef.current === requestId) setLocalDocContent(null);
+        })
+        .finally(() => {
+          if (localDetailRequestRef.current === requestId) setLocalDocLoading(false);
+        });
+
+      if (skill.center_skill_id) {
+        api
+          .getSkillDocument(skill.center_skill_id)
+          .then((doc) => {
+            if (localDetailRequestRef.current === requestId) setLocalCenterDocContent(doc.content);
+          })
+          .catch(() => {
+            if (localDetailRequestRef.current === requestId) setLocalCenterDocContent(null);
+          })
+          .finally(() => {
+            if (localDetailRequestRef.current === requestId) setLocalCenterDocLoading(false);
+          });
+      }
+    },
+    [currentTool]
+  );
+
+  const existsInGlobal = useCallback(
+    (skill: ManagedSkill, agentK: string) =>
+      skill.targets.some((target) => target.tool === agentK),
+    []
+  );
+
+  const handlePresetAdd = useCallback(async (skill: ManagedSkill, agentK: string) => {
+    await api.syncSkillToTool(skill.id, agentK);
+  }, []);
+
+  const handlePresetRemove = useCallback(async (skill: ManagedSkill, agentK: string) => {
+    await api.unsyncSkillFromTool(skill.id, agentK);
+  }, []);
+
+  const handlePresetComplete = useCallback(async () => {
+    await Promise.all([refreshManagedSkills(), refreshTools(), loadLocalSkills()]);
+  }, [loadLocalSkills, refreshManagedSkills, refreshTools]);
+
+  const renderLocalSkillActions = (skill: ProjectSkill, variant: "grid" | "list") => {
+    const uploadKey = `upload:${skill.relative_path}`;
+    const pullKey = `pull:${skill.relative_path}`;
+    const deleteKey = `delete:${skill.relative_path}`;
+    const canPull = skill.sync_status === "center_newer" || skill.sync_status === "diverged";
+    const isInSync = skill.sync_status === "in_sync";
+    const isManaged = !!skill.center_skill_id && managedLocalIds.has(skill.center_skill_id);
+    const canDeleteLocal = !isManaged && skill.sync_status === "project_only";
+    const removing = removingLocalSkillId === skill.relative_path;
+    const buttonClassName = variant === "grid"
+      ? "rounded-md px-2 py-1 text-[13px] font-medium text-muted transition-colors outline-none hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
+      : "rounded-md p-0.5 text-muted transition-colors hover:bg-surface-hover hover:text-secondary disabled:opacity-50";
+
+    if (isInSync && !isManaged) return null;
+
+    return (
+      <>
+        {!isInSync && canPull && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setPullConfirmSkill(skill);
+            }}
+            disabled={localActionKey === pullKey}
+            className={buttonClassName}
+            title={t("globalWorkspace.localSkills.pull")}
+          >
+            {localActionKey === pullKey ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Download className="h-3.5 w-3.5" />
+            )}
+          </button>
+        )}
+
+        {!isInSync && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (skill.sync_status === "project_only") {
+                void handleUploadLocalSkill(skill);
+              } else {
+                setUploadConfirmSkill(skill);
+              }
+            }}
+            disabled={localActionKey === uploadKey}
+            className={buttonClassName}
+            title={t("globalWorkspace.localSkills.upload")}
+          >
+            {localActionKey === uploadKey ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Upload className="h-3.5 w-3.5" />
+            )}
+          </button>
+        )}
+
+        {isManaged ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleRemoveLocalManagedSkill(skill);
+            }}
+            disabled={removing}
+            title={t("globalWorkspace.localSkills.removeManaged")}
+            className={cn(buttonClassName, "hover:bg-red-500/10 hover:text-red-500")}
+          >
+            {removing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
+          </button>
+        ) : canDeleteLocal ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteLocalConfirmSkill(skill);
+            }}
+            disabled={localActionKey === deleteKey}
+            title={t("globalWorkspace.localSkills.deleteLocal")}
+            className={cn(buttonClassName, "hover:bg-red-500/10 hover:text-red-500")}
+          >
+            {localActionKey === deleteKey ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
+          </button>
+        ) : null}
+      </>
+    );
+  };
+
+  if (redirectTarget) {
+    return <Navigate to={redirectTarget} replace />;
+  }
+
+  if (installedTools.length === 0) {
+    return (
+      <div className="app-page">
+        <div className="app-panel flex flex-col items-center justify-center py-16 text-center">
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-surface-hover">
+            <Globe className="h-5 w-5 text-muted" />
+          </div>
+          <p className="text-[13px] font-medium text-secondary">{t(config.i18nKeys.noAgents)}</p>
+          <p className="mt-1 max-w-[260px] text-[12px] leading-relaxed text-muted">
+            {t(config.i18nKeys.noAgentsHint)}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentTool) {
+    return (
+      <div className="app-page">
+        <div className="app-page-header flex flex-col gap-2.5 pb-3 pr-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h1 className="app-page-title flex items-center gap-2.5">
+                <Globe className="h-5 w-5 text-accent" />
+                {t(config.i18nKeys.title)}
+                <span className="app-badge">{installedTools.length}</span>
+              </h1>
+            </div>
+          </div>
+
+          {presets.length > 0 && (
+            <PresetBar
+              presets={presets}
+              managedSkills={managedSkills}
+              agentKeys={presetBarAgentKeys}
+              existsInWorkspace={existsInGlobal}
+              onAddSkill={handlePresetAdd}
+              onRemoveSkill={handlePresetRemove}
+              onComplete={handlePresetComplete}
+            />
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {installedTools.map((tool) => {
+            const count = localCountByAgent[tool.key] ?? skillCountByAgent[tool.key] ?? 0;
+            return (
+              <button
+                key={tool.key}
+                onClick={() => navigate(`${config.basePath}/${tool.key}`)}
+                className="app-panel group flex items-center gap-3 p-3.5 text-left transition-all hover:border-border hover:bg-surface-hover"
+              >
+                <AgentIcon
+                  agentKey={tool.key}
+                  displayName={tool.display_name}
+                  className="h-9 w-9 rounded-lg transition-colors group-hover:border-border"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-semibold text-secondary">{tool.display_name}</p>
+                  <p className="text-[12px] text-muted">{t("globalWorkspace.skillCount", { count })}</p>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-faint transition-transform group-hover:translate-x-0.5" />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app-page">
+      {/* Header */}
+      <div className="app-page-header flex flex-col gap-2.5 pb-3 pr-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-[1_1_360px]">
+            <h1 className="app-page-title flex items-center gap-2.5">
+              <AgentIcon
+                agentKey={currentTool.key}
+                displayName={currentTool.display_name}
+                className="h-7 w-7 rounded-lg"
+              />
+              {currentTool.display_name}
+              <span className="app-badge">{localSkills.length}</span>
+            </h1>
+            <p className="mt-1 truncate text-[13px] text-muted" title={currentTool.skills_dir}>
+              {compactHomePath(currentTool.skills_dir)}
+              <span className="px-1.5">·</span>
+              {t("globalWorkspace.localSkills.summary", {
+                total: localSkills.length,
+                managed: managedLocalCount,
+                synced: inSyncLocalCount,
+              })}
+            </p>
+          </div>
+
+          <div className="flex min-w-0 flex-[2_1_520px] flex-wrap items-center justify-end gap-2">
+            <div className="relative w-full min-w-[220px] max-w-[320px]">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t("globalWorkspace.localSkills.searchPlaceholder")}
+                className="app-input w-full pl-8 font-medium"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+            </div>
+
+            <div className="app-segmented app-toolbar-segmented shrink-0">
+              <button
+                onClick={() => void loadLocalSkills()}
+                disabled={localSkillsLoading}
+                className="rounded-md p-2 text-muted transition-colors outline-none hover:text-tertiary disabled:opacity-50"
+                title={t("settings.refresh")}
+              >
+                <RefreshCw className={cn("h-4 w-4", localSkillsLoading && "animate-spin")} />
+              </button>
+              <button
+                onClick={() => setViewMode("grid")}
+                className={cn(
+                  "rounded-md p-2 transition-colors outline-none",
+                  viewMode === "grid" ? "bg-surface-active text-secondary" : "text-muted hover:text-tertiary"
+                )}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={cn(
+                  "rounded-md p-2 transition-colors outline-none",
+                  viewMode === "list" ? "bg-surface-active text-secondary" : "text-muted hover:text-tertiary"
+                )}
+              >
+                <List className="h-4 w-4" />
+              </button>
+
+              {/* Selection can stay active in either view. */}
+              <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 self-center bg-border-subtle" />
+              <button
+                type="button"
+                aria-pressed={isMultiSelect}
+                onClick={() => isMultiSelect ? exitMultiSelect() : setIsMultiSelect(true)}
+                className={cn(
+                  "app-segmented-button inline-flex items-center gap-1.5 hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-border",
+                  isMultiSelect && "app-segmented-button-active hover:bg-surface-active hover:text-secondary"
+                )}
+              >
+                <SquareCheck className="h-4 w-4" />
+                {isMultiSelect ? t("globalWorkspace.cancelSelect") : t("globalWorkspace.selectMode")}
+              </button>
+            </div>
+
+            <button
+              onClick={() => setAddDialogOpen(true)}
+              className="app-toolbar-button app-toolbar-button-primary"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {t("globalWorkspace.addSkill")}
+            </button>
+          </div>
+        </div>
+
+        {allLocalTags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[12px] text-muted">{t("mySkills.tags.filter")}</span>
+            <button
+              onClick={() => setTagFilters(new Set())}
+              className={cn(
+                "rounded-full px-2.5 py-0.5 text-[12px] font-medium transition-colors",
+                tagFilters.size === 0
+                  ? "bg-accent text-white dark:bg-accent dark:text-white"
+                  : "bg-surface-hover text-muted hover:text-secondary"
+              )}
+            >
+              {t("mySkills.tags.allTags")}
+            </button>
+            {localSkills.some((s) => s.tags.length === 0) && (() => {
+              const isActive = tagFilters.has(UNTAGGED_FILTER);
+              return (
+                <button
+                  onClick={() => {
+                    setTagFilters((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(UNTAGGED_FILTER)) next.delete(UNTAGGED_FILTER);
+                      else next.add(UNTAGGED_FILTER);
+                      return next;
+                    });
+                  }}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[12px] font-medium transition-colors",
+                    isActive
+                      ? "bg-surface-active text-primary"
+                      : "border border-dashed border-border text-muted hover:text-secondary"
+                  )}
+                  title={t("mySkills.tags.untagged")}
+                >
+                  <CircleSlash className="h-3 w-3" />
+                  {t("mySkills.tags.untagged")}
+                </button>
+              );
+            })()}
+            {allLocalTags.map((tag) => {
+              const active = tagFilters.has(tag);
+              return (
+                <button
+                  key={tag}
+                  onClick={() => {
+                    setTagFilters((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(tag)) next.delete(tag);
+                      else next.add(tag);
+                      return next;
+                    });
+                  }}
+                  className={cn(
+                    "rounded-full px-2.5 py-0.5 text-[12px] font-medium transition-colors",
+                    active ? getTagActiveColor(tag, allLocalTags) : getTagColor(tag, allLocalTags)
+                  )}
+                >
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Preset bar */}
+        {presets.length > 0 && (
+          <PresetBar
+            presets={presets}
+            managedSkills={managedSkills}
+            agentKeys={presetBarAgentKeys}
+            existsInWorkspace={existsInGlobal}
+            onAddSkill={handlePresetAdd}
+            onRemoveSkill={handlePresetRemove}
+            onComplete={handlePresetComplete}
+          />
+        )}
+      </div>
+
+      {localSkillsLoading ? (
+        <div className="flex items-center gap-2 py-4 text-[13px] text-muted">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          {t("common.loading")}
+        </div>
+      ) : visibleLocalSkills.length === 0 ? (
+        <div className="flex min-h-[260px] flex-col items-center justify-center px-4 text-center">
+          <Globe className="mb-4 h-12 w-12 text-faint" />
+          <h3 className="mb-1.5 text-[14px] font-semibold text-tertiary">
+            {localSkills.length === 0
+              ? t("globalWorkspace.localSkills.empty")
+              : t("mySkills.noMatch")}
+          </h3>
+          {localSkills.length === 0 && (
+            <button
+              onClick={() => setAddDialogOpen(true)}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-accent-hover"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {t("globalWorkspace.addSkill")}
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+        {isMultiSelect && (
+          <MultiSelectToolbar
+            selectedCount={selectedIds.size}
+            isAllSelected={isAllSelected}
+            actions={[
+              ...(selectedUnsyncable.length > 0
+                ? [{
+                    key: "unsync",
+                    label: t("globalWorkspace.deleteSelected", { count: selectedUnsyncable.length }),
+                    icon: <Unlink className="h-3.5 w-3.5" />,
+                    busy: batchRunning,
+                    onSelect: () => setBatchUnsyncConfirm(true),
+                  }]
+                : []),
+              ...(selectedDeletable.length > 0
+                ? [{
+                    key: "delete",
+                    tone: "danger" as const,
+                    label: t("globalWorkspace.localSkills.deleteLocalSelected", { count: selectedDeletable.length }),
+                    icon: <Trash2 className="h-3.5 w-3.5" />,
+                    busy: batchRunning,
+                    onSelect: () => setBatchDeleteConfirm(true),
+                  }]
+                : []),
+            ]}
+            labels={{
+              hint: t("globalWorkspace.selectHint"),
+              selected: t("globalWorkspace.selectedCount", { count: selectedIds.size }),
+              selectAll: t("globalWorkspace.selectAll"),
+              deselectAll: t("globalWorkspace.deselectAll"),
+              cancel: t("common.cancel"),
+              more: t("mySkills.moreActions"),
+            }}
+            onSelectAll={handleSelectAll}
+            onCancel={exitMultiSelect}
+          />
+        )}
+        <div
+          className={cn(
+            "pb-8",
+            viewMode === "grid"
+              ? "grid grid-cols-2 gap-3 lg:grid-cols-3"
+              : "flex flex-col gap-0.5"
+          )}
+        >
+          {visibleLocalSkills.map((skill) => {
+            const statusMeta = getLocalStatusMeta(t, skill.sync_status);
+            const isManaged = !!skill.center_skill_id && managedLocalIds.has(skill.center_skill_id);
+            const key = localSkillKey(skill);
+
+            return (
+              <WorkspaceSkillCard
+                key={key}
+                viewMode={viewMode}
+                title={skill.name}
+                description={skill.description || skill.relative_path}
+                tags={skill.tags.map((tag) => ({ label: tag, className: getTagColor(tag, allLocalTags) }))}
+                status={statusMeta}
+                fileCount={skill.files.length}
+                active={isManaged}
+                actions={isMultiSelect ? undefined : renderLocalSkillActions(skill, viewMode)}
+                actionsHover={viewMode === "list"}
+                selectable={isMultiSelect}
+                selected={selectedIds.has(key)}
+                onClick={() => isMultiSelect ? toggleSelect(key) : void openLocalDetail(skill)}
+              />
+            );
+          })}
+        </div>
+        </>
+      )}
+
+      {currentTool && (
+        <AddSkillsSheet
+          open={addDialogOpen}
+          onClose={() => setAddDialogOpen(false)}
+          target={{
+            kind: "global",
+            agentKey: currentTool.key,
+            agentDisplayName: currentTool.display_name,
+            installedSkillIds: installedIds,
+          }}
+          managedSkills={managedSkills}
+          onInstalled={handleSheetInstalled}
+        />
+      )}
+
+      <DetailSheet
+        open={!!localDetailSkill}
+        title={localDetailSkill?.name ?? ""}
+        description={localDetailSkill?.description}
+        meta={
+          localDetailSkill ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={cn("rounded-full px-2.5 py-1 text-[12px] font-medium", getLocalStatusMeta(t, localDetailSkill.sync_status).className)}>
+                {getLocalStatusMeta(t, localDetailSkill.sync_status).label}
+              </span>
+              <span className="rounded-full bg-surface-hover px-2.5 py-1 text-[12px] text-muted">
+                {localDetailSkill.relative_path}
+              </span>
+            </div>
+          ) : null
+        }
+        onClose={() => setLocalDetailSkill(null)}
+      >
+        {localDetailSkill?.center_skill_id && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            {(["local", "diff", "center"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setLocalContentTab(tab)}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors",
+                  localContentTab === tab
+                    ? "bg-accent text-white"
+                    : "bg-surface-hover text-muted hover:text-secondary"
+                )}
+                disabled={(tab === "diff" || tab === "center") && localCenterDocLoading}
+              >
+                {tab === "local"
+                  ? t("mySkills.docTabs.local")
+                  : tab === "diff"
+                    ? t("mySkills.docTabs.diff")
+                    : t("project.docTabs.center")}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {localDocLoading ? (
+          <div className="mt-12 text-center text-[13px] text-muted">{t("common.loading")}</div>
+        ) : localContentTab === "diff" ? (
+          localDocContent && localCenterDocContent ? (
+            <DocumentDiffViewer original={localDocContent} updated={localCenterDocContent} />
+          ) : localCenterDocLoading ? (
+            <div className="mt-12 text-center text-[13px] text-muted">{t("common.loading")}</div>
+          ) : (
+            <div className="mt-12 text-center text-[13px] text-muted">{t("mySkills.sourceDiffUnavailable")}</div>
+          )
+        ) : localContentTab === "center" ? (
+          localCenterDocLoading ? (
+            <div className="mt-12 text-center text-[13px] text-muted">{t("common.loading")}</div>
+          ) : localCenterDocContent ? (
+            <SkillMarkdown content={localCenterDocContent} />
+          ) : (
+            <div className="mt-12 text-center text-[13px] text-muted">{t("mySkills.sourceDiffUnavailable")}</div>
+          )
+        ) : localDocContent ? (
+          <SkillMarkdown content={localDocContent} />
+        ) : (
+          <div className="mt-12 text-center text-[13px] text-muted">{t("common.documentMissing")}</div>
+        )}
+      </DetailSheet>
+
+      <ConfirmDialog
+        open={!!uploadConfirmSkill}
+        title={t("globalWorkspace.localSkills.uploadConfirmTitle")}
+        message={t("globalWorkspace.localSkills.uploadConfirmMessage", {
+          name: uploadConfirmSkill?.name ?? "",
+        })}
+        tone="warning"
+        confirmLabel={t("globalWorkspace.localSkills.upload")}
+        onClose={() => setUploadConfirmSkill(null)}
+        onConfirm={() => uploadConfirmSkill ? handleUploadLocalSkill(uploadConfirmSkill) : Promise.resolve()}
+      />
+      <ConfirmDialog
+        open={!!pullConfirmSkill}
+        title={t("globalWorkspace.localSkills.pullConfirmTitle")}
+        message={t("globalWorkspace.localSkills.pullConfirmMessage", {
+          name: pullConfirmSkill?.name ?? "",
+          agent: currentTool?.display_name ?? "",
+        })}
+        tone="danger"
+        confirmLabel={t("globalWorkspace.localSkills.pull")}
+        onClose={() => setPullConfirmSkill(null)}
+        onConfirm={() => pullConfirmSkill ? handlePullLocalSkill(pullConfirmSkill) : Promise.resolve()}
+      />
+      <ConfirmDialog
+        open={batchUnsyncConfirm}
+        title={t("globalWorkspace.removeSkill")}
+        message={t("globalWorkspace.batchRemoveConfirm", {
+          count: selectedUnsyncable.length,
+          agent: currentTool?.display_name ?? "",
+        })}
+        details={selectedUnsyncable.map((skill) => skill.name)}
+        tone="warning"
+        confirmLabel={t("globalWorkspace.removeSkill")}
+        onClose={() => setBatchUnsyncConfirm(false)}
+        onConfirm={handleBatchUnsync}
+      />
+
+      <ConfirmDialog
+        open={batchDeleteConfirm}
+        title={t("globalWorkspace.localSkills.deleteLocalConfirmTitle")}
+        message={t("globalWorkspace.localSkills.deleteLocalBatchConfirm", {
+          count: selectedDeletable.length,
+          agent: currentTool?.display_name ?? "",
+        })}
+        details={selectedDeletable.map((skill) => skill.relative_path)}
+        confirmLabel={t("common.delete")}
+        onClose={() => setBatchDeleteConfirm(false)}
+        onConfirm={handleBatchDeleteLocal}
+      />
+
+      <ConfirmDialog
+        open={!!deleteLocalConfirmSkill}
+        title={t("globalWorkspace.localSkills.deleteLocalConfirmTitle")}
+        message={t("globalWorkspace.localSkills.deleteLocalConfirmMessage", {
+          name: deleteLocalConfirmSkill?.name ?? "",
+          agent: currentTool?.display_name ?? "",
+        })}
+        tone="danger"
+        confirmLabel={t("common.delete")}
+        onClose={() => setDeleteLocalConfirmSkill(null)}
+        onConfirm={() => deleteLocalConfirmSkill ? handleDeleteLocalSkill(deleteLocalConfirmSkill) : Promise.resolve()}
+      />
+    </div>
+  );
+}

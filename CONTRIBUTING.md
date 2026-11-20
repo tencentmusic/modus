@@ -33,6 +33,8 @@ CI 覆盖 Linux 的 Python 3.11–3.14，以及 macOS、Windows 的最低与最�
 
 DSH 原生插件在 `integrations/dsh/` 独立构建。涉及插件时，还需按 [DSH 设计与贡献](integrations/dsh/architecture.md#贡献与验证) 运行 TypeScript、真实 CLI 和隔离安装验证；Python 检查不覆盖 npm 运行时。
 
+桌面应用位于 `integrations/desktop/`。前端用 `npm test` 验证，Rust 后端用 `cargo test --locked --manifest-path src-tauri/Cargo.toml` 验证，两条命令均在桌面目录运行。完整 Apple Silicon 构建与打包见[桌面构建说明](scripts/README.md#macos-桌面发行包)。
+
 ## 命名与模块设计
 
 - 组合入口保持声明式：终端适配器拥有参数、交互、输出流和退出码，服务拥有应用行为，报告模块将结构化结果转为读者可理解的文本。

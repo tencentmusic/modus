@@ -1,7 +1,7 @@
 """公开 CLI 的组合入口。
 
 这里只声明命令树与全局选项。终端适配器负责交互和输出，应用服务负责行为；
-五个公开命令与内部技能入口共享同一套中文帮助策略。"""
+公开命令与内部技能入口共享同一套中文帮助策略。"""
 
 from __future__ import annotations
 
@@ -14,7 +14,16 @@ import typer
 from . import __version__
 from . import command_reference as catalog
 from .artifacts_io import CorruptArtifactError
-from .cli_commands import analysis, context, discovery, initialize, knowledge, uninstall, update
+from .cli_commands import (
+    analysis,
+    context,
+    desktop,
+    discovery,
+    initialize,
+    knowledge,
+    uninstall,
+    update,
+)
 from .cli_commands.common import HELP_CONTEXT_SETTINGS, ModusCommand, ModusGroup, command_panel
 
 
@@ -106,6 +115,12 @@ app.command(
     help=catalog.cli_help("status"),
     rich_help_panel=command_panel("status"),
 )(discovery.status)
+app.command(
+    name="dashboard",
+    cls=ModusCommand,
+    help=catalog.cli_help("dashboard"),
+    rich_help_panel=command_panel("dashboard"),
+)(desktop.launch)
 app.command(
     name="init",
     cls=ModusCommand,
