@@ -381,6 +381,8 @@ The public PyPI distribution is named `openmodus`; no private index is required.
 
 On Apple Silicon Macs, install a release that includes the desktop app and run `modus dashboard` to open Modus Manager. On first launch, Modus installs the bundled app in `~/Applications` or reuses an existing installation. Both the CLI and the app can be built from the Modus checkout. [Build the desktop wheel](../scripts/README.md#macos-桌面发行包)
 
+After scanning a directory in Modus Knowledge, expand each project's knowledge base to browse and preview Markdown in its original `modus/knowledge` folder hierarchy. Search expands the folders containing matches.
+
 To use features in the current source, run `uv tool install .` from the Modus repository root containing `pyproject.toml`. For development, `uv tool install --editable .` makes source changes take effect directly. Both methods also install the `modus` command.
 
 `modus init` selects a host in an interactive terminal. For scripts or noninteractive terminals, specify one with `modus init --platform codex`, repeat `--platform` for several hosts, or use `modus init --all-platforms`. A first noninteractive run without a platform selection connects all supported hosts. The same neutral Skill contracts are projected into each selected host.

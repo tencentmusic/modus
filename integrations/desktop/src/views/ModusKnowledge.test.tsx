@@ -22,6 +22,17 @@ const flush = () => act(async () => { await Promise.resolve(); });
 function button(node: HTMLElement, text: string) {
   return Array.from(node.querySelectorAll("button")).find((b) => b.textContent?.includes(text))!;
 }
+function branch(node: HTMLElement, label: string) {
+  return Array.from(node.querySelectorAll("summary")).find((summary) => summary.textContent === label)!
+    .parentElement as HTMLDetailsElement;
+}
+function search(node: HTMLElement, value: string) {
+  const input = node.querySelector('input[aria-label="knowledge.search"]') as HTMLInputElement;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
 async function scan(node: HTMLElement) {
   await act(async () => { button(node, "knowledge.scan").click(); });
 }
@@ -60,19 +71,62 @@ describe("Modus knowledge browser", () => {
     expect(node.querySelector("pre")?.textContent).toBe("# Document body");
   });
 
-  it("searches document metadata and passes the snapshots option", async () => {
+  it("searches document metadata after scanning without evaluation and test copies", async () => {
     const node = mount(<ModusKnowledge />);
     await flush();
-    act(() => (node.querySelector('input[type="checkbox"]') as HTMLInputElement).click());
+    expect(node.querySelector('input[type="checkbox"]')).toBeNull();
     await scan(node);
-    expect(api.scanModusKnowledge).toHaveBeenCalledWith("/workspace", true);
-    const input = node.querySelector('input[aria-label="knowledge.search"]') as HTMLInputElement;
-    act(() => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "orders.md");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    expect(api.scanModusKnowledge).toHaveBeenCalledWith("/workspace", false);
+    search(node, "orders.md");
     expect(button(node, "Orders")).toBeDefined();
     expect(button(node, "Rules")).toBeUndefined();
+  });
+
+  it("keeps same-named projects separate and reveals only matching branches in the library tree", async () => {
+    const relativePath = "domain/ai-resolution/references/business/scenario/index.md";
+    const scenario = {
+      ...document("Scenario"),
+      path: `/workspace/app/modus/knowledge/${relativePath}`,
+      relative_path: relativePath,
+    };
+    const snapshot = {
+      ...scenario,
+      path: `/workspace/snapshot/app/modus/knowledge/${relativePath}`,
+      project_path: "/workspace/snapshot/app",
+      title: "Snapshot scenario",
+    };
+    vi.mocked(api.scanModusKnowledge).mockResolvedValue({
+      documents: [document("Overview", "overview"), scenario, snapshot],
+      warnings: [],
+    });
+    const node = mount(<ModusKnowledge />);
+    await flush(); await scan(node);
+
+    const currentProject = branch(node, "app/workspace/app");
+    const snapshotProject = branch(node, "app/workspace/snapshot/app");
+    expect(currentProject.open).toBe(false);
+    expect(snapshotProject.contains(button(node, "Snapshot scenario"))).toBe(true);
+    act(() => currentProject.querySelector("summary")!.click());
+    expect(currentProject.open).toBe(true);
+    const library = branch(currentProject, "knowledge.library");
+    expect(library.open).toBe(true);
+    expect(library.contains(button(node, "Overview"))).toBe(true);
+    expect(branch(library, "domain").open).toBe(false);
+
+    search(node, "snapshot scenario");
+    expect([...node.querySelectorAll("summary")].map((summary) => summary.textContent)).not.toContain("app/workspace/app");
+    let matchingBranch = branch(node, "app/workspace/snapshot/app");
+    expect(matchingBranch.open).toBe(true);
+    for (const label of ["knowledge.library", "domain", "ai-resolution", "references", "business", "scenario"]) {
+      matchingBranch = branch(matchingBranch, label);
+      expect(matchingBranch.open).toBe(true);
+    }
+    const match = button(matchingBranch, "Snapshot scenario");
+    await act(async () => match.click());
+    expect(api.getModusKnowledgeDocument).toHaveBeenCalledWith("/workspace", snapshot.path);
+    expect(node.querySelector("article")?.textContent).toBe("# Document body");
+    act(() => match.click());
+    expect(node.querySelector("article")?.textContent).toBe("# Document body");
   });
 
   it("ignores an older document response after another selection", async () => {

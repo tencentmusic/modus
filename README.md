@@ -380,6 +380,8 @@ Modus 自身也遵守它倡导的边界：入口层保持窄，应用编排与�
 
 Apple Silicon Mac 安装含桌面应用的发行版本后，运行 `modus dashboard` 即可打开 Modus Manager。首次运行会把随包应用安装到 `~/Applications`，也可以复用已安装的应用。从同一份 Modus 源码可构建 CLI 和桌面应用。[桌面发行包构建方法](scripts/README.md#macos-桌面发行包)
 
+在「Modus 知识库」选择目录并扫描后，可以展开各项目的知识库，按 `modus/knowledge` 内的目录层级浏览和预览 Markdown。搜索会展开命中文档所在的目录。
+
 体验当前源码中的能力时，在 Modus 源码仓库根目录（包含 `pyproject.toml`）运行 `uv tool install .`。参与开发时可用 `uv tool install --editable .`，让源码修改直接生效。两种方式安装后的命令也都是 `modus`。
 
 `modus init` 在交互式终端中选择平台；脚本或非交互终端中可显式指定，例如 `modus init --platform codex`，需要多个平台时重复 `--platform`，或用 `modus init --all-platforms`。未指定平台的首次非交互运行会接入全部支持的平台。同一份中立 Skill 合同会投影到所选平台。
