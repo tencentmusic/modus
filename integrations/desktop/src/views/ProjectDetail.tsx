@@ -180,6 +180,7 @@ export function ProjectDetail() {
   };
 
   const project = projects.find((p) => p.id === id);
+  const missingModus = project?.missing_modus === true;
   const getSkillKey = useCallback((skill: Pick<ProjectSkillGroup, "id">) => {
     return skill.id;
   }, []);
@@ -190,8 +191,12 @@ export function ProjectDetail() {
   // Same request-id guard as WorkspaceView's local-skill load.
   const skillsRequestRef = useRef(0);
   const loadSkills = useCallback(async () => {
-    if (!id) return;
     const requestId = ++skillsRequestRef.current;
+    if (!id || missingModus) {
+      setSkills([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const result = await api.getProjectSkills(id);
@@ -201,7 +206,7 @@ export function ProjectDetail() {
     } finally {
       if (skillsRequestRef.current === requestId) setLoading(false);
     }
-  }, [id]);
+  }, [id, missingModus]);
 
   useEffect(() => {
     loadSkills();
@@ -219,7 +224,10 @@ export function ProjectDetail() {
   useEffect(() => {
     let cancelled = false;
     const loadProjectAgentTargets = async () => {
-      if (!id) return;
+      if (!id || missingModus) {
+        setProjectAgentTargets([]);
+        return;
+      }
       try {
         const result = await api.getProjectAgentTargets(id);
         if (!cancelled) {
@@ -233,7 +241,7 @@ export function ProjectDetail() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, missingModus]);
 
   useEffect(() => {
     if (!project && !loading) {
@@ -962,6 +970,19 @@ export function ProjectDetail() {
   }, [loadSkills, refreshProjects]);
 
   if (!project) return null;
+  if (missingModus) {
+    return (
+      <div className="app-page">
+        <div className="app-page-header">
+          <h1 className="app-page-title">{project.name}</h1>
+          <p className="mt-1 break-all text-[12px] text-muted">{project.path}</p>
+        </div>
+        <p role="status" className="px-2 py-4 text-[13px] text-secondary">
+          {t("project.missingModus")}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="app-page">

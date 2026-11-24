@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Folder,
   ChevronDown,
@@ -102,6 +102,10 @@ function SkillDetailPanelContent({
   onProjectsChanged?: () => void;
 }) {
   const { t } = useTranslation();
+  const activeProjects = useMemo(
+    () => projects?.filter((project) => !project.missing_modus),
+    [projects],
+  );
   const [doc, setDoc] = useState<SkillDocument | null>(null);
   const [sourceDoc, setSourceDoc] = useState<SourceSkillDocument | null>(null);
   const [sourceDiff, setSourceDiff] = useState<SkillSourceDiff | null>(null);
@@ -329,10 +333,10 @@ function SkillDetailPanelContent({
         />
       )}
 
-      {projects && projects.length > 0 && (
+      {activeProjects && activeProjects.length > 0 && (
         <SkillProjectsSection
           skill={skill}
-          projects={projects}
+          projects={activeProjects}
           onChanged={onProjectsChanged}
         />
       )}

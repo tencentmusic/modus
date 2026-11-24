@@ -241,36 +241,29 @@ fn read_skills_from_dir_recursive(
     }
 }
 
-/// Scan a root directory for projects containing any agent's skills directory.
-pub fn scan_projects_in_dir(
-    root: &Path,
-    max_depth: usize,
-    agent_configs: &[AgentSkillConfig],
-) -> Vec<String> {
-    let mut results = Vec::new();
-    scan_recursive(root, 0, max_depth, agent_configs, &mut results);
-    results.sort();
-    results
+/// 普通项目以根目录下的 .modus/ 为准，项目内的技能目录可稍后创建。
+pub fn has_modus_dir(root: &Path) -> bool {
+    root.join(".modus").is_dir()
 }
 
-fn has_any_agent_skills(dir: &Path, agent_configs: &[AgentSkillConfig]) -> bool {
-    agent_configs
-        .iter()
-        .any(|config| dir.join(&config.relative_skills_dir).is_dir())
+pub fn scan_projects_in_dir(root: &Path, max_depth: usize) -> Vec<String> {
+    let mut results = Vec::new();
+    scan_recursive(root, 0, max_depth, &mut results);
+    results.sort();
+    results
 }
 
 fn scan_recursive(
     dir: &Path,
     depth: usize,
     max_depth: usize,
-    agent_configs: &[AgentSkillConfig],
     results: &mut Vec<String>,
 ) {
     if depth > max_depth {
         return;
     }
 
-    if has_any_agent_skills(dir, agent_configs) {
+    if has_modus_dir(dir) {
         results.push(dir.to_string_lossy().to_string());
         return; // don't recurse into subdirectories of a matched project
     }
@@ -294,7 +287,7 @@ fn scan_recursive(
             {
                 continue;
             }
-            scan_recursive(&path, depth + 1, max_depth, agent_configs, results);
+            scan_recursive(&path, depth + 1, max_depth, results);
         }
     }
 }
@@ -317,6 +310,22 @@ fn list_files(dir: &Path) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn only_discovers_projects_with_a_modus_directory() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let eligible = root.join("group/eligible");
+        std::fs::create_dir_all(eligible.join(".modus")).unwrap();
+        std::fs::create_dir_all(root.join("agent-only/.claude/skills")).unwrap();
+        std::fs::create_dir_all(root.join("marker-file")).unwrap();
+        std::fs::write(root.join("marker-file/.modus"), "").unwrap();
+
+        assert_eq!(
+            super::scan_projects_in_dir(root, 4),
+            vec![eligible.to_string_lossy().to_string()]
+        );
+    }
+
     use super::{read_linked_workspace_skills, read_project_skills, AgentSkillConfig};
     use std::fs;
     use tempfile::tempdir;

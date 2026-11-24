@@ -3,6 +3,7 @@ import { X, FolderOpen, Search, Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
 import { cn } from "../utils";
+import { getErrorMessage } from "../lib/error";
 import * as api from "../lib/tauri";
 
 interface Props {
@@ -19,6 +20,7 @@ export function AddProjectDialog({ open, onClose, onAdded }: Props) {
   const [scanResults, setScanResults] = useState<string[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [scanned, setScanned] = useState(false);
   const [linkedName, setLinkedName] = useState("");
   const [linkedPath, setLinkedPath] = useState("");
@@ -32,6 +34,7 @@ export function AddProjectDialog({ open, onClose, onAdded }: Props) {
     setSelected(new Set());
     setAdding(false);
     setScanned(false);
+    setError(null);
     setLinkedName("");
     setLinkedPath("");
   }, [open]);
@@ -42,12 +45,13 @@ export function AddProjectDialog({ open, onClose, onAdded }: Props) {
     const dir = await dialogOpen({ directory: true, multiple: false });
     if (!dir) return;
     setAdding(true);
+    setError(null);
     try {
       await api.addProject(dir as string);
       await onAdded();
       onClose();
-    } catch {
-      // error handled by toast in parent
+    } catch (err) {
+      setError(getErrorMessage(err, t("common.error")));
     } finally {
       setAdding(false);
     }
@@ -161,8 +165,9 @@ export function AddProjectDialog({ open, onClose, onAdded }: Props) {
         {tab === "manual" ? (
           <div className="space-y-3">
             <p className="text-[13px] text-tertiary">
-              {t("project.addManual")}
+              {t("project.modusRequired")}
             </p>
+            {error && <p role="alert" className="text-[13px] text-red-500">{error}</p>}
             <button
               onClick={handleSelectFolder}
               disabled={adding}

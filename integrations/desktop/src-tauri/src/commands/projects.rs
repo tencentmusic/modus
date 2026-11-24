@@ -34,6 +34,7 @@ pub struct ProjectDto {
     pub workspace_type: String,
     pub linked_agent_name: Option<String>,
     pub supports_skill_toggle: bool,
+    pub missing_modus: bool,
     pub sort_order: i32,
     pub skill_count: usize,
     pub sync_health: SyncHealthDto,
@@ -213,7 +214,13 @@ fn project_to_dto(
     all_managed: &[SkillRecord],
     configs: &[project_scanner::AgentSkillConfig],
 ) -> ProjectDto {
-    let skills = read_workspace_skills(rec, configs);
+    let missing_modus = rec.missing_modus();
+    // 暂停时保留登记信息，跳过磁盘上的技能读取和哈希比较。
+    let skills = if missing_modus {
+        Vec::new()
+    } else {
+        read_workspace_skills(rec, configs)
+    };
     let mut grouped_statuses: HashMap<String, String> = HashMap::new();
 
     for skill in &skills {
@@ -246,7 +253,9 @@ fn project_to_dto(
         path: rec.path.clone(),
         workspace_type: rec.workspace_type.clone(),
         linked_agent_name: rec.linked_agent_name.clone(),
-        supports_skill_toggle: rec.workspace_type != "linked" || rec.disabled_path.is_some(),
+        supports_skill_toggle: !missing_modus
+            && (rec.workspace_type != "linked" || rec.disabled_path.is_some()),
+        missing_modus,
         sort_order: rec.sort_order,
         skill_count,
         sync_health: health,
@@ -640,7 +649,8 @@ pub fn get_projects_internal(store: &SkillStore) -> Result<Vec<ProjectDto>, AppE
         .collect();
     let elapsed_ms = start.elapsed().as_millis();
     if should_log_first_or_slow(&GET_PROJECTS_FIRST_CALL, elapsed_ms, 100) {
-        log::info!("get_projects: {count} projects in {elapsed_ms} ms");
+        let paused = dtos.iter().filter(|project| project.missing_modus).count();
+        log::info!("get_projects: {count} projects ({paused} missing .modus/) in {elapsed_ms} ms");
     }
     Ok(dtos)
 }
@@ -665,6 +675,9 @@ pub async fn add_project(
 pub fn prepare_project_record(store: &SkillStore, path: &Path) -> Result<ProjectRecord, AppError> {
     if !path.is_dir() {
         return Err(AppError::invalid_input("Directory does not exist"));
+    }
+    if !project_scanner::has_modus_dir(path) {
+        return Err(missing_modus_error(path));
     }
     let canonical = dunce::canonicalize(path)?;
     let stored = stored_project_path(&canonical, &std::path::absolute(path)?);
@@ -718,7 +731,7 @@ pub fn add_project_internal(store: &SkillStore, path: String) -> Result<ProjectD
     let record = prepare_project_record(store, Path::new(&path))?;
     let claude_dir = Path::new(&record.path).join(".claude");
 
-    // Support initializing an empty project directory as a managed project.
+    // 保留现有 Claude 技能目录初始化行为，登记前已验证 .modus/。
     std::fs::create_dir_all(claude_dir.join("skills"))?;
     std::fs::create_dir_all(claude_dir.join("skills-disabled"))?;
 
@@ -865,20 +878,19 @@ pub async fn reorder_projects(
 }
 
 #[tauri::command]
-pub async fn scan_projects(
-    root: String,
-    store: State<'_, Arc<SkillStore>>,
-) -> Result<Vec<String>, AppError> {
-    let store = store.inner().clone();
+pub async fn scan_projects(root: String) -> Result<Vec<String>, AppError> {
     tauri::async_runtime::spawn_blocking(move || {
         let root_path = Path::new(&root);
         if !root_path.is_dir() {
             return Err(AppError::invalid_input("Directory does not exist"));
         }
-        let configs = agent_skill_configs(&store);
-        Ok(project_scanner::scan_projects_in_dir(
-            root_path, 4, &configs,
-        ))
+        let projects = project_scanner::scan_projects_in_dir(root_path, 4);
+        log::debug!(
+            "scan_projects: found {} Modus projects under {}",
+            projects.len(),
+            root_path.display()
+        );
+        Ok(projects)
     })
     .await?
 }
@@ -899,10 +911,7 @@ pub fn get_project_agent_targets_internal(
     store: &SkillStore,
     project_id: String,
 ) -> Result<Vec<ProjectAgentTargetDto>, AppError> {
-    let record = store
-        .get_project_by_id(&project_id)
-        .map_err(AppError::db)?
-        .ok_or_else(|| AppError::not_found("Workspace not found"))?;
+    let record = get_project_record(store, &project_id)?;
     Ok(project_agent_targets_for_record(&store, &record))
 }
 
@@ -922,10 +931,7 @@ pub fn get_project_skills_internal(
     store: &SkillStore,
     project_id: String,
 ) -> Result<Vec<project_scanner::ProjectSkillInfo>, AppError> {
-    let record = store
-        .get_project_by_id(&project_id)
-        .map_err(AppError::db)?
-        .ok_or_else(|| AppError::not_found("Workspace not found"))?;
+    let record = get_project_record(store, &project_id)?;
 
     let configs = agent_skill_configs(&store);
     let mut skills = read_workspace_skills(&record, &configs);
@@ -958,10 +964,7 @@ pub async fn get_project_skill_document(
     tauri::async_runtime::spawn_blocking(move || {
         ensure_safe_skill_relative_path(&skill_relative_path)?;
 
-        let record = store
-            .get_project_by_id(&project_id)
-            .map_err(AppError::db)?
-            .ok_or_else(|| AppError::not_found("Workspace not found"))?;
+        let record = get_project_record(&store, &project_id)?;
 
         let (skills_root, disabled_root) = resolve_agent_skills_roots(&store, &record, &agent)
             .ok_or_else(|| AppError::not_found(format!("Unknown workspace agent: {}", agent)))?;
@@ -1267,7 +1270,7 @@ pub fn export_skill_to_project_internal(
             skill.name, occupied.agent
         )));
     }
-    apply_project_deploy(store, &plan)
+    apply_project_deploy(store, &project_id, &plan)
 }
 
 #[tauri::command]
@@ -1281,10 +1284,7 @@ pub async fn update_project_skill_from_center(
     tauri::async_runtime::spawn_blocking(move || {
         ensure_safe_skill_relative_path(&skill_relative_path)?;
 
-        let record = store
-            .get_project_by_id(&project_id)
-            .map_err(AppError::db)?
-            .ok_or_else(|| AppError::not_found("Workspace not found"))?;
+        let record = get_project_record(&store, &project_id)?;
 
         let configs = agent_skill_configs(&store);
         let skills = read_workspace_skills(&record, &configs);
@@ -1352,10 +1352,7 @@ pub async fn toggle_project_skill(
     tauri::async_runtime::spawn_blocking(move || {
         ensure_safe_skill_relative_path(&skill_relative_path)?;
 
-        let record = store
-            .get_project_by_id(&project_id)
-            .map_err(AppError::db)?
-            .ok_or_else(|| AppError::not_found("Workspace not found"))?;
+        let record = get_project_record(&store, &project_id)?;
 
         let (skills_dir, disabled_dir) = resolve_agent_skills_roots(&store, &record, &agent)
             .ok_or_else(|| AppError::not_found(format!("Unknown agent: {}", agent)))?;
@@ -1487,10 +1484,23 @@ fn ensure_removable(store: &SkillStore, record: &ProjectRecord, target: &Path) -
 // needs live here, where a dry run and the real run read the same answer.
 
 fn get_project_record(store: &SkillStore, project_id: &str) -> Result<ProjectRecord, AppError> {
-    store
+    let record = store
         .get_project_by_id(project_id)
         .map_err(AppError::db)?
-        .ok_or_else(|| AppError::not_found("Workspace not found"))
+        .ok_or_else(|| AppError::not_found("Workspace not found"))?;
+    if record.missing_modus() {
+        ensure_workspace_path_exists(&record)?;
+        return Err(missing_modus_error(Path::new(&record.path)));
+    }
+    Ok(record)
+}
+
+fn missing_modus_error(path: &Path) -> AppError {
+    log::debug!(
+        "project management refused: missing .modus/ under {}",
+        path.display()
+    );
+    AppError::invalid_input(format!("项目根目录下缺少 .modus/：{}", path.display()))
 }
 
 /// A workspace whose folder is gone scans as "no skills", and a deploy into it
@@ -1796,8 +1806,11 @@ pub fn project_deploy_conflicts(plan: &[ProjectDeployTarget]) -> Option<AppError
 /// appeared since the plan was made.
 pub fn apply_project_deploy(
     store: &SkillStore,
+    project_id: &str,
     plan: &[ProjectDeployTarget],
 ) -> Result<(), AppError> {
+    // 生成计划后项目可能已暂停，写入前重新校验。
+    get_project_record(store, project_id)?;
     let configured_mode = store.get_setting("sync_mode").map_err(AppError::db)?;
     // Two agents can resolve to the same project skills root; write it once.
     let mut written: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
@@ -2372,6 +2385,7 @@ mod tests {
     fn project_to_dto_counts_logical_skills_not_agent_copies() {
         let tmp = tempdir().unwrap();
         let project_path = tmp.path().join("project");
+        fs::create_dir_all(project_path.join(".modus")).unwrap();
         let claude_skill = project_path.join(".claude/skills/shared-skill");
         let codex_skill = project_path.join(".codex/skills/shared-skill");
         fs::create_dir_all(&claude_skill).unwrap();
@@ -2756,7 +2770,7 @@ mod add_project_tests {
     fn add_project_creates_skill_roots_and_stores_the_canonical_path() {
         let tmp = tempdir().unwrap();
         let project_dir = tmp.path().join("repo");
-        fs::create_dir(&project_dir).unwrap();
+        fs::create_dir_all(project_dir.join(".modus")).unwrap();
         let store = SkillStore::new(&tmp.path().join("skills.db")).unwrap();
 
         let dto = add_project_internal(&store, project_dir.to_string_lossy().to_string()).unwrap();
@@ -2779,6 +2793,20 @@ mod add_project_tests {
 
         assert!(err.to_string().contains("Directory does not exist"));
         assert!(!missing.exists());
+        assert!(store.get_all_projects().unwrap().is_empty());
+    }
+
+    #[test]
+    fn add_project_rejects_an_agent_skill_root_without_modus() {
+        let tmp = tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        fs::create_dir_all(repo.join(".claude/skills")).unwrap();
+        let store = SkillStore::new(&tmp.path().join("skills.db")).unwrap();
+
+        let err = add_project_internal(&store, repo.to_string_lossy().into_owned()).unwrap_err();
+
+        assert!(err.to_string().contains(".modus/"));
+        assert!(!repo.join(".claude/skills-disabled").exists());
         assert!(store.get_all_projects().unwrap().is_empty());
     }
 
@@ -2819,7 +2847,7 @@ mod add_project_tests {
     fn add_project_rejects_another_spelling_of_a_registered_path() {
         let tmp = tempdir().unwrap();
         let project_dir = tmp.path().join("repo");
-        fs::create_dir(&project_dir).unwrap();
+        fs::create_dir_all(project_dir.join(".modus")).unwrap();
         let store = SkillStore::new(&tmp.path().join("skills.db")).unwrap();
         let first = add_project_internal(&store, project_dir.to_string_lossy().to_string()).unwrap();
 
@@ -2874,12 +2902,46 @@ mod project_plan_tests {
             .set_setting("custom_tool_paths", &serde_json::Value::Object(overrides).to_string())
             .unwrap();
         let repo = tmp.path().join("repo");
-        fs::create_dir_all(&repo).unwrap();
+        fs::create_dir_all(repo.join(".modus")).unwrap();
         let project_id = add_project_internal(&store, repo.to_string_lossy().to_string())
             .unwrap()
             .id;
         let repo = dunce::canonicalize(&repo).unwrap();
         Fixture { _guard: guard, _tmp: tmp, store, project_id, repo }
+    }
+
+    #[test]
+    fn registered_project_pauses_until_modus_is_restored() {
+        let fx = fixture(&["claude_code"]);
+        let skill = fx.repo.join(".claude/skills/local");
+        write_skill(&skill, "local", "keep this content");
+        let modus = fx.repo.join(".modus");
+
+        let skills = get_project_skills_internal(&fx.store, fx.project_id.clone()).unwrap();
+        assert_eq!(skills.len(), 1);
+        fs::remove_dir(&modus).unwrap();
+
+        let projects = get_projects_internal(&fx.store).unwrap();
+        assert_eq!(projects.len(), 1);
+        assert!(projects[0].missing_modus);
+        assert_eq!(projects[0].skill_count, 0);
+        let err = get_project_skills_internal(&fx.store, fx.project_id.clone()).unwrap_err();
+        assert!(err.to_string().contains(".modus/"));
+        let err = delete_project_skill_internal(
+            &fx.store,
+            fx.project_id.clone(),
+            "local".into(),
+            "claude_code".into(),
+            true,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains(".modus/"));
+        assert!(skill.join("SKILL.md").is_file());
+
+        fs::create_dir(modus).unwrap();
+        let projects = get_projects_internal(&fx.store).unwrap();
+        assert!(!projects[0].missing_modus);
+        assert_eq!(projects[0].skill_count, 1);
     }
 
     fn write_skill(dir: &Path, name: &str, body: &str) {
@@ -2949,7 +3011,7 @@ mod project_plan_tests {
         assert_eq!(plan[0].state, ProjectDeployState::Create);
         assert!(fs::symlink_metadata(&target).is_err(), "planning must not write");
 
-        apply_project_deploy(&fx.store, &plan).unwrap();
+        apply_project_deploy(&fx.store, &fx.project_id, &plan).unwrap();
         assert!(target.join("SKILL.md").is_file());
 
         let again = plan_project_deploy(&fx.store, &fx.project_id, &ids(&[&demo]), &["claude_code".into()]).unwrap();
@@ -3072,7 +3134,7 @@ mod project_plan_tests {
         fx.store.set_setting("sync_mode", "copy").unwrap();
         let demo = library_skill(&fx, "s-demo", "demo", "# Demo");
         let plan = plan_project_deploy(&fx.store, &fx.project_id, &ids(&[&demo]), &["claude_code".into()]).unwrap();
-        apply_project_deploy(&fx.store, &plan).unwrap();
+        apply_project_deploy(&fx.store, &fx.project_id, &plan).unwrap();
         let copy = fx.repo.join(".claude/skills/demo");
         fs::write(copy.join("SKILL.md"), "---\nname: demo\n---\n# Edited in the project\n").unwrap();
 
@@ -3095,7 +3157,7 @@ mod project_plan_tests {
         let demo = library_skill(&fx, "s-demo", "demo", "# Demo");
         let other = library_skill(&fx, "s-other", "other", "# Other");
         let plan = plan_project_deploy(&fx.store, &fx.project_id, &ids(&[&demo, &other]), &["claude_code".into()]).unwrap();
-        apply_project_deploy(&fx.store, &plan).unwrap();
+        apply_project_deploy(&fx.store, &fx.project_id, &plan).unwrap();
         // A skill written in the project, matching nothing in the library.
         write_skill(&fx.repo.join(".claude/skills/mine"), "mine", "# Mine");
 
@@ -3236,7 +3298,7 @@ mod project_plan_tests {
         for (label, add_extra) in extras {
             let _ = fs::remove_dir_all(&copy);
             let plan = plan_project_deploy(&fx.store, &fx.project_id, &ids(&[&demo]), &["claude_code".into()]).unwrap();
-            apply_project_deploy(&fx.store, &plan).unwrap();
+            apply_project_deploy(&fx.store, &fx.project_id, &plan).unwrap();
             add_extra(&copy);
 
             let removal = plan_project_undeploy(&fx.store, &fx.project_id, &ids(&[&demo]), &[]).unwrap();
@@ -3249,7 +3311,7 @@ mod project_plan_tests {
         // A plain copy with nothing extra is still removable.
         fs::remove_dir_all(&copy).unwrap();
         let plan = plan_project_deploy(&fx.store, &fx.project_id, &ids(&[&demo]), &["claude_code".into()]).unwrap();
-        apply_project_deploy(&fx.store, &plan).unwrap();
+        apply_project_deploy(&fx.store, &fx.project_id, &plan).unwrap();
         assert!(plan_project_undeploy(&fx.store, &fx.project_id, &ids(&[&demo]), &[]).unwrap()[0].safe);
     }
 
@@ -3338,7 +3400,7 @@ mod project_plan_tests {
         fx.store.set_setting("sync_mode", "copy").unwrap();
         let demo = library_skill(&fx, "s-demo", "demo", "# Demo");
         let plan = plan_project_deploy(&fx.store, &fx.project_id, &ids(&[&demo]), &["claude_code".into()]).unwrap();
-        apply_project_deploy(&fx.store, &plan).unwrap();
+        apply_project_deploy(&fx.store, &fx.project_id, &plan).unwrap();
         fs::write(fx.repo.join(".claude/skills/demo/SKILL.md"), "---\nname: demo\n---\n# Better\n").unwrap();
         let library_file = Path::new(&demo.central_path).join("SKILL.md");
         let before = fs::read_to_string(&library_file).unwrap();

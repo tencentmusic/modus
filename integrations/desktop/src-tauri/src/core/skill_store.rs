@@ -100,6 +100,13 @@ pub struct ProjectRecord {
     pub updated_at: i64,
 }
 
+impl ProjectRecord {
+    pub fn missing_modus(&self) -> bool {
+        self.workspace_type == "project"
+            && !super::project_scanner::has_modus_dir(std::path::Path::new(&self.path))
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ScenarioSkillToolToggleRecord {
     pub scenario_id: String,

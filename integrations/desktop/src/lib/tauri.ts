@@ -145,6 +145,7 @@ export interface Project {
   name: string;
   path: string;
   workspace_type: "project" | "linked";
+  missing_modus?: boolean;
   linked_agent_name: string | null;
   supports_skill_toggle: boolean;
   sort_order: number;

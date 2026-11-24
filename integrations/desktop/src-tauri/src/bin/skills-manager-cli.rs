@@ -3464,7 +3464,7 @@ fn deploy_to_project(
         return Err(map_app_err(conflict));
     }
     if !dry_run {
-        project_cmd::apply_project_deploy(store, &plan).map_err(map_app_err)?;
+        project_cmd::apply_project_deploy(store, &record.id, &plan).map_err(map_app_err)?;
     }
 
     let mut targets = Vec::new();
@@ -4366,7 +4366,7 @@ mod project_tests {
             })
             .unwrap();
         let repo = tmp.path().join("repo");
-        fs::create_dir_all(&repo).unwrap();
+        fs::create_dir_all(repo.join(".modus")).unwrap();
         project_cmd::add_project_internal(&store, repo.to_string_lossy().to_string()).unwrap();
         let repo = dunce::canonicalize(&repo).unwrap();
         Fx { tmp, store, repo }
@@ -4436,6 +4436,11 @@ mod project_tests {
         // add --dry-run: no row, no directories.
         let fresh = fx.tmp.path().join("fresh");
         fs::create_dir_all(&fresh).unwrap();
+        let err = add_project(&fx.store, &fresh, true).unwrap_err();
+        assert!(err.to_string().contains(".modus/"));
+        assert!(!fresh.join(".modus").exists());
+
+        fs::create_dir(fresh.join(".modus")).unwrap();
         let report = add_project(&fx.store, &fresh, true).unwrap();
         assert!(report.project_id.is_none());
         assert_eq!(report.created_dirs.len(), 2);

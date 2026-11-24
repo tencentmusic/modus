@@ -382,6 +382,8 @@ Apple Silicon Mac 安装含桌面应用的发行版本后，运行 `modus dashbo
 
 在「Modus 知识库」选择目录并扫描后，可以按各项目的 `modus/knowledge` 目录层级浏览 Markdown。应用会保存目录索引，下次打开时直接恢复。新增、删除或移动文档后，可点「重新扫描」更新索引。点击预览时读取原文件。搜索会展开命中文档所在的目录。
 
+Modus Manager 只发现和管理根目录下有 `.modus/` 的普通项目，包括其中的 Agent 技能目录。已登记项目在 `.modus/` 移除后暂停管理，恢复后自动继续。直接绑定的技能工作区和用户级技能目录无需 `.modus/`。
+
 体验当前源码中的能力时，在 Modus 源码仓库根目录（包含 `pyproject.toml`）运行 `uv tool install .`。参与开发时可用 `uv tool install --editable .`，让源码修改直接生效。两种方式安装后的命令也都是 `modus`。
 
 `modus init` 在交互式终端中选择平台；脚本或非交互终端中可显式指定，例如 `modus init --platform codex`，需要多个平台时重复 `--platform`，或用 `modus init --all-platforms`。未指定平台的首次非交互运行会接入全部支持的平台。同一份中立 Skill 合同会投影到所选平台。

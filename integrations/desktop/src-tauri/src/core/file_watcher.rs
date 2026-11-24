@@ -151,7 +151,8 @@ fn self_write_muted() -> bool {
     muted_at(now_ms(), mute_state().lock().unwrap().deadline_ms)
 }
 
-fn collect_watch_paths(store: &SkillStore) -> Vec<PathBuf> {
+fn collect_watch_paths(store: &SkillStore) -> (Vec<PathBuf>, HashSet<String>) {
+    let mut paused_projects = HashSet::new();
     let mut paths = vec![central_repo::skills_dir(), central_repo::scenarios_dir()];
 
     for adapter in tool_adapters::all_tool_adapters(store) {
@@ -163,6 +164,10 @@ fn collect_watch_paths(store: &SkillStore) -> Vec<PathBuf> {
         let adapters = tool_adapters::all_tool_adapters(store);
         let mut seen_dirs = std::collections::HashSet::new();
         for project in projects {
+            if project.missing_modus() {
+                paused_projects.insert(project.id);
+                continue;
+            }
             if project.workspace_type == "linked" {
                 let skills_dir = PathBuf::from(&project.path);
                 paths.push(skills_dir);
@@ -202,7 +207,7 @@ fn collect_watch_paths(store: &SkillStore) -> Vec<PathBuf> {
 
     paths.sort();
     paths.dedup();
-    paths
+    (paths, paused_projects)
 }
 
 fn watch_target(path: &Path) -> Option<PathBuf> {
@@ -222,13 +227,14 @@ fn dir_has_entries(path: &Path) -> bool {
 fn sync_watch_set(
     watcher: &mut RecommendedWatcher,
     watched: &mut HashSet<PathBuf>,
+    paused_projects: &mut HashSet<String>,
     store: &SkillStore,
 ) -> bool {
-    let desired: HashSet<PathBuf> = collect_watch_paths(store)
-        .into_iter()
-        .filter_map(|path| watch_target(&path))
-        .collect();
-    let mut changed = false;
+    let (paths, current_paused) = collect_watch_paths(store);
+    let desired: HashSet<PathBuf> = paths.into_iter().filter_map(|path| watch_target(&path)).collect();
+    // 空项目也会在 .modus/ 移除或恢复时刷新，无需监听整个项目。
+    let mut changed = *paused_projects != current_paused;
+    *paused_projects = current_paused;
 
     for stale in watched.difference(&desired).cloned().collect::<Vec<_>>() {
         if let Err(err) = watcher.unwatch(&stale) {
@@ -300,6 +306,7 @@ pub fn start_file_watcher<R: tauri::Runtime>(app: tauri::AppHandle<R>, store: Ar
         };
 
         let mut watched = HashSet::new();
+        let mut paused_projects = HashSet::new();
         let mut last_sync = Instant::now() - WATCH_RESCAN_INTERVAL;
         let mut last_emit = Instant::now() - WATCH_EMIT_DEBOUNCE;
         // A relevant change arrived while self-writes were muted; emit it once
@@ -317,7 +324,8 @@ pub fn start_file_watcher<R: tauri::Runtime>(app: tauri::AppHandle<R>, store: Ar
 
         loop {
             if last_sync.elapsed() >= WATCH_RESCAN_INTERVAL {
-                let changed = sync_watch_set(&mut watcher, &mut watched, &store);
+                let changed =
+                    sync_watch_set(&mut watcher, &mut watched, &mut paused_projects, &store);
                 // No path information here, so a mute window classifies as
                 // Foreign: the change defers instead of vanishing.
                 match decide_emit(
@@ -470,7 +478,7 @@ mod tests {
             })
             .unwrap();
 
-        let paths = collect_watch_paths(&store);
+        let (paths, _) = collect_watch_paths(&store);
         assert!(paths.contains(&skills_root));
         assert!(paths.contains(&disabled_root));
         assert!(!paths.contains(&skills_root.parent().unwrap().to_path_buf()));
@@ -478,6 +486,7 @@ mod tests {
     }
 
     fn insert_non_linked_project(store: &SkillStore, project_path: &std::path::Path) {
+        std::fs::create_dir_all(project_path.join(".modus")).unwrap();
         store
             .insert_project(&ProjectRecord {
                 id: "proj-1".to_string(),
@@ -508,7 +517,7 @@ mod tests {
         let store = SkillStore::new(&db_path).unwrap();
         insert_non_linked_project(&store, &project_path);
 
-        let paths = collect_watch_paths(&store);
+        let (paths, _) = collect_watch_paths(&store);
         assert!(!paths.contains(&skills_dir), "empty skills dir watched");
         assert!(!paths.contains(&disabled_dir), "empty disabled dir watched");
         assert!(!paths.contains(&agent_dir), "agent parent dir watched");
@@ -526,9 +535,30 @@ mod tests {
         let store = SkillStore::new(&db_path).unwrap();
         insert_non_linked_project(&store, &project_path);
 
-        let paths = collect_watch_paths(&store);
+        let (paths, _) = collect_watch_paths(&store);
         assert!(!paths.contains(&skills_dir));
         assert!(!paths.contains(&agent_dir));
+    }
+
+    #[test]
+    fn missing_modus_pauses_project_skill_watches_until_restored() {
+        let tmp = tempdir().unwrap();
+        let project_path = tmp.path().join("proj");
+        let skills_dir = project_path.join(".codex/skills");
+        fs::create_dir_all(skills_dir.join("hello")).unwrap();
+        let store = SkillStore::new(&tmp.path().join("watcher.db")).unwrap();
+        insert_non_linked_project(&store, &project_path);
+
+        let modus = project_path.join(".modus");
+        fs::remove_dir(&modus).unwrap();
+        let (paths, paused) = collect_watch_paths(&store);
+        assert!(!paths.contains(&skills_dir));
+        assert!(paused.contains("proj-1"));
+
+        fs::create_dir(modus).unwrap();
+        let (paths, paused) = collect_watch_paths(&store);
+        assert!(paths.contains(&skills_dir));
+        assert!(paused.is_empty());
     }
 
     #[test]
@@ -548,7 +578,7 @@ mod tests {
         let store = SkillStore::new(&db_path).unwrap();
         insert_non_linked_project(&store, &project_path);
 
-        let paths = collect_watch_paths(&store);
+        let (paths, _) = collect_watch_paths(&store);
         assert!(
             paths.contains(&skills_dir),
             "non-empty skills dir not watched"

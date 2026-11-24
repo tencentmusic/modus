@@ -383,6 +383,8 @@ On Apple Silicon Macs, install a release that includes the desktop app and run `
 
 After scanning a directory in Modus Knowledge, browse Markdown in each project's original `modus/knowledge` folder hierarchy. The app saves the index and restores it when you reopen the page. Select Rescan after adding, deleting, or moving documents. Previews read the original files. Search expands the folders containing matches.
 
+Modus Manager discovers and manages regular projects whose roots contain `.modus/`, including their agent skill directories. A registered project pauses when `.modus/` is removed and resumes when it is restored. Linked skill workspaces and user-level skill directories have no `.modus/` requirement.
+
 To use features in the current source, run `uv tool install .` from the Modus repository root containing `pyproject.toml`. For development, `uv tool install --editable .` makes source changes take effect directly. Both methods also install the `modus` command.
 
 `modus init` selects a host in an interactive terminal. For scripts or noninteractive terminals, specify one with `modus init --platform codex`, repeat `--platform` for several hosts, or use `modus init --all-platforms`. A first noninteractive run without a platform selection connects all supported hosts. The same neutral Skill contracts are projected into each selected host.

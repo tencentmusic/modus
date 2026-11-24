@@ -295,6 +295,9 @@ fn repoint_after_move(store: &SkillStore, from: &Path, to: &Path) -> Result<usiz
     let adapters = tool_adapters::all_tool_adapters(store);
     let mut roots: Vec<PathBuf> = adapters.iter().map(|a| a.skills_dir()).collect();
     for project in store.get_all_projects()? {
+        if project.missing_modus() {
+            continue;
+        }
         if project.workspace_type == "linked" {
             roots.push(PathBuf::from(&project.path));
             roots.extend(project.disabled_path.map(PathBuf::from));
