@@ -1,14 +1,19 @@
-//! Read-only discovery of published Modus knowledge. Machine caches, sessions,
-//! plans and skills installed for a host agent are deliberately not knowledge.
-use crate::core::error::AppError;
-use serde::Serialize;
+//! 发现已发布的 Modus 知识，在桌面数据库中保存目录索引。
+use crate::core::{error::AppError, skill_store::SkillStore};
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use tauri::State;
 use walkdir::WalkDir;
 
 const MAX_ENTRIES: usize = 100_000;
 const MAX_DOCUMENT_BYTES: u64 = 2 * 1024 * 1024;
+const KNOWLEDGE_INDEX_KEY: &str = "modus_knowledge_index";
 
-#[derive(Debug, Serialize)]
+// 用户在扫描期间离开页面并再次发起扫描时，避免较早的扫描最后写入。
+static KNOWLEDGE_SCAN_LOCK: Mutex<()> = Mutex::new(());
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct KnowledgeDocument {
     pub path: String,
     pub relative_path: String,
@@ -20,10 +25,18 @@ pub struct KnowledgeDocument {
     pub modified_at: Option<u64>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct KnowledgeScan {
     pub documents: Vec<KnowledgeDocument>,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct KnowledgeIndex {
+    pub root: String,
+    pub scanned_at: i64,
+    #[serde(flatten)]
+    pub scan: KnowledgeScan,
 }
 
 fn is_knowledge_root(path: &Path) -> bool {
@@ -131,6 +144,8 @@ fn scan(root: &Path, include_snapshots: bool) -> Result<KnowledgeScan, AppError>
         }
         let entry = match entry {
             Ok(entry) => entry,
+            // 根目录无法读取时保留上次索引，子目录中的错误仍记录为告警。
+            Err(error) if error.depth() == 0 => return Err(AppError::io(error)),
             Err(error) => {
                 result.warnings.push(error.to_string());
                 continue;
@@ -199,12 +214,67 @@ fn scan(root: &Path, include_snapshots: bool) -> Result<KnowledgeScan, AppError>
     Ok(result)
 }
 
+fn load_index(store: &SkillStore) -> Result<Option<KnowledgeIndex>, AppError> {
+    let Some(value) = store.get_setting(KNOWLEDGE_INDEX_KEY).map_err(AppError::db)? else {
+        return Ok(None);
+    };
+    let index: KnowledgeIndex = serde_json::from_str(&value).map_err(|error| {
+        log::warn!("modus knowledge: failed to decode saved index: {error}");
+        AppError::internal("无法读取上次的知识库索引，请重新扫描。")
+    })?;
+    log::debug!(
+        "modus knowledge: restored index, documents={}, warnings={}",
+        index.scan.documents.len(),
+        index.scan.warnings.len()
+    );
+    Ok(Some(index))
+}
+
+fn scan_index(
+    store: &SkillStore,
+    root: String,
+    include_snapshots: bool,
+) -> Result<KnowledgeIndex, AppError> {
+    let _guard = KNOWLEDGE_SCAN_LOCK
+        .lock()
+        .map_err(|_| AppError::internal("知识库扫描锁不可用"))?;
+    let scan = scan(Path::new(&root), include_snapshots)?;
+    let index = KnowledgeIndex {
+        root,
+        scanned_at: chrono::Utc::now().timestamp_millis(),
+        scan,
+    };
+
+    if !include_snapshots {
+        // 用一条 SQLite 写入同时替换根路径与索引。扫描过程中始终可读取旧索引。
+        let value = serde_json::to_string(&index).map_err(AppError::internal)?;
+        store
+            .set_setting(KNOWLEDGE_INDEX_KEY, &value)
+            .map_err(AppError::db)?;
+        log::info!(
+            "modus knowledge: saved index, documents={}",
+            index.scan.documents.len()
+        );
+    }
+    Ok(index)
+}
+
+#[tauri::command]
+pub async fn get_modus_knowledge_index(
+    store: State<'_, Arc<SkillStore>>,
+) -> Result<Option<KnowledgeIndex>, AppError> {
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || load_index(&store)).await?
+}
+
 #[tauri::command]
 pub async fn scan_modus_knowledge(
     root: String,
     include_snapshots: bool,
-) -> Result<KnowledgeScan, AppError> {
-    tauri::async_runtime::spawn_blocking(move || scan(Path::new(&root), include_snapshots)).await?
+    store: State<'_, Arc<SkillStore>>,
+) -> Result<KnowledgeIndex, AppError> {
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || scan_index(&store, root, include_snapshots)).await?
 }
 
 fn load_document(root: &Path, path: &Path) -> Result<String, AppError> {
@@ -239,6 +309,45 @@ mod tests {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, content).unwrap();
     }
+    #[test]
+    fn restores_the_last_index_after_reopening_the_store_and_a_failed_refresh() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("skills.db");
+        let root = dir.path().join("workspace");
+        let document = "app/modus/knowledge/overview.md";
+        write(&root, document, "# Original\n");
+        let bad_doc = root.join("app/modus/knowledge/unreadable.md");
+        std::fs::write(bad_doc, [0xff]).unwrap();
+        let root_text = root.to_string_lossy().into_owned();
+
+        let store = SkillStore::new(&db_path).unwrap();
+        assert!(load_index(&store).unwrap().is_none());
+        let saved = scan_index(&store, root_text.clone(), false).unwrap();
+        drop(store);
+
+        let reopened = SkillStore::new(&db_path).unwrap();
+        let restored = load_index(&reopened).unwrap().unwrap();
+        assert_eq!(restored.root, root_text);
+        assert_eq!(restored.scanned_at, saved.scanned_at);
+        assert_eq!(restored.scan.documents[0].title, "Original");
+        assert_eq!(restored.scan.warnings, saved.scan.warnings);
+        assert_eq!(restored.scan.warnings.len(), 1);
+
+        let missing = root.join("missing");
+        assert!(scan_index(&reopened, missing.to_string_lossy().into_owned(), false).is_err());
+        let retained = load_index(&reopened).unwrap().unwrap();
+        assert_eq!(retained.root, root_text);
+        assert_eq!(retained.scan.documents[0].title, "Original");
+
+        write(&root, document, "# Updated\n");
+        assert_eq!(
+            load_document(&root, &root.join(document)).unwrap(),
+            "# Updated\n"
+        );
+        let refreshed = scan_index(&reopened, root_text, false).unwrap();
+        assert_eq!(refreshed.scan.documents[0].title, "Updated");
+    }
+
     #[test]
     fn discovers_published_documents_and_skips_snapshots_and_machine_files() {
         let dir = tempfile::tempdir().unwrap();

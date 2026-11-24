@@ -6,7 +6,7 @@ import { ModusKnowledge } from "./ModusKnowledge";
 import * as api from "../lib/tauri";
 
 vi.mock("../lib/tauri", () => ({
-  getSettings: vi.fn(), setSettings: vi.fn(), scanModusKnowledge: vi.fn(), getModusKnowledgeDocument: vi.fn(),
+  getSettings: vi.fn(), getModusKnowledgeIndex: vi.fn(), scanModusKnowledge: vi.fn(), getModusKnowledgeDocument: vi.fn(),
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 vi.mock("react-i18next", () => {
@@ -18,6 +18,7 @@ const document = (name: string, category = "domain"): api.KnowledgeDocument => (
   path: `/workspace/app/modus/knowledge/${name}.md`, relative_path: `${name}.md`, project_name: "app", project_path: "/workspace/app",
   title: name, category, description: null, modified_at: 0,
 });
+const indexMetadata = { root: "/workspace", scanned_at: 1_764_000_000_000 };
 const flush = () => act(async () => { await Promise.resolve(); });
 function button(node: HTMLElement, text: string) {
   return Array.from(node.querySelectorAll("button")).find((b) => b.textContent?.includes(text))!;
@@ -34,15 +35,15 @@ function search(node: HTMLElement, value: string) {
   });
 }
 async function scan(node: HTMLElement) {
-  await act(async () => { button(node, "knowledge.scan").click(); });
+  await act(async () => { (button(node, "knowledge.rescan") ?? button(node, "knowledge.scan")).click(); });
 }
 
 afterEach(cleanup);
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(api.getSettings).mockResolvedValue("/workspace");
-  vi.mocked(api.setSettings).mockResolvedValue(undefined);
-  vi.mocked(api.scanModusKnowledge).mockResolvedValue({ documents: [document("Orders"), document("Rules", "constraint")], warnings: [] });
+  vi.mocked(api.getModusKnowledgeIndex).mockResolvedValue(null);
+  vi.mocked(api.scanModusKnowledge).mockResolvedValue({ ...indexMetadata, documents: [document("Orders"), document("Rules", "constraint")], warnings: [] });
   vi.mocked(api.getModusKnowledgeDocument).mockResolvedValue("# Document body");
 });
 
@@ -56,11 +57,33 @@ describe("Modus knowledge browser", () => {
     expect(api.scanModusKnowledge).not.toHaveBeenCalled();
   });
 
+  it("restores the previous index without scanning and reads the selected original", async () => {
+    vi.mocked(api.getModusKnowledgeIndex).mockResolvedValue({
+      ...indexMetadata,
+      documents: [document("Orders")],
+      warnings: ["Skipped unreadable document"],
+    });
+    const node = mount(<ModusKnowledge />);
+    await flush();
+
+    expect(node.querySelector<HTMLInputElement>('input[aria-label="knowledge.root"]')?.value).toBe("/workspace");
+    expect(node.textContent).toContain("knowledge.lastScan");
+    expect(node.textContent).toContain("Skipped unreadable document");
+    expect(button(node, "knowledge.rescan")).toBeDefined();
+    expect(api.getSettings).not.toHaveBeenCalled();
+    expect(api.scanModusKnowledge).not.toHaveBeenCalled();
+    expect(api.getModusKnowledgeDocument).not.toHaveBeenCalled();
+
+    await act(async () => { button(node, "Orders").click(); });
+    expect(api.getModusKnowledgeDocument).toHaveBeenCalledWith("/workspace", document("Orders").path);
+    expect(node.querySelector("article")?.textContent).toBe("# Document body");
+  });
+
   it("scans the saved path, filters by category, and reads the selected original", async () => {
     const node = mount(<ModusKnowledge />);
     await flush(); await scan(node);
     expect(api.scanModusKnowledge).toHaveBeenCalledWith("/workspace", false);
-    expect(api.setSettings).toHaveBeenCalledWith("modus_knowledge_root", "/workspace");
+    expect(api.getSettings).toHaveBeenCalledWith("modus_knowledge_root");
     const categories = node.querySelector('select[aria-label="knowledge.categories"]') as HTMLSelectElement;
     act(() => { categories.value = "constraint"; categories.dispatchEvent(new Event("change", { bubbles: true })); });
     expect(button(node, "Orders")).toBeUndefined();
@@ -96,6 +119,7 @@ describe("Modus knowledge browser", () => {
       title: "Snapshot scenario",
     };
     vi.mocked(api.scanModusKnowledge).mockResolvedValue({
+      ...indexMetadata,
       documents: [document("Overview", "overview"), scenario, snapshot],
       warnings: [],
     });
@@ -140,12 +164,14 @@ describe("Modus knowledge browser", () => {
     expect(node.querySelector("article")?.textContent).toBe("# Document body");
   });
 
-  it("shows scan failures instead of retaining stale results", async () => {
+  it("retains the last index and preview when a rescan fails", async () => {
     const node = mount(<ModusKnowledge />);
     await flush(); await scan(node);
+    await act(async () => { button(node, "Orders").click(); });
     vi.mocked(api.scanModusKnowledge).mockRejectedValue({ kind: "io", message: "Permission denied" });
     await scan(node);
     expect(node.querySelector('[role="alert"]')?.textContent).toBe("Permission denied");
-    expect(button(node, "Orders")).toBeUndefined();
+    expect(button(node, "Orders")).toBeDefined();
+    expect(node.querySelector("article")?.textContent).toBe("# Document body");
   });
 });

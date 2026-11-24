@@ -381,7 +381,7 @@ The public PyPI distribution is named `openmodus`; no private index is required.
 
 On Apple Silicon Macs, install a release that includes the desktop app and run `modus dashboard` to open Modus Manager. On first launch, Modus installs the bundled app in `~/Applications` or reuses an existing installation. Both the CLI and the app can be built from the Modus checkout. [Build the desktop wheel](../scripts/README.md#macos-桌面发行包)
 
-After scanning a directory in Modus Knowledge, expand each project's knowledge base to browse and preview Markdown in its original `modus/knowledge` folder hierarchy. Search expands the folders containing matches.
+After scanning a directory in Modus Knowledge, browse Markdown in each project's original `modus/knowledge` folder hierarchy. The app saves the index and restores it when you reopen the page. Select Rescan after adding, deleting, or moving documents. Previews read the original files. Search expands the folders containing matches.
 
 To use features in the current source, run `uv tool install .` from the Modus repository root containing `pyproject.toml`. For development, `uv tool install --editable .` makes source changes take effect directly. Both methods also install the `modus` command.
 

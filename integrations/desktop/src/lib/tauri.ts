@@ -859,11 +859,15 @@ export interface KnowledgeDocument {
   category: string;
   modified_at: number | null;
 }
-export interface KnowledgeScan {
+export interface KnowledgeIndex {
+  root: string;
+  scanned_at: number;
   documents: KnowledgeDocument[];
   warnings: string[];
 }
+export const getModusKnowledgeIndex = () =>
+  invoke<KnowledgeIndex | null>("get_modus_knowledge_index");
 export const scanModusKnowledge = (root: string, includeSnapshots: boolean) =>
-  invoke<KnowledgeScan>("scan_modus_knowledge", { root, includeSnapshots });
+  invoke<KnowledgeIndex>("scan_modus_knowledge", { root, includeSnapshots });
 export const getModusKnowledgeDocument = (root: string, path: string) =>
   invoke<string>("get_modus_knowledge_document", { root, path });

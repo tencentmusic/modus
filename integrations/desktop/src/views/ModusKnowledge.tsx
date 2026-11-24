@@ -88,12 +88,14 @@ function KnowledgeFolderEntries({ folder, ...props }: KnowledgeFolderEntriesProp
   );
 }
 
+const EMPTY_INDEX = { documents: [], warnings: [] };
+
 export function ModusKnowledge() {
   const { t } = useTranslation();
   const [root, setRoot] = useState("");
-  const [scannedRoot, setScannedRoot] = useState("");
-  const [documents, setDocuments] = useState<api.KnowledgeDocument[]>([]);
-  const [warnings, setWarnings] = useState<string[]>([]);
+  const [index, setIndex] = useState<api.KnowledgeIndex | null>(null);
+  const { documents, warnings } = index ?? EMPTY_INDEX;
+  const scannedRoot = index?.root ?? "";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -108,11 +110,28 @@ export function ModusKnowledge() {
 
   useEffect(() => {
     let cancelled = false;
-    api.getSettings("modus_knowledge_root").then((saved) => {
-      if (!cancelled) { setRoot(saved ?? ""); setReady(true); }
-    }).catch((e) => {
-      if (!cancelled) { setReady(true); setError(getErrorMessage(e, t("common.error"))); }
-    });
+    async function restore() {
+      try {
+        const savedIndex = await api.getModusKnowledgeIndex().catch((e) => {
+          if (!cancelled) setError(getErrorMessage(e, t("common.error")));
+          return null;
+        });
+        if (cancelled) return;
+        if (savedIndex) {
+          setRoot(savedIndex.root);
+          setIndex(savedIndex);
+          return;
+        }
+        // 升级前只保存过扫描路径，用户可以沿用该路径手动生成索引。
+        const savedRoot = await api.getSettings("modus_knowledge_root");
+        if (!cancelled) setRoot(savedRoot ?? "");
+      } catch (e) {
+        if (!cancelled) setError(getErrorMessage(e, t("common.error")));
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    }
+    void restore();
     return () => { cancelled = true; };
   }, [t]);
 
@@ -137,27 +156,27 @@ export function ModusKnowledge() {
   ), [documents, term, project, category]);
   const tree = useMemo(() => buildKnowledgeTree(filtered), [filtered]);
   const expandFolders = Boolean(term || category);
+  const scanLabel = scannedRoot && scannedRoot === root.trim() ? "knowledge.rescan" : "knowledge.scan";
 
   async function scan() {
     if (!root.trim() || busy) return;
     const version = ++scanVersion.current;
     const scanRoot = root.trim();
-    setBusy(true); setError(""); setSelected(null); setContent(null); setDocumentError("");
+    setBusy(true);
+    setError("");
     try {
       // 知识页只展示正式项目知识，扫描时跳过评测和测试副本。
       const result = await api.scanModusKnowledge(scanRoot, false);
       if (version !== scanVersion.current) return;
-      setDocuments(result.documents); setWarnings(result.warnings); setScannedRoot(scanRoot);
-      setProject(""); setCategory("");
-      console.debug("Modus knowledge scan received", {
-        projects: new Set(result.documents.map((document) => document.project_path)).size,
-        documents: result.documents.length,
-      });
-      // A settings write failure should not discard a successful scan.
-      try { await api.setSettings("modus_knowledge_root", scanRoot); }
-      catch (e) { if (version === scanVersion.current) setError(getErrorMessage(e, t("common.error"))); }
+      setIndex(result);
+      setSelected(null);
+      setContent(null);
+      setDocumentError("");
+      setProject("");
+      setCategory("");
     } catch (e) {
-      if (version === scanVersion.current) { setDocuments([]); setWarnings([]); setError(getErrorMessage(e, t("common.error"))); }
+      // 当前刷新失败时保留已显示的索引和预览。
+      if (version === scanVersion.current) setError(getErrorMessage(e, t("common.error")));
     } finally { if (version === scanVersion.current) setBusy(false); }
   }
 
@@ -184,8 +203,14 @@ export function ModusKnowledge() {
           <input aria-label={t("knowledge.root")} value={root} onChange={(e) => setRoot(e.target.value)} disabled={busy || !ready}
             className="min-w-0 flex-1 rounded-lg border border-border-subtle bg-surface px-3 py-2 text-[13px] text-primary" />
           <button onClick={browse} disabled={busy || !ready} aria-label={t("knowledge.browse")} className="rounded-lg border border-border-subtle px-3 text-secondary disabled:opacity-50"><FolderOpen size={16} /></button>
-          <button onClick={scan} disabled={busy || !ready || !root.trim()} className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-[13px] text-white disabled:opacity-50"><RefreshCw size={15} className={busy ? "animate-spin" : ""} />{t(busy ? "knowledge.scanning" : "knowledge.scan")}</button>
+          <button onClick={scan} disabled={busy || !ready || !root.trim()} className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-[13px] text-white disabled:opacity-50"><RefreshCw size={15} className={busy ? "animate-spin" : ""} />{t(busy ? "knowledge.scanning" : scanLabel)}</button>
         </div>
+        {index && (
+          <p className="mt-2 break-all text-[12px] text-muted">
+            {t("knowledge.lastScan", { date: new Date(index.scanned_at).toLocaleString() })}
+            {scannedRoot !== root.trim() && ` · ${scannedRoot}`}
+          </p>
+        )}
       </div>
       {error && <p role="alert" className="text-[13px] text-danger">{error}</p>}
       {warnings.length > 0 && <details className="text-[12px] text-muted"><summary>{t("knowledge.warnings", { count: warnings.length })}</summary><ul className="max-h-28 overflow-auto">{warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul></details>}

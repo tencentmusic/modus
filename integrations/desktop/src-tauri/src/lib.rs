@@ -979,6 +979,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::knowledge::get_modus_knowledge_index,
             commands::knowledge::scan_modus_knowledge,
             commands::knowledge::get_modus_knowledge_document,
             // Tools
